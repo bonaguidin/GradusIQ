@@ -1,0 +1,1371 @@
+{
+  "student_id": "b0bc8ff6-0df3-4e5f-a107-a4e5c263f604",
+  "program_id": "beed8b0a-5843-472f-b554-d1bb02f025a2",
+  "groups": [
+    {
+      "id": "d8adb544-4597-4b28-ac56-7529ad84f3d3",
+      "program_id": "beed8b0a-5843-472f-b554-d1bb02f025a2",
+      "catalog_year": "2026-2027",
+      "coursedog_rule_id": "Uhhx6L6O",
+      "parent_group_id": null,
+      "name": "Lyle EDGE Curriculum (9-13 Credit Hours)",
+      "group_type": "compound_all",
+      "n_required": null,
+      "credit_hours_required": 9,
+      "notes_html": null,
+      "requires_manual_definition": false,
+      "created_at": "2026-08-19T17:59:26.633744+00:00",
+      "updated_at": "2026-08-19T17:59:26.633744+00:00",
+      "rule_source": "coursedog"
+    },
+    {
+      "id": "7489058b-ba0f-40b7-a60d-39037ea49c10",
+      "program_id": "beed8b0a-5843-472f-b554-d1bb02f025a2",
+      "catalog_year": "2026-2027",
+      "coursedog_rule_id": "JVDU4qJ2",
+      "parent_group_id": null,
+      "name": "Mathematics and Science (24-26 Credit Hours)",
+      "group_type": "compound_all",
+      "n_required": null,
+      "credit_hours_required": 24,
+      "notes_html": "<p data-indent=\"1\"><strong>\u2022 </strong>One 3000-level or higher MATH or STAT course (3 credit hours)</p><p data-indent=\"1\">Note: (Math 1337 &amp; Math 1338) or Math 1340</p><p>Note: credit_hours_required (24) does not reconcile against child course credits alone \u2014 likely spans a separate, currently-unlinked 'Two Courses' science requirement; see planning-docs/degree-planner-spec.md \u00a78.4.</p>",
+      "requires_manual_definition": false,
+      "created_at": "2026-08-19T17:59:26.633744+00:00",
+      "updated_at": "2026-08-19T17:59:26.633744+00:00",
+      "rule_source": "coursedog"
+    },
+    {
+      "id": "4d4fd494-f958-454f-9d0f-c448c73c9010",
+      "program_id": "beed8b0a-5843-472f-b554-d1bb02f025a2",
+      "catalog_year": "2026-2027",
+      "coursedog_rule_id": "mcAsXWxO",
+      "parent_group_id": null,
+      "name": "Two Courses",
+      "group_type": "compound_any",
+      "n_required": null,
+      "credit_hours_required": null,
+      "notes_html": null,
+      "requires_manual_definition": false,
+      "created_at": "2026-08-19T17:59:26.633744+00:00",
+      "updated_at": "2026-08-19T17:59:26.633744+00:00",
+      "rule_source": "coursedog"
+    },
+    {
+      "id": "ca2e41c0-839d-433a-8a1f-416fa9bc1522",
+      "program_id": "beed8b0a-5843-472f-b554-d1bb02f025a2",
+      "catalog_year": "2026-2027",
+      "coursedog_rule_id": "yz6zCXU9",
+      "parent_group_id": null,
+      "name": "Computer Science Core (33 Credit Hours)",
+      "group_type": "enumerated_all",
+      "n_required": null,
+      "credit_hours_required": 33,
+      "notes_html": null,
+      "requires_manual_definition": false,
+      "created_at": "2026-08-19T17:59:26.633744+00:00",
+      "updated_at": "2026-08-19T17:59:26.633744+00:00",
+      "rule_source": "coursedog"
+    },
+    {
+      "id": "3693d16f-f47f-48b2-886f-6c8f647b9bde",
+      "program_id": "beed8b0a-5843-472f-b554-d1bb02f025a2",
+      "catalog_year": "2026-2027",
+      "coursedog_rule_id": "AjzAZTn4",
+      "parent_group_id": null,
+      "name": "Technical Electives (9 Credit Hours)",
+      "group_type": "freeform",
+      "n_required": null,
+      "credit_hours_required": 9,
+      "notes_html": "<p data-indent=\"1\">Nine credit hours of CS courses at the 3000 level or above as approved by the adviser. The adviser may approve other sufficiently technical courses from other departments to satisfy the Technical elective requirements. Technical electives cannot be satisfied by courses that are part of the student\u2019s chosen track.</p>",
+      "requires_manual_definition": true,
+      "created_at": "2026-08-19T17:59:26.633744+00:00",
+      "updated_at": "2026-08-19T17:59:26.633744+00:00",
+      "rule_source": "coursedog"
+    },
+    {
+      "id": "3e927b68-ec73-422d-a3cd-a6cc46082959",
+      "program_id": "beed8b0a-5843-472f-b554-d1bb02f025a2",
+      "catalog_year": "2026-2027",
+      "coursedog_rule_id": "pi5Mxbgo",
+      "parent_group_id": null,
+      "name": "Engineering Leadership (6 Credit Hours)",
+      "group_type": "enumerated_at_least_n",
+      "n_required": 2,
+      "credit_hours_required": 6,
+      "notes_html": "<p data-indent=\"1\">Students who are also enrolled in a major or minor program in the Cox School of Business may request leadership courses from these programs to substitute for the Computer Science leadership courses. These requests must be approved by the Computer Science Department. Other courses at the 3000 level or above may be petitioned to meet this requirement with prior approval by adviser. CS courses used to meet this requirement may not also meet a CS elective requirement.</p>",
+      "requires_manual_definition": false,
+      "created_at": "2026-08-19T17:59:26.633744+00:00",
+      "updated_at": "2026-08-19T17:59:26.633744+00:00",
+      "rule_source": "coursedog"
+    },
+    {
+      "id": "657e31db-4498-4ad3-88d6-0f29917dad3f",
+      "program_id": "beed8b0a-5843-472f-b554-d1bb02f025a2",
+      "catalog_year": "2026-2027",
+      "coursedog_rule_id": "ugGrn4NL",
+      "parent_group_id": null,
+      "name": "Advanced Major Electives (3-5 Credit Hours)",
+      "group_type": "freeform",
+      "n_required": null,
+      "credit_hours_required": 3,
+      "notes_html": "<p data-indent=\"1\"> Students must complete advanced major electives in Computer Science courses numbered 4000 or above as approved by the adviser. CS 4340 may not be used to meet this requirement.</p><p data-indent=\"1\">Note: Students who take CS 5315 to fulfill the Lyle EDGE Leadership and Mentoring requirements are required to take 3 credits of advanced major electives. All other students must take 5 credits of advanced major electives. Students may petition to count up to 6 credit hours of Lyle courses from other departments numbered 4000 or above toward advanced major electives with advisor approval</p>",
+      "requires_manual_definition": true,
+      "created_at": "2026-08-19T17:59:26.633744+00:00",
+      "updated_at": "2026-08-19T17:59:26.633744+00:00",
+      "rule_source": "coursedog"
+    },
+    {
+      "id": "a2ad6bcf-0915-4542-8de0-947720bcbda6",
+      "program_id": "beed8b0a-5843-472f-b554-d1bb02f025a2",
+      "catalog_year": "2026-2027",
+      "coursedog_rule_id": "stXBXGWY",
+      "parent_group_id": "d8adb544-4597-4b28-ac56-7529ad84f3d3",
+      "name": "Interdisciplinary Projects (3 Credit Hours)",
+      "group_type": "enumerated_all",
+      "n_required": null,
+      "credit_hours_required": 3,
+      "notes_html": null,
+      "requires_manual_definition": false,
+      "created_at": "2026-08-19T17:59:26.633744+00:00",
+      "updated_at": "2026-08-19T17:59:26.633744+00:00",
+      "rule_source": "coursedog"
+    },
+    {
+      "id": "f4fdc51e-7bdc-41c3-a2e7-d74a610769c7",
+      "program_id": "beed8b0a-5843-472f-b554-d1bb02f025a2",
+      "catalog_year": "2026-2027",
+      "coursedog_rule_id": "RNhDPrZV",
+      "parent_group_id": "d8adb544-4597-4b28-ac56-7529ad84f3d3",
+      "name": "AI Fundamentals (3 Credit Hours)",
+      "group_type": "enumerated_all",
+      "n_required": null,
+      "credit_hours_required": 3,
+      "notes_html": null,
+      "requires_manual_definition": false,
+      "created_at": "2026-08-19T17:59:26.633744+00:00",
+      "updated_at": "2026-08-19T17:59:26.633744+00:00",
+      "rule_source": "coursedog"
+    },
+    {
+      "id": "3f025209-079d-47c3-b41f-de143346e53a",
+      "program_id": "beed8b0a-5843-472f-b554-d1bb02f025a2",
+      "catalog_year": "2026-2027",
+      "coursedog_rule_id": "zivoTpLT",
+      "parent_group_id": "d8adb544-4597-4b28-ac56-7529ad84f3d3",
+      "name": "Advanced/Domain Specific Use/Design of AI",
+      "group_type": "enumerated_at_least_n",
+      "n_required": 1,
+      "credit_hours_required": null,
+      "notes_html": null,
+      "requires_manual_definition": false,
+      "created_at": "2026-08-19T17:59:26.633744+00:00",
+      "updated_at": "2026-08-19T17:59:26.633744+00:00",
+      "rule_source": "coursedog"
+    },
+    {
+      "id": "6286c0ab-21b3-4996-ba76-53c5b30a49e1",
+      "program_id": "beed8b0a-5843-472f-b554-d1bb02f025a2",
+      "catalog_year": "2026-2027",
+      "coursedog_rule_id": "Erk6DNZS",
+      "parent_group_id": "d8adb544-4597-4b28-ac56-7529ad84f3d3",
+      "name": "Leadership and Mentoring (1-3 Credit Hours)",
+      "group_type": "enumerated_at_least_n",
+      "n_required": 1,
+      "credit_hours_required": 1,
+      "notes_html": null,
+      "requires_manual_definition": false,
+      "created_at": "2026-08-19T17:59:26.633744+00:00",
+      "updated_at": "2026-08-19T17:59:26.633744+00:00",
+      "rule_source": "coursedog"
+    },
+    {
+      "id": "e7fee06a-f192-4cb4-b271-44d799e67ab3",
+      "program_id": "beed8b0a-5843-472f-b554-d1bb02f025a2",
+      "catalog_year": "2026-2027",
+      "coursedog_rule_id": "lJeRgYky",
+      "parent_group_id": "d8adb544-4597-4b28-ac56-7529ad84f3d3",
+      "name": "Innovation and Entrepreneurship (1 Credit Hour)",
+      "group_type": "enumerated_all",
+      "n_required": null,
+      "credit_hours_required": 1,
+      "notes_html": null,
+      "requires_manual_definition": false,
+      "created_at": "2026-08-19T17:59:26.633744+00:00",
+      "updated_at": "2026-08-19T17:59:26.633744+00:00",
+      "rule_source": "coursedog"
+    },
+    {
+      "id": "3c8d3e1a-53d9-4aca-9aea-40428c83e5ae",
+      "program_id": "beed8b0a-5843-472f-b554-d1bb02f025a2",
+      "catalog_year": "2026-2027",
+      "coursedog_rule_id": "TOO3JyxS",
+      "parent_group_id": "d8adb544-4597-4b28-ac56-7529ad84f3d3",
+      "name": "Experiential Learning (1-3 Credit Hours)",
+      "group_type": "enumerated_at_least_n",
+      "n_required": 1,
+      "credit_hours_required": 1,
+      "notes_html": null,
+      "requires_manual_definition": false,
+      "created_at": "2026-08-19T17:59:26.633744+00:00",
+      "updated_at": "2026-08-19T17:59:26.633744+00:00",
+      "rule_source": "coursedog"
+    },
+    {
+      "id": "586f5d71-7812-4d2e-afad-00b1e128bd7e",
+      "program_id": "beed8b0a-5843-472f-b554-d1bb02f025a2",
+      "catalog_year": "2026-2027",
+      "coursedog_rule_id": "bBp5BF7P",
+      "parent_group_id": "4d4fd494-f958-454f-9d0f-c448c73c9010",
+      "name": "Content Area 1, Biology",
+      "group_type": "enumerated_all",
+      "n_required": null,
+      "credit_hours_required": null,
+      "notes_html": null,
+      "requires_manual_definition": false,
+      "created_at": "2026-08-19T17:59:26.633744+00:00",
+      "updated_at": "2026-08-19T17:59:26.633744+00:00",
+      "rule_source": "coursedog"
+    },
+    {
+      "id": "e5f2a29f-bb0b-43c9-9e5c-c489f47fad1a",
+      "program_id": "beed8b0a-5843-472f-b554-d1bb02f025a2",
+      "catalog_year": "2026-2027",
+      "coursedog_rule_id": "SOymRgOH",
+      "parent_group_id": "4d4fd494-f958-454f-9d0f-c448c73c9010",
+      "name": "Content Area 2, Chemistry",
+      "group_type": "enumerated_all",
+      "n_required": null,
+      "credit_hours_required": null,
+      "notes_html": null,
+      "requires_manual_definition": false,
+      "created_at": "2026-08-19T17:59:26.633744+00:00",
+      "updated_at": "2026-08-19T17:59:26.633744+00:00",
+      "rule_source": "coursedog"
+    },
+    {
+      "id": "b15c52e5-ad74-4fcf-a10e-e0abdb7355e3",
+      "program_id": "beed8b0a-5843-472f-b554-d1bb02f025a2",
+      "catalog_year": "2026-2027",
+      "coursedog_rule_id": "xcVMAEuK",
+      "parent_group_id": "4d4fd494-f958-454f-9d0f-c448c73c9010",
+      "name": "Content Area 3, Geology",
+      "group_type": "enumerated_at_least_n",
+      "n_required": 2,
+      "credit_hours_required": null,
+      "notes_html": null,
+      "requires_manual_definition": false,
+      "created_at": "2026-08-19T17:59:26.633744+00:00",
+      "updated_at": "2026-08-19T17:59:26.633744+00:00",
+      "rule_source": "coursedog"
+    },
+    {
+      "id": "cb393105-c316-49bd-88c8-5905b29515f0",
+      "program_id": "beed8b0a-5843-472f-b554-d1bb02f025a2",
+      "catalog_year": "2026-2027",
+      "coursedog_rule_id": "T6z1BLsv",
+      "parent_group_id": "4d4fd494-f958-454f-9d0f-c448c73c9010",
+      "name": "Content Area 4, Physics",
+      "group_type": "enumerated_credit_threshold",
+      "n_required": null,
+      "credit_hours_required": 7,
+      "notes_html": null,
+      "requires_manual_definition": false,
+      "created_at": "2026-08-19T17:59:26.633744+00:00",
+      "updated_at": "2026-08-19T17:59:26.633744+00:00",
+      "rule_source": "coursedog"
+    },
+    {
+      "id": "cc894367-1de1-4076-a86c-218110860afc",
+      "program_id": "beed8b0a-5843-472f-b554-d1bb02f025a2",
+      "catalog_year": "2026-2027",
+      "coursedog_rule_id": "JVDU4qJ2-calc-alt",
+      "parent_group_id": "7489058b-ba0f-40b7-a60d-39037ea49c10",
+      "name": "Calculus Sequence",
+      "group_type": "compound_any",
+      "n_required": null,
+      "credit_hours_required": null,
+      "notes_html": "<p>Note: (Math 1337 &amp; Math 1338) or Math 1340 -- split from the parent Mathematics and Science group's notes field. See planning-docs/degree-planner-spec.md \u00a78.4.</p>",
+      "requires_manual_definition": false,
+      "created_at": "2026-08-19T20:45:51.841353+00:00",
+      "updated_at": "2026-08-19T20:45:51.841353+00:00",
+      "rule_source": "manual"
+    },
+    {
+      "id": "2e4b84d0-1a02-4701-a6ab-ffa7a3d28e0e",
+      "program_id": "beed8b0a-5843-472f-b554-d1bb02f025a2",
+      "catalog_year": "2026-2027",
+      "coursedog_rule_id": "JVDU4qJ2-calc-1337-1338",
+      "parent_group_id": "cc894367-1de1-4076-a86c-218110860afc",
+      "name": "Calculus I & II",
+      "group_type": "enumerated_all",
+      "n_required": null,
+      "credit_hours_required": 6,
+      "notes_html": null,
+      "requires_manual_definition": false,
+      "created_at": "2026-08-19T20:46:01.66879+00:00",
+      "updated_at": "2026-08-19T20:46:01.66879+00:00",
+      "rule_source": "manual"
+    },
+    {
+      "id": "5e32b4d1-f99f-4691-8dac-b8f77e7af8f1",
+      "program_id": "beed8b0a-5843-472f-b554-d1bb02f025a2",
+      "catalog_year": "2026-2027",
+      "coursedog_rule_id": "JVDU4qJ2-calc-1340",
+      "parent_group_id": "cc894367-1de1-4076-a86c-218110860afc",
+      "name": "Consolidated Calculus",
+      "group_type": "enumerated_all",
+      "n_required": null,
+      "credit_hours_required": 3,
+      "notes_html": null,
+      "requires_manual_definition": false,
+      "created_at": "2026-08-19T20:46:01.66879+00:00",
+      "updated_at": "2026-08-19T20:46:01.66879+00:00",
+      "rule_source": "manual"
+    },
+    {
+      "id": "7dfc3679-6c89-4b7e-b418-384f82e92429",
+      "program_id": "beed8b0a-5843-472f-b554-d1bb02f025a2",
+      "catalog_year": "2026-2027",
+      "coursedog_rule_id": "JVDU4qJ2-linalg",
+      "parent_group_id": "7489058b-ba0f-40b7-a60d-39037ea49c10",
+      "name": "Linear Algebra",
+      "group_type": "enumerated_all",
+      "n_required": null,
+      "credit_hours_required": 3,
+      "notes_html": null,
+      "requires_manual_definition": false,
+      "created_at": "2026-08-19T20:46:01.66879+00:00",
+      "updated_at": "2026-08-19T20:46:01.66879+00:00",
+      "rule_source": "manual"
+    },
+    {
+      "id": "705f095c-55c2-45f5-90e3-f5423e05cc80",
+      "program_id": "beed8b0a-5843-472f-b554-d1bb02f025a2",
+      "catalog_year": "2026-2027",
+      "coursedog_rule_id": "JVDU4qJ2-cs2353",
+      "parent_group_id": "7489058b-ba0f-40b7-a60d-39037ea49c10",
+      "name": "Discrete Computational Structures",
+      "group_type": "enumerated_all",
+      "n_required": null,
+      "credit_hours_required": 3,
+      "notes_html": null,
+      "requires_manual_definition": false,
+      "created_at": "2026-08-19T20:46:01.66879+00:00",
+      "updated_at": "2026-08-19T20:46:01.66879+00:00",
+      "rule_source": "manual"
+    },
+    {
+      "id": "157c580e-2a9c-496e-ae4a-6a6c4436856b",
+      "program_id": "beed8b0a-5843-472f-b554-d1bb02f025a2",
+      "catalog_year": "2026-2027",
+      "coursedog_rule_id": "JVDU4qJ2-statmethods",
+      "parent_group_id": "7489058b-ba0f-40b7-a60d-39037ea49c10",
+      "name": "Statistical Methods",
+      "group_type": "enumerated_all",
+      "n_required": null,
+      "credit_hours_required": 3,
+      "notes_html": null,
+      "requires_manual_definition": false,
+      "created_at": "2026-08-19T20:46:01.66879+00:00",
+      "updated_at": "2026-08-19T20:46:01.66879+00:00",
+      "rule_source": "manual"
+    }
+  ],
+  "options": [
+    {
+      "id": "2a16e48c-d3e5-4028-8cb2-e5f6f2017c46",
+      "requirement_group_id": "a2ad6bcf-0915-4542-8de0-947720bcbda6",
+      "option_index": 0,
+      "logic": "and"
+    },
+    {
+      "id": "d709fb22-2b43-4b4c-aca1-1f5874eff973",
+      "requirement_group_id": "a2ad6bcf-0915-4542-8de0-947720bcbda6",
+      "option_index": 1,
+      "logic": "and"
+    },
+    {
+      "id": "822a31cb-704e-4040-b3b4-1e5419e09bfa",
+      "requirement_group_id": "a2ad6bcf-0915-4542-8de0-947720bcbda6",
+      "option_index": 2,
+      "logic": "and"
+    },
+    {
+      "id": "90722ea0-f5f5-4394-a3f2-e01047a8cd3d",
+      "requirement_group_id": "f4fdc51e-7bdc-41c3-a2e7-d74a610769c7",
+      "option_index": 0,
+      "logic": "and"
+    },
+    {
+      "id": "c47ffc7c-d24a-4f03-bd33-4c5f0eff47cb",
+      "requirement_group_id": "3f025209-079d-47c3-b41f-de143346e53a",
+      "option_index": 0,
+      "logic": "and"
+    },
+    {
+      "id": "a0ad16f7-f58d-4c2a-acb9-fe6e0f70a6d9",
+      "requirement_group_id": "3f025209-079d-47c3-b41f-de143346e53a",
+      "option_index": 1,
+      "logic": "and"
+    },
+    {
+      "id": "8d436e92-6030-46b5-8df3-2473b986e30d",
+      "requirement_group_id": "3f025209-079d-47c3-b41f-de143346e53a",
+      "option_index": 2,
+      "logic": "and"
+    },
+    {
+      "id": "aef4ca89-cd62-4307-87af-5b9123841a64",
+      "requirement_group_id": "3f025209-079d-47c3-b41f-de143346e53a",
+      "option_index": 3,
+      "logic": "and"
+    },
+    {
+      "id": "cd2a6338-a76e-42f0-83e1-017b7e0b1089",
+      "requirement_group_id": "3f025209-079d-47c3-b41f-de143346e53a",
+      "option_index": 4,
+      "logic": "and"
+    },
+    {
+      "id": "3a33e9c0-1c07-4b57-9399-9f7c2b5cf83f",
+      "requirement_group_id": "3f025209-079d-47c3-b41f-de143346e53a",
+      "option_index": 5,
+      "logic": "and"
+    },
+    {
+      "id": "836183c1-5f4e-4245-9d39-d597bee927a0",
+      "requirement_group_id": "3f025209-079d-47c3-b41f-de143346e53a",
+      "option_index": 6,
+      "logic": "and"
+    },
+    {
+      "id": "d00f90b5-9dcd-4e20-8f86-ae3d708dd3b3",
+      "requirement_group_id": "3f025209-079d-47c3-b41f-de143346e53a",
+      "option_index": 7,
+      "logic": "and"
+    },
+    {
+      "id": "1cdcee72-1c71-485d-96e7-00cfdc579662",
+      "requirement_group_id": "3f025209-079d-47c3-b41f-de143346e53a",
+      "option_index": 8,
+      "logic": "and"
+    },
+    {
+      "id": "83596dd4-fdf8-4cbb-8c06-78606c047817",
+      "requirement_group_id": "3f025209-079d-47c3-b41f-de143346e53a",
+      "option_index": 9,
+      "logic": "and"
+    },
+    {
+      "id": "cdcc888f-6929-4af4-b0ef-3c6c957abd48",
+      "requirement_group_id": "3f025209-079d-47c3-b41f-de143346e53a",
+      "option_index": 10,
+      "logic": "and"
+    },
+    {
+      "id": "7a321268-4ba3-45c2-9506-695059474474",
+      "requirement_group_id": "6286c0ab-21b3-4996-ba76-53c5b30a49e1",
+      "option_index": 0,
+      "logic": "and"
+    },
+    {
+      "id": "7244f647-964d-4b4b-921e-bd9a41df5fb5",
+      "requirement_group_id": "6286c0ab-21b3-4996-ba76-53c5b30a49e1",
+      "option_index": 1,
+      "logic": "and"
+    },
+    {
+      "id": "14844a46-542a-41ec-822f-806ae8daad9d",
+      "requirement_group_id": "e7fee06a-f192-4cb4-b271-44d799e67ab3",
+      "option_index": 0,
+      "logic": "and"
+    },
+    {
+      "id": "d220c5fa-3738-4027-9688-ec5302b4044b",
+      "requirement_group_id": "3c8d3e1a-53d9-4aca-9aea-40428c83e5ae",
+      "option_index": 0,
+      "logic": "and"
+    },
+    {
+      "id": "20e2598b-f641-4cd2-8eed-c826b3f868bb",
+      "requirement_group_id": "3c8d3e1a-53d9-4aca-9aea-40428c83e5ae",
+      "option_index": 1,
+      "logic": "and"
+    },
+    {
+      "id": "69514528-7d8a-4fd2-b3ae-0165a84c4d90",
+      "requirement_group_id": "3c8d3e1a-53d9-4aca-9aea-40428c83e5ae",
+      "option_index": 2,
+      "logic": "and"
+    },
+    {
+      "id": "59babf67-ef69-416c-96af-fe2e34b9a019",
+      "requirement_group_id": "3c8d3e1a-53d9-4aca-9aea-40428c83e5ae",
+      "option_index": 3,
+      "logic": "and"
+    },
+    {
+      "id": "38af396d-c378-4606-ad77-3b9715ca732e",
+      "requirement_group_id": "3c8d3e1a-53d9-4aca-9aea-40428c83e5ae",
+      "option_index": 4,
+      "logic": "and"
+    },
+    {
+      "id": "92ee4f46-b19c-4a12-9367-fd388e82d08b",
+      "requirement_group_id": "3c8d3e1a-53d9-4aca-9aea-40428c83e5ae",
+      "option_index": 5,
+      "logic": "and"
+    },
+    {
+      "id": "a31c761f-a54a-4366-bc9e-309f70e05853",
+      "requirement_group_id": "586f5d71-7812-4d2e-afad-00b1e128bd7e",
+      "option_index": 0,
+      "logic": "and"
+    },
+    {
+      "id": "5fb0bbb0-efcb-4821-9284-ab542e7a8204",
+      "requirement_group_id": "586f5d71-7812-4d2e-afad-00b1e128bd7e",
+      "option_index": 1,
+      "logic": "and"
+    },
+    {
+      "id": "1a363b86-863c-484e-a456-49b253cde906",
+      "requirement_group_id": "e5f2a29f-bb0b-43c9-9e5c-c489f47fad1a",
+      "option_index": 0,
+      "logic": "and"
+    },
+    {
+      "id": "120af4f6-41e6-471d-abf9-11dcdbf26f2b",
+      "requirement_group_id": "e5f2a29f-bb0b-43c9-9e5c-c489f47fad1a",
+      "option_index": 1,
+      "logic": "and"
+    },
+    {
+      "id": "c3c4d143-06db-48a9-ab50-a5b1ebd31d8d",
+      "requirement_group_id": "b15c52e5-ad74-4fcf-a10e-e0abdb7355e3",
+      "option_index": 0,
+      "logic": "and"
+    },
+    {
+      "id": "4f6ee53b-9137-4b71-9515-bfbf909740a3",
+      "requirement_group_id": "b15c52e5-ad74-4fcf-a10e-e0abdb7355e3",
+      "option_index": 1,
+      "logic": "and"
+    },
+    {
+      "id": "cb5bddbf-a7c4-4de3-988e-8aaa311e471b",
+      "requirement_group_id": "b15c52e5-ad74-4fcf-a10e-e0abdb7355e3",
+      "option_index": 2,
+      "logic": "and"
+    },
+    {
+      "id": "c031248e-8b70-4f3a-97ef-e151a6a4aa19",
+      "requirement_group_id": "b15c52e5-ad74-4fcf-a10e-e0abdb7355e3",
+      "option_index": 3,
+      "logic": "and"
+    },
+    {
+      "id": "7312ca05-1b33-4d1c-a45c-51dab08f43a7",
+      "requirement_group_id": "b15c52e5-ad74-4fcf-a10e-e0abdb7355e3",
+      "option_index": 4,
+      "logic": "and"
+    },
+    {
+      "id": "f244dd05-03a1-4309-9111-03633ffdf578",
+      "requirement_group_id": "cb393105-c316-49bd-88c8-5905b29515f0",
+      "option_index": 0,
+      "logic": "and"
+    },
+    {
+      "id": "c6592380-1251-42ec-b178-b5ebc1797d66",
+      "requirement_group_id": "cb393105-c316-49bd-88c8-5905b29515f0",
+      "option_index": 1,
+      "logic": "and"
+    },
+    {
+      "id": "df228796-d1ac-4f2f-8c99-c32d8ca675e2",
+      "requirement_group_id": "cb393105-c316-49bd-88c8-5905b29515f0",
+      "option_index": 2,
+      "logic": "and"
+    },
+    {
+      "id": "d92d04de-4924-4ae5-b4f9-9a1527559e31",
+      "requirement_group_id": "ca2e41c0-839d-433a-8a1f-416fa9bc1522",
+      "option_index": 0,
+      "logic": "and"
+    },
+    {
+      "id": "ab7a76c2-7ae8-4f11-a3f3-bce9cf0a7595",
+      "requirement_group_id": "ca2e41c0-839d-433a-8a1f-416fa9bc1522",
+      "option_index": 1,
+      "logic": "and"
+    },
+    {
+      "id": "b18e7083-3046-431e-b0bd-23db0a950855",
+      "requirement_group_id": "ca2e41c0-839d-433a-8a1f-416fa9bc1522",
+      "option_index": 2,
+      "logic": "and"
+    },
+    {
+      "id": "f6859b67-0b25-4054-a2e9-011a7333e54d",
+      "requirement_group_id": "ca2e41c0-839d-433a-8a1f-416fa9bc1522",
+      "option_index": 3,
+      "logic": "and"
+    },
+    {
+      "id": "11522844-61d2-436a-b088-368069473d97",
+      "requirement_group_id": "ca2e41c0-839d-433a-8a1f-416fa9bc1522",
+      "option_index": 4,
+      "logic": "and"
+    },
+    {
+      "id": "2aefb628-e438-4893-9e97-2ddfe75088b1",
+      "requirement_group_id": "ca2e41c0-839d-433a-8a1f-416fa9bc1522",
+      "option_index": 5,
+      "logic": "and"
+    },
+    {
+      "id": "7124437a-5ae7-43aa-bcd5-bef681b6fece",
+      "requirement_group_id": "ca2e41c0-839d-433a-8a1f-416fa9bc1522",
+      "option_index": 6,
+      "logic": "and"
+    },
+    {
+      "id": "07fbd9c7-c3af-4135-be7b-5e2ddd8e2ecd",
+      "requirement_group_id": "ca2e41c0-839d-433a-8a1f-416fa9bc1522",
+      "option_index": 7,
+      "logic": "and"
+    },
+    {
+      "id": "00aa4a58-c114-4b4a-a8c9-8c3a49ebdf1c",
+      "requirement_group_id": "ca2e41c0-839d-433a-8a1f-416fa9bc1522",
+      "option_index": 8,
+      "logic": "and"
+    },
+    {
+      "id": "bec11731-b9df-4354-b6a7-d34c78d1edbc",
+      "requirement_group_id": "ca2e41c0-839d-433a-8a1f-416fa9bc1522",
+      "option_index": 9,
+      "logic": "and"
+    },
+    {
+      "id": "81049a06-9cf7-4d45-8d89-3c480ad7f855",
+      "requirement_group_id": "ca2e41c0-839d-433a-8a1f-416fa9bc1522",
+      "option_index": 10,
+      "logic": "and"
+    },
+    {
+      "id": "ff855754-9d4b-462c-82ef-665b11469ff2",
+      "requirement_group_id": "3e927b68-ec73-422d-a3cd-a6cc46082959",
+      "option_index": 0,
+      "logic": "and"
+    },
+    {
+      "id": "a46b6abf-019e-4182-81e8-a0b36c77bfe5",
+      "requirement_group_id": "3e927b68-ec73-422d-a3cd-a6cc46082959",
+      "option_index": 1,
+      "logic": "and"
+    },
+    {
+      "id": "5c9c03fc-7cd0-442c-b050-2f216206b3b6",
+      "requirement_group_id": "3e927b68-ec73-422d-a3cd-a6cc46082959",
+      "option_index": 2,
+      "logic": "and"
+    },
+    {
+      "id": "ddf53627-e6a0-47a1-a1cd-076d1a759575",
+      "requirement_group_id": "3e927b68-ec73-422d-a3cd-a6cc46082959",
+      "option_index": 3,
+      "logic": "and"
+    },
+    {
+      "id": "3cc64461-d0a0-42ed-9cf1-3a02d5565edd",
+      "requirement_group_id": "3e927b68-ec73-422d-a3cd-a6cc46082959",
+      "option_index": 4,
+      "logic": "and"
+    },
+    {
+      "id": "dee2114b-f4e0-4663-912a-1f989b44ee93",
+      "requirement_group_id": "3e927b68-ec73-422d-a3cd-a6cc46082959",
+      "option_index": 5,
+      "logic": "and"
+    },
+    {
+      "id": "e02f65b4-2fd9-4f33-9885-86f6b0fd5ded",
+      "requirement_group_id": "2e4b84d0-1a02-4701-a6ab-ffa7a3d28e0e",
+      "option_index": 0,
+      "logic": "and"
+    },
+    {
+      "id": "b07d1b4b-21e8-49c7-aa96-c19331447fb3",
+      "requirement_group_id": "5e32b4d1-f99f-4691-8dac-b8f77e7af8f1",
+      "option_index": 0,
+      "logic": "and"
+    },
+    {
+      "id": "e0eded08-3182-4884-acb9-da61d9c50551",
+      "requirement_group_id": "7dfc3679-6c89-4b7e-b418-384f82e92429",
+      "option_index": 0,
+      "logic": "and"
+    },
+    {
+      "id": "c54cc12a-6894-4795-a314-46801c463c06",
+      "requirement_group_id": "705f095c-55c2-45f5-90e3-f5423e05cc80",
+      "option_index": 0,
+      "logic": "and"
+    },
+    {
+      "id": "736f0ca5-9f53-484c-bbd1-8eb8aea6e60b",
+      "requirement_group_id": "157c580e-2a9c-496e-ae4a-6a6c4436856b",
+      "option_index": 0,
+      "logic": "or"
+    }
+  ],
+  "option_courses": [
+    {
+      "id": "9e5e4aa9-d09c-46ef-b6cd-f4d46408a472",
+      "requirement_group_option_id": "2a16e48c-d3e5-4028-8cb2-e5f6f2017c46",
+      "coursedog_group_id": "0280091",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "7cfbd4c2-f840-4c66-a7fa-ba3cd14a1fa8",
+      "requirement_group_option_id": "d709fb22-2b43-4b4c-aca1-1f5874eff973",
+      "coursedog_group_id": "0280191",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "9961b669-ee94-4091-844c-a0867149ddac",
+      "requirement_group_option_id": "822a31cb-704e-4040-b3b4-1e5419e09bfa",
+      "coursedog_group_id": "0280441",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "f56e2d30-441f-42e2-977a-3068c81b9f23",
+      "requirement_group_option_id": "90722ea0-f5f5-4394-a3f2-e01047a8cd3d",
+      "coursedog_group_id": "0284711",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "3411ae13-bfc3-4d1f-8e98-6f8081b6bbe7",
+      "requirement_group_option_id": "c47ffc7c-d24a-4f03-bd33-4c5f0eff47cb",
+      "coursedog_group_id": "0275631",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "8646a922-a10e-41df-96f1-80efc6c6618b",
+      "requirement_group_option_id": "a0ad16f7-f58d-4c2a-acb9-fe6e0f70a6d9",
+      "coursedog_group_id": "0278621",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "1aa20c77-3aa4-4df9-a992-9d6e2f29fb78",
+      "requirement_group_option_id": "8d436e92-6030-46b5-8df3-2473b986e30d",
+      "coursedog_group_id": "0225131",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "5291fe0f-377f-46e2-8b5f-6cb427f3a023",
+      "requirement_group_option_id": "aef4ca89-cd62-4307-87af-5b9123841a64",
+      "coursedog_group_id": "0225761",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "98d13652-7f60-4e91-8114-df2410f675b0",
+      "requirement_group_option_id": "cd2a6338-a76e-42f0-83e1-017b7e0b1089",
+      "coursedog_group_id": "0046401",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "3b5f4ff0-642b-46c5-bf55-e6fa8d541c36",
+      "requirement_group_option_id": "3a33e9c0-1c07-4b57-9399-9f7c2b5cf83f",
+      "coursedog_group_id": "0275611",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "64c827a7-ff58-4859-ad90-a3eb73c7d8f7",
+      "requirement_group_option_id": "836183c1-5f4e-4245-9d39-d597bee927a0",
+      "coursedog_group_id": "0258761",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "475311eb-1b3b-4adb-97a9-32454f97aa35",
+      "requirement_group_option_id": "d00f90b5-9dcd-4e20-8f86-ae3d708dd3b3",
+      "coursedog_group_id": "0268171",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "c624778b-37a3-42ec-8b43-44631c7a2146",
+      "requirement_group_option_id": "1cdcee72-1c71-485d-96e7-00cfdc579662",
+      "coursedog_group_id": "0283371",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "c54c7477-f54c-4871-9abe-500349abdd8f",
+      "requirement_group_option_id": "83596dd4-fdf8-4cbb-8c06-78606c047817",
+      "coursedog_group_id": "0278081",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "5e2895f7-a0ed-4808-8bdd-221e44d19d88",
+      "requirement_group_option_id": "cdcc888f-6929-4af4-b0ef-3c6c957abd48",
+      "coursedog_group_id": "0237421",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "01aae70f-76fe-43d1-af61-c3259b07ddd2",
+      "requirement_group_option_id": "7a321268-4ba3-45c2-9506-695059474474",
+      "coursedog_group_id": "0280181",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "d94ace8c-e685-4119-87d1-b7cccbeea110",
+      "requirement_group_option_id": "7244f647-964d-4b4b-921e-bd9a41df5fb5",
+      "coursedog_group_id": "0046381",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "339ffaac-45bc-47f0-8dab-be6bd67c9288",
+      "requirement_group_option_id": "14844a46-542a-41ec-822f-806ae8daad9d",
+      "coursedog_group_id": "0283581",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "a1fc68cf-b0f9-4d8b-add2-4fdc6b206d39",
+      "requirement_group_option_id": "d220c5fa-3738-4027-9688-ec5302b4044b",
+      "coursedog_group_id": "0261251",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "6ca59bcf-ed3a-4aaa-9b6b-34f600438194",
+      "requirement_group_option_id": "20e2598b-f641-4cd2-8eed-c826b3f868bb",
+      "coursedog_group_id": "0261261",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "050f224d-a2a6-48fa-865a-b686c7ca842f",
+      "requirement_group_option_id": "69514528-7d8a-4fd2-b3ae-0165a84c4d90",
+      "coursedog_group_id": "0261291",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "ea73922c-de2f-4c90-98cd-50b4d00ccc6c",
+      "requirement_group_option_id": "59babf67-ef69-416c-96af-fe2e34b9a019",
+      "coursedog_group_id": "0261301",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "8402cc6d-1184-41aa-9829-f6ef99339089",
+      "requirement_group_option_id": "38af396d-c378-4606-ad77-3b9715ca732e",
+      "coursedog_group_id": "0046731",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "71c5923a-f6f9-4cac-ac3b-4e70b6300e20",
+      "requirement_group_option_id": "92ee4f46-b19c-4a12-9367-fd388e82d08b",
+      "coursedog_group_id": "0046761",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "14a9c417-9e53-4c00-b9e9-66d8cbad547f",
+      "requirement_group_option_id": "a31c761f-a54a-4366-bc9e-309f70e05853",
+      "coursedog_group_id": "0019411",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "87a77091-b49e-492b-a415-712031597c02",
+      "requirement_group_option_id": "a31c761f-a54a-4366-bc9e-309f70e05853",
+      "coursedog_group_id": "0019371",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "4469b7fd-eb9b-4152-acaf-00e8f478a5c0",
+      "requirement_group_option_id": "5fb0bbb0-efcb-4821-9284-ab542e7a8204",
+      "coursedog_group_id": "0019421",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "31819945-1bdf-4e6b-9fd7-54895cf0267c",
+      "requirement_group_option_id": "5fb0bbb0-efcb-4821-9284-ab542e7a8204",
+      "coursedog_group_id": "0019381",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "67c7a623-28ab-4cdb-82e2-ade45c22fef8",
+      "requirement_group_option_id": "1a363b86-863c-484e-a456-49b253cde906",
+      "coursedog_group_id": "0033981",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "d128441a-8fba-4700-8f9a-0810e8e4b60f",
+      "requirement_group_option_id": "1a363b86-863c-484e-a456-49b253cde906",
+      "coursedog_group_id": "0033911",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "699cba0d-3314-408d-b83b-67eb1c735d18",
+      "requirement_group_option_id": "120af4f6-41e6-471d-abf9-11dcdbf26f2b",
+      "coursedog_group_id": "0033991",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "7cc405c1-74cf-4d2a-9b6c-ab9b690b9233",
+      "requirement_group_option_id": "120af4f6-41e6-471d-abf9-11dcdbf26f2b",
+      "coursedog_group_id": "0033921",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "cf18d799-b467-4b3c-b2ae-0e8cd415cc86",
+      "requirement_group_option_id": "c3c4d143-06db-48a9-ab50-a5b1ebd31d8d",
+      "coursedog_group_id": "0075331",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "e899b6fa-4554-4d65-9b4c-d94f765dc8ca",
+      "requirement_group_option_id": "4f6ee53b-9137-4b71-9515-bfbf909740a3",
+      "coursedog_group_id": "0075361",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "9630ac56-cb48-49b1-93d8-8764fe1fe67c",
+      "requirement_group_option_id": "cb5bddbf-a7c4-4de3-988e-8aaa311e471b",
+      "coursedog_group_id": "0075371",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "c39823e6-1dee-46b7-b941-d42f6b779f5d",
+      "requirement_group_option_id": "c031248e-8b70-4f3a-97ef-e151a6a4aa19",
+      "coursedog_group_id": "0075391",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "dc0bb8eb-54f0-4144-bc28-2c54d51e1321",
+      "requirement_group_option_id": "7312ca05-1b33-4d1c-a45c-51dab08f43a7",
+      "coursedog_group_id": "0075401",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "ceb72938-eb74-4529-b0ae-318781eb5f42",
+      "requirement_group_option_id": "f244dd05-03a1-4309-9111-03633ffdf578",
+      "coursedog_group_id": "0139911",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "9c3a4d11-210e-4a59-8c9f-851dd1fca00b",
+      "requirement_group_option_id": "f244dd05-03a1-4309-9111-03633ffdf578",
+      "coursedog_group_id": "0139861",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "2cf9d60a-f5b0-4c9c-bc0d-106d5076acfa",
+      "requirement_group_option_id": "c6592380-1251-42ec-b178-b5ebc1797d66",
+      "coursedog_group_id": "0139921",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "89710f69-28e6-4878-a5e2-7d0e31675e1e",
+      "requirement_group_option_id": "c6592380-1251-42ec-b178-b5ebc1797d66",
+      "coursedog_group_id": "0139871",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "71a87873-8be3-4d41-83e1-2ba035109e02",
+      "requirement_group_option_id": "df228796-d1ac-4f2f-8c99-c32d8ca675e2",
+      "coursedog_group_id": "0140111",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "cda4bc9d-3b0a-4d12-8e10-a5949d8948d3",
+      "requirement_group_option_id": "d92d04de-4924-4ae5-b4f9-9a1527559e31",
+      "coursedog_group_id": "0045691",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "2b1ce1b7-45f7-4231-a12a-de0c6779f0ad",
+      "requirement_group_option_id": "ab7a76c2-7ae8-4f11-a3f3-bce9cf0a7595",
+      "coursedog_group_id": "0243541",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "ccaee214-f967-4040-a2a4-47ac6c5888e0",
+      "requirement_group_option_id": "b18e7083-3046-431e-b0bd-23db0a950855",
+      "coursedog_group_id": "0278101",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "4bfea7f8-cd40-4f9f-8ec4-43d135aa901c",
+      "requirement_group_option_id": "f6859b67-0b25-4054-a2e9-011a7333e54d",
+      "coursedog_group_id": "0045741",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "c7c49100-8a3e-4708-af83-ff0fcbba9b33",
+      "requirement_group_option_id": "11522844-61d2-436a-b088-368069473d97",
+      "coursedog_group_id": "0278091",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "f6d92bb9-2704-43e7-8faa-e5da41fee524",
+      "requirement_group_option_id": "2aefb628-e438-4893-9e97-2ddfe75088b1",
+      "coursedog_group_id": "0210241",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "907eae0f-8449-4921-8144-d67f1a518cdf",
+      "requirement_group_option_id": "7124437a-5ae7-43aa-bcd5-bef681b6fece",
+      "coursedog_group_id": "0278081",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "20649444-682a-4c30-a42c-8268b5b8f959",
+      "requirement_group_option_id": "07fbd9c7-c3af-4135-be7b-5e2ddd8e2ecd",
+      "coursedog_group_id": "0046421",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "7fa682ae-1d47-4a1d-a410-34f51cd35c3a",
+      "requirement_group_option_id": "00aa4a58-c114-4b4a-a8c9-8c3a49ebdf1c",
+      "coursedog_group_id": "0046481",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "d437216d-4d70-49e6-9950-ad273cbf69b8",
+      "requirement_group_option_id": "bec11731-b9df-4354-b6a7-d34c78d1edbc",
+      "coursedog_group_id": "0222401",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "13c56155-1a49-4c31-b781-527a597ba8d4",
+      "requirement_group_option_id": "81049a06-9cf7-4d45-8d89-3c480ad7f855",
+      "coursedog_group_id": "0249511",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "e8922288-1224-4d60-bcf1-d52d4da7f1cd",
+      "requirement_group_option_id": "ff855754-9d4b-462c-82ef-665b11469ff2",
+      "coursedog_group_id": "0275631",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "2443dae2-c187-4142-8970-48084be80f4d",
+      "requirement_group_option_id": "a46b6abf-019e-4182-81e8-a0b36c77bfe5",
+      "coursedog_group_id": null,
+      "unresolved_course_ref": "0220321"
+    },
+    {
+      "id": "bc795263-1efd-4d10-a0c5-52e0921e0e47",
+      "requirement_group_option_id": "5c9c03fc-7cd0-442c-b050-2f216206b3b6",
+      "coursedog_group_id": null,
+      "unresolved_course_ref": "0248931"
+    },
+    {
+      "id": "e0f5b540-6485-4e01-9e28-7f4fa4775bfa",
+      "requirement_group_option_id": "ddf53627-e6a0-47a1-a1cd-076d1a759575",
+      "coursedog_group_id": "0267561",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "ad2b8f88-0115-455e-83fe-5d0f458d3761",
+      "requirement_group_option_id": "3cc64461-d0a0-42ed-9cf1-3a02d5565edd",
+      "coursedog_group_id": "0218661",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "44b076c6-612e-4cd8-9beb-d323aa518fef",
+      "requirement_group_option_id": "dee2114b-f4e0-4663-912a-1f989b44ee93",
+      "coursedog_group_id": "0220931",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "4896b767-38d4-4420-a4ac-50be99b1df9f",
+      "requirement_group_option_id": "e02f65b4-2fd9-4f33-9885-86f6b0fd5ded",
+      "coursedog_group_id": "0103681",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "a851be66-5539-4981-acfa-4f205a2d141c",
+      "requirement_group_option_id": "e02f65b4-2fd9-4f33-9885-86f6b0fd5ded",
+      "coursedog_group_id": "0103691",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "469df245-3ebe-4b87-8091-f3c048c182d5",
+      "requirement_group_option_id": "b07d1b4b-21e8-49c7-aa96-c19331447fb3",
+      "coursedog_group_id": "0253511",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "dcd3169e-bf48-496b-b5fe-c6b6196df0a7",
+      "requirement_group_option_id": "e0eded08-3182-4884-acb9-da61d9c50551",
+      "coursedog_group_id": "0103941",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "f2860cbf-50a2-4075-a2cb-1b85e2fe2bdb",
+      "requirement_group_option_id": "c54cc12a-6894-4795-a314-46801c463c06",
+      "coursedog_group_id": "0045751",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "9eae7f85-a2a7-4722-81a2-6b9f448d0d89",
+      "requirement_group_option_id": "736f0ca5-9f53-484c-bbd1-8eb8aea6e60b",
+      "coursedog_group_id": "0046011",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "83e5f5bd-4ff4-4f58-ab9c-1f1ed575786a",
+      "requirement_group_option_id": "736f0ca5-9f53-484c-bbd1-8eb8aea6e60b",
+      "coursedog_group_id": "0165231",
+      "unresolved_course_ref": null
+    },
+    {
+      "id": "07678d10-682a-4743-be63-6aa65d31d6ad",
+      "requirement_group_option_id": "736f0ca5-9f53-484c-bbd1-8eb8aea6e60b",
+      "coursedog_group_id": "0218951",
+      "unresolved_course_ref": null
+    }
+  ],
+  "course_records": [
+    {
+      "id": "6d83fcf3-d57a-4ea6-8707-c07a19c88f8a",
+      "student_id": "b0bc8ff6-0df3-4e5f-a107-a4e5c263f604",
+      "term_id": "47245cff-e29d-46bd-b562-5b81f9e98ff7",
+      "institution_id": "6b180bbf-66d7-4aef-b8c6-2ae534c78e9a",
+      "course_code": "CS 1341",
+      "title": "Principles of Computer Science I",
+      "credit_hours": 3.0,
+      "letter_grade": "A-",
+      "credit_type": "resident",
+      "counts_toward_credit": true,
+      "counts_toward_gpa": true,
+      "status": "completed",
+      "source": "manual",
+      "exam_source": null,
+      "exam_score": null,
+      "confirmed_at": "2026-08-19T00:00:00+00:00",
+      "created_at": "2026-08-19T19:11:20.963874+00:00",
+      "updated_at": "2026-08-19T19:11:20.963874+00:00",
+      "excluded_from_gpa_by": null,
+      "catalog_course_id": null
+    },
+    {
+      "id": "a54b48dd-1b5d-4029-8df6-c7e2a6352717",
+      "student_id": "b0bc8ff6-0df3-4e5f-a107-a4e5c263f604",
+      "term_id": "47245cff-e29d-46bd-b562-5b81f9e98ff7",
+      "institution_id": "6b180bbf-66d7-4aef-b8c6-2ae534c78e9a",
+      "course_code": "MATH 1337",
+      "title": "Calculus I",
+      "credit_hours": 3.0,
+      "letter_grade": "B+",
+      "credit_type": "resident",
+      "counts_toward_credit": true,
+      "counts_toward_gpa": true,
+      "status": "completed",
+      "source": "manual",
+      "exam_source": null,
+      "exam_score": null,
+      "confirmed_at": "2026-08-19T00:00:00+00:00",
+      "created_at": "2026-08-19T19:11:21.09103+00:00",
+      "updated_at": "2026-08-19T19:11:21.09103+00:00",
+      "excluded_from_gpa_by": null,
+      "catalog_course_id": null
+    },
+    {
+      "id": "9602a9c0-36a4-4318-9c55-d316486bf502",
+      "student_id": "b0bc8ff6-0df3-4e5f-a107-a4e5c263f604",
+      "term_id": "47245cff-e29d-46bd-b562-5b81f9e98ff7",
+      "institution_id": "6b180bbf-66d7-4aef-b8c6-2ae534c78e9a",
+      "course_code": "CS 1311",
+      "title": "AI for Every Mustang",
+      "credit_hours": 3.0,
+      "letter_grade": "A",
+      "credit_type": "resident",
+      "counts_toward_credit": true,
+      "counts_toward_gpa": true,
+      "status": "completed",
+      "source": "manual",
+      "exam_source": null,
+      "exam_score": null,
+      "confirmed_at": "2026-08-19T00:00:00+00:00",
+      "created_at": "2026-08-19T19:11:21.217837+00:00",
+      "updated_at": "2026-08-19T19:11:21.217837+00:00",
+      "excluded_from_gpa_by": null,
+      "catalog_course_id": null
+    },
+    {
+      "id": "f277a2fa-a95a-4f50-8c95-27991913b702",
+      "student_id": "b0bc8ff6-0df3-4e5f-a107-a4e5c263f604",
+      "term_id": "47245cff-e29d-46bd-b562-5b81f9e98ff7",
+      "institution_id": "6b180bbf-66d7-4aef-b8c6-2ae534c78e9a",
+      "course_code": "ENGR 2101",
+      "title": "Interdisciplinary Project: Design Process and Teams",
+      "credit_hours": 1.0,
+      "letter_grade": "B",
+      "credit_type": "resident",
+      "counts_toward_credit": true,
+      "counts_toward_gpa": true,
+      "status": "completed",
+      "source": "manual",
+      "exam_source": null,
+      "exam_score": null,
+      "confirmed_at": "2026-08-19T00:00:00+00:00",
+      "created_at": "2026-08-19T19:11:21.336955+00:00",
+      "updated_at": "2026-08-19T19:11:21.336955+00:00",
+      "excluded_from_gpa_by": null,
+      "catalog_course_id": null
+    },
+    {
+      "id": "85130e44-8bc7-4002-8284-1f45425bc4e5",
+      "student_id": "b0bc8ff6-0df3-4e5f-a107-a4e5c263f604",
+      "term_id": "91be9e6a-ada5-4737-8780-51881a0532fc",
+      "institution_id": "6b180bbf-66d7-4aef-b8c6-2ae534c78e9a",
+      "course_code": "CS 1342",
+      "title": "Principles of Computer Science II",
+      "credit_hours": 3.0,
+      "letter_grade": "B+",
+      "credit_type": "resident",
+      "counts_toward_credit": true,
+      "counts_toward_gpa": true,
+      "status": "in_progress",
+      "source": "manual",
+      "exam_source": null,
+      "exam_score": null,
+      "confirmed_at": "2026-08-19T00:00:00+00:00",
+      "created_at": "2026-08-19T19:11:21.480851+00:00",
+      "updated_at": "2026-08-19T19:11:21.480851+00:00",
+      "excluded_from_gpa_by": null,
+      "catalog_course_id": null
+    },
+    {
+      "id": "f8902141-3900-453d-9deb-321ab5609e88",
+      "student_id": "b0bc8ff6-0df3-4e5f-a107-a4e5c263f604",
+      "term_id": "91be9e6a-ada5-4737-8780-51881a0532fc",
+      "institution_id": "6b180bbf-66d7-4aef-b8c6-2ae534c78e9a",
+      "course_code": "MATH 1338",
+      "title": "Calculus II",
+      "credit_hours": 3.0,
+      "letter_grade": "B",
+      "credit_type": "resident",
+      "counts_toward_credit": true,
+      "counts_toward_gpa": true,
+      "status": "in_progress",
+      "source": "manual",
+      "exam_source": null,
+      "exam_score": null,
+      "confirmed_at": "2026-08-19T00:00:00+00:00",
+      "created_at": "2026-08-19T19:11:21.602489+00:00",
+      "updated_at": "2026-08-19T19:11:21.602489+00:00",
+      "excluded_from_gpa_by": null,
+      "catalog_course_id": null
+    },
+    {
+      "id": "9c2eedae-20ce-43e3-8980-744a3c11cdfb",
+      "student_id": "b0bc8ff6-0df3-4e5f-a107-a4e5c263f604",
+      "term_id": "91be9e6a-ada5-4737-8780-51881a0532fc",
+      "institution_id": "6b180bbf-66d7-4aef-b8c6-2ae534c78e9a",
+      "course_code": "CS 2340",
+      "title": "Computer Organization",
+      "credit_hours": 3.0,
+      "letter_grade": "C+",
+      "credit_type": "resident",
+      "counts_toward_credit": true,
+      "counts_toward_gpa": true,
+      "status": "in_progress",
+      "source": "manual",
+      "exam_source": null,
+      "exam_score": null,
+      "confirmed_at": "2026-08-19T00:00:00+00:00",
+      "created_at": "2026-08-19T19:11:21.720772+00:00",
+      "updated_at": "2026-08-19T19:11:21.720772+00:00",
+      "excluded_from_gpa_by": null,
+      "catalog_course_id": null
+    },
+    {
+      "id": "ad376f94-23ac-4528-81a1-08463a3459b5",
+      "student_id": "b0bc8ff6-0df3-4e5f-a107-a4e5c263f604",
+      "term_id": "91be9e6a-ada5-4737-8780-51881a0532fc",
+      "institution_id": "6b180bbf-66d7-4aef-b8c6-2ae534c78e9a",
+      "course_code": "ENGR 2111",
+      "title": "Leadership and Mentorship for Engineers",
+      "credit_hours": 1.0,
+      "letter_grade": "A-",
+      "credit_type": "resident",
+      "counts_toward_credit": true,
+      "counts_toward_gpa": true,
+      "status": "in_progress",
+      "source": "manual",
+      "exam_source": null,
+      "exam_score": null,
+      "confirmed_at": "2026-08-19T00:00:00+00:00",
+      "created_at": "2026-08-19T19:11:21.841817+00:00",
+      "updated_at": "2026-08-19T19:11:21.841817+00:00",
+      "excluded_from_gpa_by": null,
+      "catalog_course_id": null
+    }
+  ],
+  "catalog_by_gid": {
+    "0019371": "BIOL 1101",
+    "0019381": "BIOL 1102",
+    "0019411": "BIOL 1301",
+    "0019421": "BIOL 1302",
+    "0033911": "CHEM 1113",
+    "0033921": "CHEM 1114",
+    "0033981": "CHEM 1303",
+    "0033991": "CHEM 1304",
+    "0075331": "GEOL 1301",
+    "0075361": "GEOL 1305",
+    "0075371": "GEOL 1307",
+    "0075391": "GEOL 1313",
+    "0075401": "GEOL 1315",
+    "0103681": "MATH 1337",
+    "0103691": "MATH 1338",
+    "0253511": "MATH 1340",
+    "0103941": "MATH 3304",
+    "0139861": "PHYS 1105",
+    "0139871": "PHYS 1106",
+    "0139911": "PHYS 1303",
+    "0139921": "PHYS 1304",
+    "0140111": "PHYS 3305",
+    "0165231": "STAT 4340",
+    "0267561": "CEE 2302",
+    "0218661": "CEE 3302",
+    "0284711": "CS 1311",
+    "0045691": "CS 1341",
+    "0243541": "CS 1342",
+    "0278101": "CS 2340",
+    "0045741": "CS 2341",
+    "0045751": "CS 2353",
+    "0278091": "CS 3341",
+    "0210241": "CS 3353",
+    "0275631": "CS 3377",
+    "0046011": "CS 4340",
+    "0278621": "CS 5312",
+    "0046381": "CS 5315",
+    "0225131": "CS 5316",
+    "0225761": "CS 5319",
+    "0046401": "CS 5320",
+    "0275611": "CS 5322",
+    "0258761": "CS 5323",
+    "0268171": "CS 5324",
+    "0283371": "CS 5325",
+    "0278081": "CS 5328",
+    "0046421": "CS 5330",
+    "0237421": "CS 5331",
+    "0046481": "CS 5343",
+    "0222401": "CS 5344",
+    "0249511": "CS 5351",
+    "0046731": "CS 5391",
+    "0046761": "CS 5394",
+    "0283581": "ENGR 2112",
+    "0261251": "ENGR 1199",
+    "0280091": "ENGR 2101",
+    "0280181": "ENGR 2111",
+    "0261261": "ENGR 2199",
+    "0280191": "ENGR 3101",
+    "0261291": "ENGR 3199",
+    "0280441": "ENGR 4101",
+    "0261301": "ENGR 4199",
+    "0220931": "OREM 3308",
+    "0218951": "OREM 3340"
+  }
+}

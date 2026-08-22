@@ -1,0 +1,274 @@
+# Skill alias table — spec §4
+#
+# canonical → every surface form that should resolve to it.
+#
+# ============================================================================
+# THIS FILE IS KASH'S TO REVIEW (§12).
+#
+# §12 defines two separate checks that must not be conflated:
+#   - Alias table review (Kash) — is "Salesforce Admin" a skill or a job title?
+#     Domain judgment. That is this file.
+#   - Extraction spot-check (Deepak) — hand-verify ~30 postings against what
+#     the script extracted. That is tools/verify_sample.py.
+#
+# The entries below are a STARTER SET, not a reviewed one.
+# ============================================================================
+#
+# ============================================================================
+# DECIDED 2026-08-19: THIS FILE IS THE VOCABULARY. skill_terms_review.csv IS
+# NOT A COMPETING ONE.
+# ============================================================================
+#
+# Two approaches to the same problem existed in parallel and were drifting.
+# This one is curated, alias-based and word-boundary matched. The other,
+# skill_terms_review.csv on the `ats-fetcher` branch, generated 8,725
+# candidate terms from the O*NET software catalogue and filtered them by how
+# often each fired against real posting text.
+#
+# The frequency data settles it, and not in the generated file's favour. Of
+# its 8,725 terms only 121 ever fired at all, and the ones that fired hardest
+# are: Training (91), IMPACT (89), Testing (84), Experian (70), Client (65),
+# Shape (42), MAGIC (39), Vision (33). Those are O*NET product names and
+# ordinary English words colliding with prose -- "Experian" is a PMG *client*,
+# not a skill anyone was asked for. A high fire count measures string
+# collision, not relevance, which is exactly the failure §4's "never naive
+# substring search" rule exists to prevent.
+#
+# So skill_terms_review.csv is retired as a vocabulary source. It keeps real
+# value as the permanent record of what was considered and rejected, and as
+# the evidence behind this decision -- do not delete it.
+#
+# Seven genuine skills were harvested from its 121 fired terms and appear at
+# the bottom of this file. Everything else was a collision.
+#
+# Current count: 46. §4's target is roughly 60-120, so this is still under
+# where it should be, and the gap is real work rather than a rounding error.
+#
+# THE TABLE IS BOUNDED, NOT OPEN-ENDED (§4).
+#
+# Build aliases **only** for skills O*NET already rates as important for the
+# ~10 DFW role families. O*NET's importance scores ARE the skill set; this
+# table only teaches the matcher to find those skills in prose. Roughly
+# 60–120 skills, reviewable by hand — which is what makes the review real
+# rather than a gesture.
+#
+# Adding a skill O*NET does not rate for these families is out of scope. It
+# will produce counts nothing downstream knows how to interpret.
+#
+# ---
+#
+# match_mode — one per §4 edge case:
+#
+#   word_boundary  (default)  Standard \b fencing. Stops "Excel" firing inside
+#                             "Excellent communication skills."
+#   symbol                    C++, C#. `+` and `#` ARE word boundaries, so \b
+#                             cannot match. Escaped literal, manual edge logic.
+#   qualified                 Single letters — R, C, Go, D. Bare "R" matches
+#                             nearly everything. Needs an adjacent qualifier or
+#                             it is not counted. §4: the undercount is the
+#                             better error.
+#
+# Nested aliases (Java vs JavaScript) need no declaration — the matcher sorts
+# ALL aliases by length descending and consumes matched spans, so JavaScript is
+# claimed before Java gets a turn.
+#
+# ---
+#
+# NOT IN SCOPE (§4, deferred to post-pilot): skills that need *reading* rather
+# than *finding* — "comfortable presenting to senior stakeholders", "applies
+# professional skepticism". String matching cannot catch these. O*NET's
+# occupation-level ratings cover the soft-skill side until it is worth
+# building. Do not add near-miss heuristics for them here.
+
+skills:
+
+  # --- Data / analysis ------------------------------------------------------
+  - canonical: SQL
+    aliases: [SQL, Structured Query Language, T-SQL, TSQL, PL/SQL, PLSQL, MySQL, PostgreSQL, Postgres]
+    # REVIEW: MySQL/Postgres are specific engines. Folding them into SQL counts
+    # "experience with PostgreSQL" as SQL — usually right. Split them out if a
+    # family ever needs engine-level granularity.
+
+  - canonical: Excel
+    aliases: [Excel, Microsoft Excel, MS Excel, Excel modeling, advanced Excel]
+
+  - canonical: Power BI
+    aliases: [Power BI, PowerBI, Power-BI, Microsoft Power BI]
+
+  - canonical: Tableau
+    aliases: [Tableau, Tableau Desktop]
+
+  - canonical: Python
+    aliases: [Python, Python 3]
+
+  - canonical: R
+    match_mode: qualified
+    aliases: [R]
+    qualifiers: ["R programming", "in R", "using R", "R/Python", "Python/R", "R studio", "RStudio", "R language"]
+    # §4 edge case 4. Bare "R" matches nearly everything. Undercount accepted.
+
+  - canonical: SAS
+    aliases: [SAS]
+
+  - canonical: Alteryx
+    aliases: [Alteryx]
+
+  - canonical: Looker
+    aliases: [Looker, Looker Studio]
+
+  - canonical: Statistics
+    aliases: [statistics, statistical analysis, descriptive statistics, regression analysis]
+
+  - canonical: Data Visualization
+    aliases: [data visualization, data visualisation, dashboarding, dashboard development]
+
+  - canonical: ETL
+    aliases: [ETL, ELT, extract transform load, data pipeline, data pipelines]
+
+  # --- Finance / accounting -------------------------------------------------
+  - canonical: Financial Modeling
+    aliases: [financial modeling, financial modelling, financial models, three-statement model, 3-statement model]
+
+  - canonical: Forecasting
+    aliases: [forecasting, financial forecasting, demand forecasting, budgeting and forecasting]
+
+  - canonical: Variance Analysis
+    aliases: [variance analysis, budget variance, actual vs budget]
+
+  - canonical: GAAP
+    aliases: [GAAP, US GAAP, generally accepted accounting principles]
+
+  - canonical: Financial Reporting
+    aliases: [financial reporting, month-end close, month end close, financial statements]
+
+  - canonical: SAP
+    aliases: [SAP, SAP ERP, SAP S/4HANA]
+
+  - canonical: Oracle
+    aliases: [Oracle, Oracle ERP, Oracle Financials, NetSuite]
+    # REVIEW: NetSuite is Oracle-owned but a distinct product. Split if finance
+    # families need the distinction.
+
+  - canonical: QuickBooks
+    aliases: [QuickBooks, Quick Books, QBO]
+
+  # --- Engineering / software ----------------------------------------------
+  - canonical: JavaScript
+    aliases: [JavaScript, JS, ECMAScript]
+    # §4 edge case 2 — must be claimed before Java. Handled by global
+    # longest-first ordering + span consumption, not by anything declared here.
+
+  - canonical: TypeScript
+    aliases: [TypeScript, TS]
+    # REVIEW: bare "TS" is risky — it appears as an abbreviation elsewhere
+    # (e.g. "TS/SCI" clearance). Candidate for removal on first spot-check.
+
+  - canonical: Java
+    aliases: [Java]
+
+  - canonical: C++
+    match_mode: symbol
+    aliases: [C++, CPP, C plus plus]
+    # §4 edge case 3. `+` is itself a word boundary; \b cannot fence this.
+
+  - canonical: C#
+    match_mode: symbol
+    aliases: ["C#", "C-Sharp", "C Sharp", ".NET", "dotnet"]
+    # REVIEW: .NET is a framework, not the language. Folding it in is usually
+    # right for demand signal, arguably wrong for precision.
+
+  - canonical: Go
+    match_mode: qualified
+    aliases: [Go]
+    qualifiers: ["Go programming", "in Go", "using Go", "Golang", "Go language"]
+    # §4 edge case 4. "Go" matches every "go to market".
+
+  - canonical: Git
+    aliases: [Git, GitHub, GitLab, version control]
+
+  - canonical: REST APIs
+    aliases: [REST API, REST APIs, RESTful, RESTful API, REST]
+
+  - canonical: AWS
+    aliases: [AWS, Amazon Web Services]
+
+  - canonical: Azure
+    aliases: [Azure, Microsoft Azure]
+
+  - canonical: Docker
+    aliases: [Docker, containerization, containerisation]
+
+  - canonical: CI/CD
+    aliases: [CI/CD, CICD, continuous integration, continuous deployment, Jenkins]
+
+  # --- Business / operations ------------------------------------------------
+  - canonical: Salesforce
+    aliases: [Salesforce, SFDC, Salesforce CRM]
+    # REVIEW — §12 names this one explicitly: is "Salesforce Admin" a skill or
+    # a job title? If it reads as a title, the posting is a Salesforce Admin
+    # role and counting "Salesforce" as a required skill is arguably circular.
+
+  - canonical: Requirements Gathering
+    aliases: [requirements gathering, requirements elicitation, business requirements, BRD]
+
+  - canonical: Process Mapping
+    aliases: [process mapping, process documentation, workflow mapping, process improvement]
+
+  - canonical: Project Management
+    aliases: [project management, project coordination, PMP]
+
+  - canonical: Agile
+    aliases: [Agile, Scrum, Kanban, sprint planning]
+
+  - canonical: Jira
+    aliases: [Jira, Atlassian Jira]
+
+  - canonical: Stakeholder Management
+    aliases: [stakeholder management, stakeholder engagement]
+    # BORDERLINE — this edges toward §4's deferred set. It is findable as a
+    # phrase, but "comfortable presenting to senior stakeholders" is not, and
+    # counting only the literal phrase undercounts in a way that looks like
+    # signal. Flagged for the review pass.
+
+  # --- Added 2026-08-19 from corpus evidence ---------------------------------
+  #
+  # These seven are the entire harvest from skill_terms_review.csv's 121
+  # terms that fired against real postings. Everything else in that 121 was a
+  # collision rather than a skill -- see the decision note at the top of this
+  # file. Each of these was checked against what the posting text actually
+  # said, not just accepted for having a fire count.
+
+  - canonical: Google Analytics
+    aliases: [Google Analytics, GA4, Google Analytics 4]
+    # 18 postings. Marketing-side analytics, which the curated list had no
+    # entry for at all despite marketing being a named target role family.
+
+  - canonical: Adobe Analytics
+    aliases: [Adobe Analytics, Omniture, Adobe Experience Cloud]
+    # 8 postings.
+
+  - canonical: Google Ads
+    aliases: [Google Ads, Google AdWords, AdWords, Google Ad Manager]
+    # 5 postings.
+
+  - canonical: Social Media Marketing
+    aliases: [social media marketing, social media strategy, social media management, paid social]
+    # 15 postings fired on the bare term "social media", which is too loose --
+    # "follow us on social media" is not a skill. The aliases here require the
+    # word to be doing work.
+
+  - canonical: Epic
+    aliases: [Epic Systems, EpicCare, Epic EHR, Epic EMR]
+    # 17 postings. Deliberately NOT aliased as bare "Epic" -- "epic
+    # collaboration" and "epic scale" are common prose, and the review file's
+    # own fire count for the bare term is inflated by exactly that. Worth
+    # carrying because seven of the 44 DFW employers are health systems and
+    # Epic is the dominant EHR.
+
+  - canonical: Figma
+    aliases: [Figma]
+    # 4 postings.
+
+  - canonical: Node.js
+    aliases: [Node.js, NodeJS, Node JS]
+    # 4 postings. Bare "Node" is excluded on purpose -- too collision-prone.

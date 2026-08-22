@@ -52,7 +52,11 @@ MIN_SUBMISSION_COMMENTS = 3
 EXPECTED = {
     "student_jordanReyes.json":  {"courses": 5, "enrollments": 5, "assignments": 12, "submissions": 11},
     "student_priyaNair.json":    {"courses": 6, "enrollments": 6, "assignments": 19, "submissions": 14},
-    "student_ethanBrooks.json":  {"courses": 6, "enrollments": 6, "assignments": 24, "submissions": 17},
+    # Courses/enrollments updated to 8 (from 6) for the SMU CS-BS conversion
+    # (planning-docs/degree-planner-spec.md §8.4); assignments/submissions
+    # deliberately untouched -- still describe the old TAMU profile pending
+    # new SMU-specific content, per this file's own _notes.
+    "student_ethanBrooks.json":  {"courses": 8, "enrollments": 8, "assignments": 24, "submissions": 17},
     "student_marcusWebb.json":   {"courses": 4, "enrollments": 4, "assignments": 9,  "submissions": 9},
     "student_sofiaRamirez.json": {"courses": 5, "enrollments": 5, "assignments": 17, "submissions": 12},
 }

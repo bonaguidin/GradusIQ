@@ -1,0 +1,240 @@
+# Role family rules — title → one of the 14 target roles
+#
+# REWRITTEN 2026-08-19. The previous version mapped ten general professional
+# occupations (financial_analyst, accountant, data_engineer, it_support,
+# supply_chain). Those came from table 2 of DFW_Market_Research_MVP_Analysis_v3
+# and were correct for the mid-career "Career OS" concept this project started
+# as. The product now serves students, and the fourteen families below are the
+# keys in data/role_requirements.json — the same strings FIT and GAP already
+# use. A family that does not exist there produces postings nothing can
+# retrieve.
+#
+# ============================================================================
+# READ THIS BEFORE EXPECTING COVERAGE: ~99% OF EMPLOYER-BOARD POSTINGS WILL
+# MAP TO NULL, AND THAT IS CORRECT BEHAVIOUR.
+# ============================================================================
+#
+# Measured, not guessed. Of the 153 real postings pulled from PMG and Match
+# Group, exactly 2 have student- or intern-shaped titles — 1.3%, and one of
+# those is "Apprenticeship - Junior Marketing Assistant", which is a stretch.
+# Atmos Energy's board returns "Sr Applications Developer", "Service
+# Technician", "Mgr Safety".
+#
+# That is not a defect in these rules. It is what an employer's own ATS board
+# is: every open role at the company, overwhelmingly experienced hires. So:
+#
+#   - Employer-direct fetching (ATS, Workday) is the right tool for BREADTH —
+#     which DFW employers are hiring, in what volume, wanting which skills.
+#     Expect a student-role hit rate around 1-2%.
+#   - Adzuna and JSearch are the right tool for STUDENT ROLES specifically,
+#     because they are searched by role. Their target_role comes from the
+#     query and never touches this file.
+#
+# Anyone reading a low mapped-count as "the rules are broken" will start
+# loosening phrases until general postings match student families. That is the
+# silent-failure mode §5 warns about, and it is worse than mapping nothing.
+#
+# ============================================================================
+#
+# MATCHING: longest phrase first, globally across all families. A title
+# claimed by "software engineering intern" never reaches a bare "intern" rule.
+# `exclude_phrases` beats any match.
+#
+# NO MATCH → role_family: NULL. The posting is still written. NEVER dropped.
+# The unmapped bin is the feedback loop — run tools/verify_sample.py --unmapped
+# after a pull and fix this file, per §5's "wrong rules get rewritten and
+# tonight's pull re-run."
+#
+# SENIORITY IS NOT PART OF THE FAMILY (§6). normalize_title() collapses
+# Sr./Senior/II/III before matching, so a phrase containing a seniority word is
+# dead config. Level lives in `seniority` and is filtered at read time.
+#
+# STATUS: first pass, unreviewed. Every family below needs Kasheia's eye on
+# whether the phrases claim the right postings — particularly the boundary
+# between Computer Engineering / Embedded Systems, and between Lab Assistant /
+# Research Assistant, which overlap in real posting language.
+
+families:
+
+  # --- Software and computing ------------------------------------------------
+
+  - family: Software Engineering Intern
+    match_phrases:
+      - software engineering intern
+      - software engineer intern
+      - software developer intern
+      - software development intern
+      - swe intern
+      - backend engineering intern
+      - frontend engineering intern
+      - full stack engineering intern
+      - web development intern
+      - mobile development intern
+      - application development intern
+    exclude_phrases:
+      - sales engineer intern
+      # Sales engineering is a commercial role wearing an engineering title.
+
+  - family: Computer Engineering Intern
+    match_phrases:
+      - computer engineering intern
+      - computer engineer intern
+      - hardware engineering intern
+      - hardware engineer intern
+      - digital design intern
+      - fpga intern
+      - asic intern
+      - vlsi intern
+    # BOUNDARY NOTE: hardware/firmware language overlaps Embedded Systems
+    # below. Where a posting says both, longest-phrase-first decides, which
+    # may not be the right call. Needs review against real titles.
+
+  - family: Embedded Systems Intern
+    match_phrases:
+      - embedded systems intern
+      - embedded software intern
+      - embedded engineering intern
+      - firmware intern
+      - firmware engineering intern
+      - rtos intern
+
+  # --- Business, finance, operations -----------------------------------------
+
+  - family: Business Analyst Intern
+    match_phrases:
+      - business analyst intern
+      - business analysis intern
+      - business systems analyst intern
+      - business intelligence intern
+      - data analyst intern
+      - analytics intern
+      - reporting analyst intern
+    exclude_phrases:
+      - financial analyst intern
+      # Claimed by Finance Intern below; listed here so the more specific
+      # finance phrase is never stolen by a generic analyst rule.
+
+  - family: Finance Intern
+    match_phrases:
+      - finance intern
+      - financial analyst intern
+      - financial planning and analysis intern
+      - fp&a intern
+      - corporate finance intern
+      - accounting intern
+      - audit intern
+      - tax intern
+      - treasury intern
+      - investment banking intern
+    exclude_phrases:
+      - financial advisor intern
+      - financial services representative
+      # Client-facing sales, not analysis.
+
+  - family: Operations Intern
+    match_phrases:
+      - operations intern
+      - business operations intern
+      - supply chain intern
+      - logistics intern
+      - procurement intern
+      - inventory intern
+      - demand planning intern
+      - process improvement intern
+
+  # --- Engineering (aero / mechanical) ---------------------------------------
+
+  - family: Aerospace Engineering Intern
+    match_phrases:
+      - aerospace engineering intern
+      - aerospace engineer intern
+      - aeronautical engineering intern
+      - propulsion intern
+      - aerodynamics intern
+
+  - family: Flight Systems Intern
+    match_phrases:
+      - flight systems intern
+      - flight software intern
+      - flight test intern
+      - avionics intern
+      - guidance navigation and control intern
+      - gnc intern
+
+  - family: Mechanical Analysis Intern
+    match_phrases:
+      - mechanical analysis intern
+      - mechanical engineering intern
+      - mechanical engineer intern
+      - stress analysis intern
+      - structural analysis intern
+      - finite element intern
+      - fea intern
+      - thermal analysis intern
+      - cad intern
+
+  # --- Research and health ---------------------------------------------------
+
+  - family: Lab Assistant
+    match_phrases:
+      - lab assistant
+      - laboratory assistant
+      - lab technician
+      - laboratory technician
+      - lab aide
+      - research lab assistant
+    # BOUNDARY NOTE: "research lab assistant" is claimed here rather than by
+    # Research Assistant, on the reasoning that lab work is the distinguishing
+    # feature. Reasonable people could go the other way; needs review.
+
+  - family: Pre-Health Clinical Volunteer
+    match_phrases:
+      - clinical volunteer
+      - hospital volunteer
+      - patient care volunteer
+      - clinical experience volunteer
+      - patient care technician
+      - medical scribe
+      - clinical research volunteer
+    # COVERAGE WARNING: this role tested empty on both Adzuna and JSearch on
+    # 2026-08-17 — zero results in DFW from either vendor. Two-vendor agreement
+    # on near-zero volume is a real market-coverage gap, not a rules problem.
+    # See planning-docs/job-posting-integration-spec.md §6a. Do not loosen
+    # these phrases chasing volume that is not there.
+
+  - family: Research Assistant
+    match_phrases:
+      - research assistant
+      - undergraduate research assistant
+      - research intern
+      - research associate intern
+      - student researcher
+    exclude_phrases:
+      - market research
+      - user research
+      # Commercial research functions, not academic research posts.
+
+  # --- People and student-facing ---------------------------------------------
+
+  - family: People Operations Intern
+    match_phrases:
+      - people operations intern
+      - human resources intern
+      - hr intern
+      - talent acquisition intern
+      - recruiting intern
+      - people team intern
+      - talent intern
+
+  - family: Student Success Peer Mentor
+    match_phrases:
+      - peer mentor
+      - student success peer mentor
+      - peer tutor
+      - peer advisor
+      - student success coach
+      - academic peer mentor
+      - orientation leader
+      - resident advisor
+    # Mostly institution-internal postings rather than employer-board ones.
+    # Expect these to come from the university, not from Workday.

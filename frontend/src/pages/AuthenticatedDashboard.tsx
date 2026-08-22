@@ -8,6 +8,10 @@ import { ChatPanel } from '../components/ChatPanel';
 import { GuidedTour } from '../components/GuidedTour';
 import { DashboardSuccessNotice } from '../components/DashboardSuccessNotice';
 import { CourseDiscoveryPanel } from '../components/CourseDiscoveryPanel';
+import { RequirementSatisfactionPanel } from '../components/RequirementSatisfactionPanel';
+import { DegreeSchedulePanel } from '../components/DegreeSchedulePanel';
+import { DegreePlannerSummary } from '../components/DegreePlannerSummary';
+import type { DegreeScheduleResponse } from '../api/degreeSchedule';
 import { FitAnalysisPanel } from '../components/FitAnalysisPanel';
 import { GapAnalysisPanel } from '../components/GapAnalysisPanel';
 import { ShiftAnalysisPanel } from '../components/ShiftAnalysisPanel';
@@ -66,6 +70,7 @@ export function AuthenticatedDashboard() {
   const [railOpen, setRailOpen] = useState(false);
   const [fieldFocus, setFieldFocus] = useState<CareerFieldFocus | null>(null);
   const [profileSaved, setProfileSaved] = useState(false);
+  const [degreeScheduleResult, setDegreeScheduleResult] = useState<DegreeScheduleResponse | null>(null);
   // Lifted out of GapAnalysisPanel/FitAnalysisPanel/ShiftAnalysisPanel (each
   // still owns its own internal useCachedAnalysisRun by default) so Career
   // Overview and Career Intelligence read the same independent run states.
@@ -494,6 +499,19 @@ export function AuthenticatedDashboard() {
                   selectedRole={courseDiscoverySelectedRole}
                   onSelectedRoleChange={setCourseDiscoverySelectedRole}
                 />
+                <div className="degree-planner-flow">
+                  <DegreePlannerSummary
+                    institution={dashboard.institutionName}
+                    major={major}
+                    expectedGraduation={dashboard.expectedGraduation}
+                    schedule={degreeScheduleResult}
+                  />
+                  <DegreeSchedulePanel
+                    targetRole={dashboard.career.target_roles[0]}
+                    onResult={setDegreeScheduleResult}
+                  />
+                  <RequirementSatisfactionPanel />
+                </div>
               </div>
             )}
 

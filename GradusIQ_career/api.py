@@ -22,7 +22,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterator, Literal
+from typing import Any, Iterator, Literal, Mapping
 from pydantic import BaseModel, ConfigDict, Field
 
 from dotenv import load_dotenv
@@ -36,6 +36,7 @@ from GradusIQ_career.ai.contracts import ChatOutput, feature_output_is_valid
 from GradusIQ_career.ai.runtime import AIRuntime
 from GradusIQ_career.ai.model_config import (
     ROLES_VALIDATED_AT_STARTUP,
+    get_model_for_role,
     validate_configured_models,
 )
 from GradusIQ_career.ai.openrouter_client import (
@@ -57,7 +58,7 @@ from GradusIQ_career.planning.planned import (
     remove_planned,
 )
 from GradusIQ_career.planning.search import CatalogSearchError, search_catalog
-from GradusIQ_career.planning.term_view import fetch_terms_view
+from GradusIQ_career.planning.term_view import TermsView, fetch_terms_view
 from GradusIQ_career.planning.lifecycle import (
     CourseNotEditable,
     LifecycleError,
@@ -69,14 +70,49 @@ from GradusIQ_career.planning.lifecycle import (
 )
 from GradusIQ_career.action_planning import build_action_plan, dependency_order
 from GradusIQ_career.course_discovery.agent import CourseDiscoveryAgent
+from GradusIQ_career.course_discovery.catalog import LocalCatalogRepository
 from GradusIQ_career.course_discovery.models import (
+    CatalogInstitution,
+    CareerSkillNeed,
+    CourseCatalogRecord,
     CourseDiscoveryContext,
     PlannedCourseEvidence,
+    StructuredPrerequisite,
     resolve_institution,
 )
 from GradusIQ_career.course_discovery.needs import derive_career_skill_needs
+from GradusIQ_career.course_discovery.prerequisites import structured_prerequisite
 from GradusIQ_career.features.market_data import is_role_supported, supported_target_roles
 from GradusIQ_career.course_discovery.service import CourseDiscoveryService
+from GradusIQ_career.course_discovery.requirement_satisfaction import (
+    evaluate_requirement_tree,
+    to_satisfaction_result,
+)
+from GradusIQ_career.course_discovery.requirement_selection import (
+    RequirementSelectionResult,
+    select_structured_requirements,
+    structured_candidate_codes,
+)
+from GradusIQ_career.course_discovery.scheduler import (
+    ScheduleResult,
+    _next_long_term,
+    satisfied_course_codes,
+    schedule_courses,
+)
+from GradusIQ_career.course_discovery.scheduler_scope import scope_schedule_input
+from GradusIQ_career.course_discovery.technical_elective_candidates import (
+    TECHNICAL_ELECTIVE_NAME,
+    TECHNICAL_ELECTIVE_RULE_ID,
+    generate_technical_elective_candidates,
+)
+from GradusIQ_career.course_discovery.requirement_ranker import rank_requirement_candidates
+from GradusIQ_career.degree_plan_career_optimization import (
+    CareerOptimizationCoordinator,
+    CareerOptimizedScheduleResponse,
+    build_requirement_ranking_fingerprint,
+    compute_career_optimized_response,
+    skipped_response,
+)
 from GradusIQ_career.resume.extraction import extract_resume_text
 from GradusIQ_career.resume.parser import parse_resume_text
 from GradusIQ_career.resume.review import (
@@ -93,6 +129,7 @@ from GradusIQ_career.resume.store import (
     store_parsed_resume,
     write_confirmed_academic_facts,
 )
+from GradusIQ_career.requirement_satisfaction_fetch import fetch_requirement_tree
 from GradusIQ_career.supabase_client import SupabaseConfigError, build_client_for_token
 from GradusIQ_career.transcript.catalog import match_courses
 from GradusIQ_career.transcript.crosscheck import cross_check_terms
@@ -1081,6 +1118,14 @@ class CourseDiscoveryRequest(BaseModel):
     target_role: str | None = Field(default=None, min_length=1, max_length=150)
 
 
+class CareerOptimizeScheduleRequest(BaseModel):
+    """Career preference only; every academic input is rebuilt server-side."""
+
+    model_config = ConfigDict(extra="forbid")
+    target_role: str | None = Field(default=None, min_length=1, max_length=150)
+    force_refresh: bool = False
+
+
 def _resolve_course_discovery_inputs(
     request: Request, body: CourseDiscoveryRequest | None
 ):
@@ -1720,6 +1765,55 @@ def _home_institution_id(client, student_id: str) -> str:
     return home_rows[0]["institution_id"]
 
 
+def _resolve_program_id_for_student(client, student_id: str) -> str | None:
+    """The programs.id matching this student's home institution + catalog year.
+
+    Returns None -- not an HTTPException -- when there is no home
+    institution, no catalog_year on it, or no programs row for that
+    (institution_id, catalog_year) pair. Unlike _home_institution_id's 409,
+    this is an expected outcome today for every student except Ethan
+    Brooks/SMU CS-BS: the requirement-skeleton tables (programs,
+    requirement_groups, ...) currently hold exactly one program, so "no
+    program data for this student" is the common case, not a data-integrity
+    problem worth erroring on. Joins on catalog_year rather than major/degree
+    text, matching why student_institutions.catalog_year was added
+    (20260819140000): programs.catalog_year is the same key
+    requirement_groups snapshots are pinned to (20260818130000).
+    """
+    try:
+        home_rows = (
+            client.table("student_institutions")
+            .select("institution_id,catalog_year")
+            .eq("student_id", student_id)
+            .eq("relationship", "home")
+            .execute()
+            .data
+        )
+    except Exception as exc:  # noqa: BLE001 -- RLS denial or transport
+        raise HTTPException(status_code=502, detail="Could not resolve institution.") from exc
+    if not home_rows:
+        return None
+    institution_id = home_rows[0]["institution_id"]
+    catalog_year = home_rows[0].get("catalog_year")
+    if not catalog_year:
+        return None
+
+    try:
+        program_rows = (
+            client.table("programs")
+            .select("id")
+            .eq("institution_id", institution_id)
+            .eq("catalog_year", catalog_year)
+            .execute()
+            .data
+        )
+    except Exception as exc:  # noqa: BLE001 -- RLS denial or transport
+        raise HTTPException(status_code=502, detail="Could not resolve program.") from exc
+    if not program_rows:
+        return None
+    return program_rows[0]["id"]
+
+
 def _reconcile_course_lifecycle(client, student_id: str) -> None:
     """Promote due planned courses before serving academic data.
 
@@ -2253,6 +2347,420 @@ def patch_me_course_record(
     return {"course_record": updated}
 
 
+@router.get(
+    "/api/v2/student/me/requirement-satisfaction",
+    dependencies=[Depends(authorize_proxy_request)],
+)
+def get_me_requirement_satisfaction(request: Request) -> dict:
+    """Degree-requirement progress against the student's program, if any.
+
+    Live for exactly one program today (SMU CS-BS / Ethan Brooks). Every
+    other student's institution+catalog_year resolves to no programs row,
+    which is reported as a 200 skipped FeatureResult -- the same shape
+    every other feature uses for an unmet precondition -- rather than a
+    4xx, since "no requirement data for your program yet" is expected
+    product state, not a client error. evaluate_requirement_tree() is a
+    pure, deterministic, sub-second computation, so this route deliberately
+    does not use either of the existing analysis-cache layers (demo file
+    cache, student_analysis_cache): both exist to amortize GAP's ~100-200s
+    DeepSeek call, which has no analogue here.
+    """
+    client = _session_client(request)
+    student_id = _resolve_session_student_id(client)
+    program_id = _resolve_program_id_for_student(client, student_id)
+    if program_id is None:
+        return FeatureResult(
+            feature="REQUIREMENT_SATISFACTION",
+            status="skipped",
+            summary="Requirement tracking isn't available for your institution or program yet.",
+            missing_fields=[
+                MissingField(
+                    path="student_institutions.program",
+                    label="Supported degree program",
+                )
+            ],
+        ).to_dict()
+
+    try:
+        raw = fetch_requirement_tree(client, program_id, student_id)
+        groups = evaluate_requirement_tree(
+            raw.groups, raw.options, raw.option_courses, raw.course_records, raw.catalog_by_gid
+        )
+        result = to_satisfaction_result(str(student_id), str(program_id), groups)
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001 -- unexpected fetch/evaluation failure
+        raise HTTPException(status_code=502, detail="Requirement satisfaction is unavailable.") from exc
+
+    return result.model_dump(mode="json")
+
+
+def _parse_expected_graduation(value: str) -> tuple[int, Literal["Fall", "Spring"]] | None:
+    """'Spring 2029' -> (2029, 'Spring'). None on anything else -- write-time
+    validation (see the students.expected_graduation format migration)
+    already restricts stored values to 'Fall YYYY'/'Spring YYYY', but this
+    read path stays defensive rather than trusting that unconditionally."""
+    parts = value.split()
+    if len(parts) != 2 or parts[0] not in ("Fall", "Spring"):
+        return None
+    try:
+        year = int(parts[1])
+    except ValueError:
+        return None
+    return year, parts[0]  # type: ignore[return-value]
+
+
+def _resolve_starting_term(terms_view: TermsView) -> tuple[int, Literal["Fall", "Spring"]] | None:
+    """First Fall/Spring term at or after the student's upcoming term slot.
+
+    v1 schedules long terms only (scheduler.py's own simplification, see its
+    _NEXT_LONG_TERM) -- if the upcoming slot named by fetch_terms_view is an
+    intersession (May/Summer/August), this walks forward through the same
+    already-sorted terms list to the next real long term rather than
+    re-deriving "upcoming" itself.
+    """
+    if terms_view.upcoming_term_key is None:
+        return None
+    keys = [term["key"] for term in terms_view.terms]
+    try:
+        start_index = keys.index(terms_view.upcoming_term_key)
+    except ValueError:
+        return None
+    for term in terms_view.terms[start_index:]:
+        if term["season"] in ("Fall", "Spring"):
+            return term["year"], term["season"]
+    return None
+
+
+def _term_ordinal(year: int, season: str) -> int:
+    # Spring N precedes Fall N precedes Spring N+1 in real calendar time.
+    return year * 2 + (0 if season == "Spring" else 1)
+
+
+def _count_long_terms(
+    start_year: int, start_season: Literal["Fall", "Spring"], end_year: int, end_season: Literal["Fall", "Spring"]
+) -> int:
+    """Fall/Spring terms from the starting term through expected_graduation,
+    inclusive. Reuses scheduler._next_long_term's own Fall<->Spring
+    alternation rather than re-deriving it. 0 if graduation is already at or
+    before the starting term -- schedule_courses' own over-constrained check
+    (max_terms=0 against a non-empty course list) handles that case rather
+    than this needing to special-case it."""
+    if _term_ordinal(end_year, end_season) < _term_ordinal(start_year, start_season):
+        return 0
+    count = 1
+    year, season = start_year, start_season
+    while (year, season) != (end_year, end_season):
+        year, season = _next_long_term(year, season)
+        count += 1
+    return count
+
+
+@dataclass(frozen=True)
+class _AcademicScheduleState:
+    student_id: str
+    program_id: str
+    groups: list[Any]
+    raw: Any
+    base_courses: list[Any]
+    base_unscheduled: list[Any]
+    prerequisites: dict[str, StructuredPrerequisite]
+    already_satisfied: set[str]
+    starting_year: int
+    starting_season: Literal["Fall", "Spring"]
+    max_terms: int
+    academic_selection: RequirementSelectionResult
+    academic_schedule: ScheduleResult
+    catalog_by_code: dict[str, CourseCatalogRecord]
+    catalog_institution: CatalogInstitution | None
+
+
+def _reconstruct_academic_schedule(request: Request) -> _AcademicScheduleState | FeatureResult:
+    """Provider-free authoritative schedule state shared by GET and preview POST."""
+    client = _session_client(request)
+    student_id = _resolve_session_student_id(client)
+    program_id = _resolve_program_id_for_student(client, student_id)
+    if program_id is None:
+        return FeatureResult(
+            feature="SCHEDULE", status="skipped",
+            summary="Requirement tracking isn't available for your institution or program yet.",
+            missing_fields=[MissingField(
+                path="student_institutions.program", label="Supported degree program"
+            )],
+        )
+
+    student_rows = client.table("students").select("expected_graduation").eq("id", student_id).execute().data
+    expected_graduation = student_rows[0].get("expected_graduation") if student_rows else None
+    graduation_term = _parse_expected_graduation(expected_graduation) if expected_graduation else None
+    if graduation_term is None:
+        return FeatureResult(
+            feature="SCHEDULE", status="skipped",
+            summary="Add your expected graduation term to see a scheduled plan.",
+            missing_fields=[MissingField(
+                path="students.expected_graduation", label="Expected graduation term"
+            )],
+        )
+
+    institution_id = _home_institution_id(client, student_id)
+    terms_view = fetch_terms_view(client, student_id, institution_id)
+    starting_term = _resolve_starting_term(terms_view)
+    if starting_term is None:
+        return FeatureResult(
+            feature="SCHEDULE", status="skipped",
+            summary="No upcoming term is on your institution's calendar yet.",
+            missing_fields=[],
+        )
+
+    raw = fetch_requirement_tree(client, program_id, student_id)
+    groups = evaluate_requirement_tree(
+        raw.groups, raw.options, raw.option_courses, raw.course_records, raw.catalog_by_gid
+    )
+    courses, unscheduled = scope_schedule_input(
+        groups, raw.options, raw.option_courses, raw.catalog_by_gid, raw.catalog_credit_by_code
+    )
+    institution_rows = client.table("institutions").select("name").eq("id", institution_id).execute().data
+    institution_name = institution_rows[0]["name"] if institution_rows else None
+    catalog_institution = resolve_institution(institution_name)
+    catalog_repo = LocalCatalogRepository()
+    candidate_codes = structured_candidate_codes(
+        groups, raw.groups, raw.options, raw.option_courses, raw.catalog_by_gid
+    )
+    relevant_codes = sorted({course.course_code for course in courses} | candidate_codes)
+    catalog_by_code: dict[str, CourseCatalogRecord] = {}
+    prerequisites: dict[str, StructuredPrerequisite] = {}
+    for course_code in relevant_codes:
+        catalog_record = (
+            catalog_repo.get(catalog_institution, course_code) if catalog_institution else None
+        )
+        if catalog_record is not None:
+            catalog_by_code[course_code] = catalog_record
+        prerequisites[course_code] = (
+            structured_prerequisite(catalog_record)
+            if catalog_record else StructuredPrerequisite(raw_text=None)
+        )
+    already_satisfied = satisfied_course_codes(raw.course_records)
+    starting_year, starting_season = starting_term
+    max_terms = _count_long_terms(
+        starting_year, starting_season, graduation_term[0], graduation_term[1]
+    )
+    selection = select_structured_requirements(
+        groups, raw.groups, raw.options, raw.option_courses, raw.catalog_by_gid,
+        raw.catalog_credit_by_code, courses, unscheduled, prerequisites,
+        already_satisfied, student_id=str(student_id), program_id=str(program_id),
+        starting_year=starting_year, starting_season=starting_season, max_terms=max_terms,
+    )
+    result = schedule_courses(
+        str(student_id), str(program_id), selection.courses, prerequisites,
+        already_satisfied, selection.unscheduled, starting_year=starting_year,
+        starting_season=starting_season, max_terms=max_terms,
+    )
+    return _AcademicScheduleState(
+        student_id=str(student_id), program_id=str(program_id), groups=groups, raw=raw,
+        base_courses=courses, base_unscheduled=unscheduled, prerequisites=prerequisites,
+        already_satisfied=already_satisfied, starting_year=starting_year,
+        starting_season=starting_season, max_terms=max_terms,
+        academic_selection=selection, academic_schedule=result,
+        catalog_by_code=catalog_by_code,
+        catalog_institution=catalog_institution,
+    )
+
+
+@router.get(
+    "/api/v2/student/me/schedule",
+    dependencies=[Depends(authorize_proxy_request)],
+)
+def get_me_schedule(request: Request) -> dict:
+    """Term-by-term schedule for the student's remaining no-choice
+    requirements, per planning-docs/degree-planner-spec.md §10/§10.1.
+
+    Mirrors get_me_requirement_satisfaction exactly: same auth chain, same
+    program_id resolution, same 200-skipped shape when there is no program
+    data for this student yet. On success, evaluate_requirement_tree() runs
+    the same as the requirement-satisfaction route, then
+    scope_schedule_input() (course_discovery/scheduler_scope.py) splits the
+    tree into schedule_courses()'s two inputs before calling it.
+
+    An over-constrained result (ScheduleResult.status == "ERROR") is still a
+    200: schedule_courses() succeeded at determining the plan is infeasible,
+    which is a real, valid result -- not a server error -- exactly the same
+    reasoning FeatureResult's own 'failed'/'skipped' statuses already apply
+    to other routes returning 200 with a non-success payload intact.
+    """
+    try:
+        state = _reconstruct_academic_schedule(request)
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001 -- unexpected fetch/evaluation failure
+        raise HTTPException(status_code=502, detail="Schedule is unavailable.") from exc
+
+    if isinstance(state, FeatureResult):
+        return state.to_dict()
+    return state.academic_schedule.model_dump(mode="json")
+
+
+@router.get(
+    "/api/v2/student/me/degree-plan/technical-electives",
+    dependencies=[Depends(authorize_proxy_request)],
+)
+def get_me_technical_elective_candidates(request: Request) -> dict:
+    """Read-only provisional SMU CS 3000+ pool for the manual requirement."""
+    try:
+        state = _reconstruct_academic_schedule(request)
+        if isinstance(state, FeatureResult):
+            return state.to_dict()
+        technical_rows = [
+            row for row in state.raw.groups
+            if row.get("coursedog_rule_id") == TECHNICAL_ELECTIVE_RULE_ID
+            and row.get("name") == TECHNICAL_ELECTIVE_NAME
+            and row.get("group_type") == "freeform"
+            and row.get("requires_manual_definition") is True
+        ]
+        if len(technical_rows) != 1 or state.catalog_institution is None:
+            return FeatureResult(
+                feature="TECHNICAL_ELECTIVE_CANDIDATES",
+                status="skipped",
+                summary="Technical elective options aren't available for this degree program yet.",
+                missing_fields=[],
+            ).to_dict()
+        requirement = technical_rows[0]
+        planned_codes = {
+            course.course_code for course in state.academic_selection.courses
+        } | {
+            course.course_code
+            for term in state.academic_schedule.terms
+            for course in term.courses
+        }
+        result = generate_technical_elective_candidates(
+            student_id=state.student_id,
+            program_id=state.program_id,
+            requirement_group_id=str(requirement["id"]),
+            requirement_name=str(requirement["name"]),
+            catalog_year=str(requirement["catalog_year"]),
+            catalog_courses=LocalCatalogRepository().records(state.catalog_institution),
+            completed_or_in_progress_codes=state.already_satisfied,
+            planned_or_selected_codes=planned_codes,
+        )
+        return result.model_dump(mode="json")
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001 -- preserve the academic UI on local failure
+        raise HTTPException(
+            status_code=502, detail="Technical elective options are unavailable."
+        ) from exc
+
+
+@router.post(
+    "/api/v2/student/me/schedule/career-optimize",
+    dependencies=[Depends(authorize_proxy_request)],
+)
+def post_me_schedule_career_optimize(
+    request: Request, body: CareerOptimizeScheduleRequest
+) -> dict:
+    """Explicit, non-persisted career-ranking preview over academic choices."""
+    try:
+        state = _reconstruct_academic_schedule(request)
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001 -- same academic boundary as GET
+        raise HTTPException(status_code=502, detail="Schedule is unavailable.") from exc
+    if isinstance(state, FeatureResult):
+        return state.to_dict()
+
+    resolved_model = get_model_for_role("course_discovery")
+    client = _session_client(request)
+    canonical = build_student_intelligence_profile(client, state.student_id)
+    confirmed_roles = canonical.career.target_roles if canonical.career.confirmed else []
+    requested_role = body.target_role.strip() if body.target_role else None
+    target_role = requested_role or (confirmed_roles[0] if len(confirmed_roles) == 1 else None)
+    if target_role is None:
+        summary = (
+            "Choose which confirmed target role should guide this preview."
+            if len(confirmed_roles) > 1
+            else "Confirm a target role before optimizing this schedule for a career."
+        )
+        return skipped_response(
+            academic_schedule=state.academic_schedule, resolved_model=resolved_model,
+            target_role=None, summary=summary,
+        ).model_dump(mode="json")
+    if target_role not in confirmed_roles:
+        return skipped_response(
+            academic_schedule=state.academic_schedule, resolved_model=resolved_model,
+            target_role=target_role,
+            summary="The selected target role is not confirmed on this student profile.",
+        ).model_dump(mode="json")
+    if not is_role_supported(target_role):
+        return skipped_response(
+            academic_schedule=state.academic_schedule, resolved_model=resolved_model,
+            target_role=target_role,
+            summary="Career analysis isn't available for this target role yet.",
+        ).model_dump(mode="json")
+    career_needs: list[CareerSkillNeed] = derive_career_skill_needs(canonical, target_role)
+    if not career_needs:
+        return skipped_response(
+            academic_schedule=state.academic_schedule, resolved_model=resolved_model,
+            target_role=target_role,
+            summary="No trusted unmet career-skill needs are available for this target role.",
+        ).model_dump(mode="json")
+
+    rankable = [
+        item for item in state.academic_selection.candidate_sets
+        if len(item.feasible_candidates) > 1
+    ]
+    if not rankable:
+        return skipped_response(
+            academic_schedule=state.academic_schedule, resolved_model=resolved_model,
+            target_role=target_role,
+            summary="No structured requirement has more than one feasible candidate to rank.",
+        ).model_dump(mode="json")
+    fingerprint = build_requirement_ranking_fingerprint(
+        student_id=state.student_id, target_role=target_role,
+        career_needs=career_needs, candidate_sets=rankable,
+        catalog_by_code=state.catalog_by_code, resolved_model=resolved_model,
+    )
+
+    def rank_batch(candidate_sets):
+        with request.app.state.ai_concurrency.slot():
+            model_client = build_client()
+            return [
+                rank_requirement_candidates(
+                    model_client, candidate_set, target_role=target_role,
+                    career_needs=career_needs, catalog_by_code=state.catalog_by_code,
+                )
+                for candidate_set in candidate_sets
+            ]
+
+    def build_optimized(career_ranks: Mapping[str, int]) -> ScheduleResult:
+        raw = state.raw
+        selection = select_structured_requirements(
+            state.groups, raw.groups, raw.options, raw.option_courses,
+            raw.catalog_by_gid, raw.catalog_credit_by_code, state.base_courses,
+            state.base_unscheduled, state.prerequisites, state.already_satisfied,
+            student_id=state.student_id, program_id=state.program_id,
+            starting_year=state.starting_year, starting_season=state.starting_season,
+            max_terms=state.max_terms,
+            career_rank_by_candidate_id=career_ranks,
+        )
+        return schedule_courses(
+            state.student_id, state.program_id, selection.courses,
+            state.prerequisites, state.already_satisfied, selection.unscheduled,
+            starting_year=state.starting_year,
+            starting_season=state.starting_season, max_terms=state.max_terms,
+        )
+
+    coordinator: CareerOptimizationCoordinator = request.app.state.career_optimization
+    response: CareerOptimizedScheduleResponse = coordinator.run(
+        student_id=state.student_id, fingerprint=fingerprint,
+        force_refresh=body.force_refresh,
+        compute=lambda cache_status: compute_career_optimized_response(
+            target_role=target_role, fingerprint=fingerprint,
+            resolved_model=resolved_model, academic_schedule=state.academic_schedule,
+            rankable_candidate_sets=rankable, rank_batch=rank_batch,
+            build_optimized_schedule=build_optimized, cache_status=cache_status,
+        ),
+    )
+    return response.model_dump(mode="json")
+
+
 def create_app(config: APIConfig | None = None) -> FastAPI:
     # Fail the deploy, not the first request: a placeholder model ID would
     # otherwise surface as an opaque 502 (chat) or a silent status="failed"
@@ -2275,6 +2783,7 @@ def create_app(config: APIConfig | None = None) -> FastAPI:
         active_config.rate_limit_requests, active_config.rate_limit_window_seconds
     )
     application.state.ai_concurrency = AIConcurrencyGate(active_config.max_concurrent_ai_requests)
+    application.state.career_optimization = CareerOptimizationCoordinator()
     application.add_middleware(
         CORSMiddleware,
         allow_origins=list(active_config.allowed_origins),

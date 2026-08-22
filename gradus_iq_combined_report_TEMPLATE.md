@@ -1,6 +1,15 @@
 # Gradus IQ — Combined Report
 
-**Ethan Brooks** · Texas A&M University · Generated {{report_date}}
+> **STALE WORKED EXAMPLE, PARTIALLY UPDATED.** Ethan Brooks was converted from
+> TAMU/Computer-Engineering-intended to SMU/Computer Science
+> (planning-docs/degree-planner-spec.md §8.4). The "At a Glance" table below
+> reflects his current academic record. Everything from "The Through-Line"
+> onward (Professor Comment Analyzer, Exam Gap Analysis, FIT/GAP/SHIFT
+> sections) still describes his OLD TAMU/CE profile — no SMU/CS-specific
+> replacement narrative has been drafted yet, and this whole document is a
+> worked example, not live output, so nothing reads it at runtime.
+
+**Ethan Brooks** · Southern Methodist University · Generated {{report_date}}
 
 ---
 
@@ -8,12 +17,12 @@
 
 | | |
 |---|---|
-| **Current major** | General Engineering |
-| **Intended major** | Computer Engineering (via ETAM) |
-| **Classification** | Freshman |
-| **Current GPA** | 2.64 |
-| **Expected graduation** | May 2029 |
-| **Target roles** | Software Engineering Intern · Computer Engineering Intern · Embedded Systems Intern |
+| **Current major** | Computer Science |
+| **Intended major** | N/A |
+| **Classification** | Sophomore |
+| **Current GPA** | 3.28 |
+| **Expected graduation** | Spring 2029 |
+| **Target roles** | Software Engineering Intern · Computer Engineering Intern · Embedded Systems Intern *(stale — pending career_profiles rewrite)* |
 | **Features run** | Academic (4) + Career (3) — full report |
 
 ---

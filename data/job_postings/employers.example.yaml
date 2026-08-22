@@ -1,0 +1,51 @@
+# Employer targets — spec §2
+#
+# Noah's work: the DFW employer target list. Copy this to `employers.yaml`
+# (gitignored) and fill it in. **Nothing is hardcoded in the puller** — §2 says
+# the slug list is supplied separately and read from config.
+#
+# One row per employer: {ats, slug, employer_name}
+#
+# `ats` must be one of: greenhouse | lever | ashby | smartrecruiters | recruitee
+#
+# ---
+#
+# FINDING THE SLUG — it is the identifier in the employer's own careers URL:
+#
+#   greenhouse        boards.greenhouse.io/<slug>            → job-boards.greenhouse.io works too
+#   lever             jobs.lever.co/<slug>
+#   ashby             jobs.ashbyhq.com/<slug>
+#   smartrecruiters   careers.smartrecruiters.com/<slug>     → PascalCase, and it IS case-sensitive
+#   recruitee         <slug>.recruitee.com                   → slug is the subdomain
+#
+# A wrong slug is a 404 for four of the five and a **DNS failure** for
+# Recruitee, since the slug is the hostname there. See sources/recruitee.py.
+#
+# ---
+#
+# The entries below are SHAPE EXAMPLES, not verified targets. Every one needs
+# its board confirmed to exist and to be on the ATS claimed before it goes in
+# `employers.yaml`. An unverified slug produces a failed employer in the run
+# report, which is noisy but harmless — a slug pointing at the *wrong* company
+# produces real postings attributed to the wrong employer, which is not.
+
+employers:
+  - ats: greenhouse
+    slug: example-co
+    employer_name: Example Co
+
+  - ats: lever
+    slug: example-lever-co
+    employer_name: Example Lever Co
+
+  - ats: ashby
+    slug: example-ashby-co
+    employer_name: Example Ashby Co
+
+  - ats: smartrecruiters
+    slug: ExampleSmartCo
+    employer_name: Example Smart Co
+
+  - ats: recruitee
+    slug: example-recruitee-co
+    employer_name: Example Recruitee Co

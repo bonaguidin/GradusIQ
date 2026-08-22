@@ -1,0 +1,380 @@
+[
+  {
+    "coursedog_group_id": "0019371",
+    "code": "BIOL 1101",
+    "credit_min": 1,
+    "credit_max": 1
+  },
+  {
+    "coursedog_group_id": "0019381",
+    "code": "BIOL 1102",
+    "credit_min": 1,
+    "credit_max": 1
+  },
+  {
+    "coursedog_group_id": "0019411",
+    "code": "BIOL 1301",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0019421",
+    "code": "BIOL 1302",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0033911",
+    "code": "CHEM 1113",
+    "credit_min": 1,
+    "credit_max": 1
+  },
+  {
+    "coursedog_group_id": "0033921",
+    "code": "CHEM 1114",
+    "credit_min": 1,
+    "credit_max": 1
+  },
+  {
+    "coursedog_group_id": "0033981",
+    "code": "CHEM 1303",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0033991",
+    "code": "CHEM 1304",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0075331",
+    "code": "GEOL 1301",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0075361",
+    "code": "GEOL 1305",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0075371",
+    "code": "GEOL 1307",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0075391",
+    "code": "GEOL 1313",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0075401",
+    "code": "GEOL 1315",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0103681",
+    "code": "MATH 1337",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0103691",
+    "code": "MATH 1338",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0253511",
+    "code": "MATH 1340",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0103941",
+    "code": "MATH 3304",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0139861",
+    "code": "PHYS 1105",
+    "credit_min": 1,
+    "credit_max": 1
+  },
+  {
+    "coursedog_group_id": "0139871",
+    "code": "PHYS 1106",
+    "credit_min": 1,
+    "credit_max": 1
+  },
+  {
+    "coursedog_group_id": "0139911",
+    "code": "PHYS 1303",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0139921",
+    "code": "PHYS 1304",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0140111",
+    "code": "PHYS 3305",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0165231",
+    "code": "STAT 4340",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0267561",
+    "code": "CEE 2302",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0218661",
+    "code": "CEE 3302",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0284711",
+    "code": "CS 1311",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0045691",
+    "code": "CS 1341",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0243541",
+    "code": "CS 1342",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0278101",
+    "code": "CS 2340",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0045741",
+    "code": "CS 2341",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0045751",
+    "code": "CS 2353",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0278091",
+    "code": "CS 3341",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0210241",
+    "code": "CS 3353",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0275631",
+    "code": "CS 3377",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0046011",
+    "code": "CS 4340",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0278621",
+    "code": "CS 5312",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0046381",
+    "code": "CS 5315",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0225131",
+    "code": "CS 5316",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0225761",
+    "code": "CS 5319",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0046401",
+    "code": "CS 5320",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0275611",
+    "code": "CS 5322",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0258761",
+    "code": "CS 5323",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0268171",
+    "code": "CS 5324",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0283371",
+    "code": "CS 5325",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0278081",
+    "code": "CS 5328",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0046421",
+    "code": "CS 5330",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0237421",
+    "code": "CS 5331",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0046481",
+    "code": "CS 5343",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0222401",
+    "code": "CS 5344",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0249511",
+    "code": "CS 5351",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0046731",
+    "code": "CS 5391",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0046761",
+    "code": "CS 5394",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0283581",
+    "code": "ENGR 2112",
+    "credit_min": 1,
+    "credit_max": 1
+  },
+  {
+    "coursedog_group_id": "0261251",
+    "code": "ENGR 1199",
+    "credit_min": 1,
+    "credit_max": 1
+  },
+  {
+    "coursedog_group_id": "0280091",
+    "code": "ENGR 2101",
+    "credit_min": 1,
+    "credit_max": 1
+  },
+  {
+    "coursedog_group_id": "0280181",
+    "code": "ENGR 2111",
+    "credit_min": 1,
+    "credit_max": 1
+  },
+  {
+    "coursedog_group_id": "0261261",
+    "code": "ENGR 2199",
+    "credit_min": 1,
+    "credit_max": 1
+  },
+  {
+    "coursedog_group_id": "0280191",
+    "code": "ENGR 3101",
+    "credit_min": 1,
+    "credit_max": 1
+  },
+  {
+    "coursedog_group_id": "0261291",
+    "code": "ENGR 3199",
+    "credit_min": 1,
+    "credit_max": 1
+  },
+  {
+    "coursedog_group_id": "0280441",
+    "code": "ENGR 4101",
+    "credit_min": 1,
+    "credit_max": 1
+  },
+  {
+    "coursedog_group_id": "0261301",
+    "code": "ENGR 4199",
+    "credit_min": 1,
+    "credit_max": 1
+  },
+  {
+    "coursedog_group_id": "0220931",
+    "code": "OREM 3308",
+    "credit_min": 3,
+    "credit_max": 3
+  },
+  {
+    "coursedog_group_id": "0218951",
+    "code": "OREM 3340",
+    "credit_min": 3,
+    "credit_max": 3
+  }
+]

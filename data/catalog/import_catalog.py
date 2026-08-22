@@ -104,6 +104,7 @@ TARGET_COLUMNS = (
     "prerequisites",
     "catalog_year",
     "source_last_checked",
+    "coursedog_group_id",
 )
 
 # Fields present in the catalog JSON that course_catalog has no column for, and
@@ -199,6 +200,9 @@ def to_row(course: dict[str, Any], institution_id: str) -> dict[str, Any]:
         "prerequisites": course.get("prerequisites"),
         "catalog_year": course.get("catalog_year"),
         "source_last_checked": course.get("source_last_checked"),
+        # Nullable: TAMU (CourseLeaf-sourced) rows never have one; SMU rows
+        # have it unless the source record itself omitted courseGroupId.
+        "coursedog_group_id": course.get("coursedog_group_id"),
     }
 
 

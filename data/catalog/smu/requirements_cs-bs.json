@@ -1,0 +1,627 @@
+{
+  "program": {
+    "coursedog_program_id": "CS-BS-2026-05-21",
+    "program_group_id": "CS-BS",
+    "code": "CS-BS",
+    "name": "Computer Science",
+    "degree_designation": "BS - Bachelor of Science"
+  },
+  "catalog_year": "2026-2027",
+  "groups": [
+    {
+      "coursedog_rule_id": "Uhhx6L6O",
+      "parent_coursedog_rule_id": null,
+      "name": "Lyle EDGE Curriculum (9-13 Credit Hours)",
+      "group_type": "compound_all",
+      "n_required": null,
+      "credit_hours_required": 9,
+      "notes_html": null,
+      "requires_manual_definition": false,
+      "options": []
+    },
+    {
+      "coursedog_rule_id": "stXBXGWY",
+      "parent_coursedog_rule_id": "Uhhx6L6O",
+      "name": "Interdisciplinary Projects (3 Credit Hours)",
+      "group_type": "enumerated_all",
+      "n_required": null,
+      "credit_hours_required": 3,
+      "notes_html": null,
+      "requires_manual_definition": false,
+      "options": [
+        {
+          "option_index": 0,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0280091"
+          ]
+        },
+        {
+          "option_index": 1,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0280191"
+          ]
+        },
+        {
+          "option_index": 2,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0280441"
+          ]
+        }
+      ]
+    },
+    {
+      "coursedog_rule_id": "RNhDPrZV",
+      "parent_coursedog_rule_id": "Uhhx6L6O",
+      "name": "AI Fundamentals (3 Credit Hours)",
+      "group_type": "enumerated_all",
+      "n_required": null,
+      "credit_hours_required": 3,
+      "notes_html": null,
+      "requires_manual_definition": false,
+      "options": [
+        {
+          "option_index": 0,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0284711"
+          ]
+        }
+      ]
+    },
+    {
+      "coursedog_rule_id": "zivoTpLT",
+      "parent_coursedog_rule_id": "Uhhx6L6O",
+      "name": "Advanced/Domain Specific Use/Design of AI",
+      "group_type": "enumerated_at_least_n",
+      "n_required": 1,
+      "credit_hours_required": null,
+      "notes_html": null,
+      "requires_manual_definition": false,
+      "options": [
+        {
+          "option_index": 0,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0275631"
+          ]
+        },
+        {
+          "option_index": 1,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0278621"
+          ]
+        },
+        {
+          "option_index": 2,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0225131"
+          ]
+        },
+        {
+          "option_index": 3,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0225761"
+          ]
+        },
+        {
+          "option_index": 4,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0046401"
+          ]
+        },
+        {
+          "option_index": 5,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0275611"
+          ]
+        },
+        {
+          "option_index": 6,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0258761"
+          ]
+        },
+        {
+          "option_index": 7,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0268171"
+          ]
+        },
+        {
+          "option_index": 8,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0283371"
+          ]
+        },
+        {
+          "option_index": 9,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0278081"
+          ]
+        },
+        {
+          "option_index": 10,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0237421"
+          ]
+        }
+      ]
+    },
+    {
+      "coursedog_rule_id": "Erk6DNZS",
+      "parent_coursedog_rule_id": "Uhhx6L6O",
+      "name": "Leadership and Mentoring (1-3 Credit Hours)",
+      "group_type": "enumerated_at_least_n",
+      "n_required": 1,
+      "credit_hours_required": 1,
+      "notes_html": null,
+      "requires_manual_definition": false,
+      "options": [
+        {
+          "option_index": 0,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0280181"
+          ]
+        },
+        {
+          "option_index": 1,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0046381"
+          ]
+        }
+      ]
+    },
+    {
+      "coursedog_rule_id": "lJeRgYky",
+      "parent_coursedog_rule_id": "Uhhx6L6O",
+      "name": "Innovation and Entrepreneurship (1 Credit Hour)",
+      "group_type": "enumerated_all",
+      "n_required": null,
+      "credit_hours_required": 1,
+      "notes_html": null,
+      "requires_manual_definition": false,
+      "options": [
+        {
+          "option_index": 0,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0283581"
+          ]
+        }
+      ]
+    },
+    {
+      "coursedog_rule_id": "TOO3JyxS",
+      "parent_coursedog_rule_id": "Uhhx6L6O",
+      "name": "Experiential Learning (1-3 Credit Hours)",
+      "group_type": "enumerated_at_least_n",
+      "n_required": 1,
+      "credit_hours_required": 1,
+      "notes_html": null,
+      "requires_manual_definition": false,
+      "options": [
+        {
+          "option_index": 0,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0261251"
+          ]
+        },
+        {
+          "option_index": 1,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0261261"
+          ]
+        },
+        {
+          "option_index": 2,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0261291"
+          ]
+        },
+        {
+          "option_index": 3,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0261301"
+          ]
+        },
+        {
+          "option_index": 4,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0046731"
+          ]
+        },
+        {
+          "option_index": 5,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0046761"
+          ]
+        }
+      ]
+    },
+    {
+      "coursedog_rule_id": "JVDU4qJ2",
+      "parent_coursedog_rule_id": null,
+      "name": "Mathematics and Science (24-26 Credit Hours)",
+      "group_type": "enumerated_all",
+      "n_required": null,
+      "credit_hours_required": 24,
+      "notes_html": "<p data-indent=\"1\"><strong>• </strong>One 3000-level or higher MATH or STAT course (3 credit hours)</p><p data-indent=\"1\">Note: (Math 1337 &amp; Math 1338) or Math 1340</p>",
+      "requires_manual_definition": false,
+      "options": [
+        {
+          "option_index": 0,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0103681",
+            "0103691"
+          ]
+        },
+        {
+          "option_index": 1,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0253511"
+          ]
+        },
+        {
+          "option_index": 2,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0103941"
+          ]
+        },
+        {
+          "option_index": 3,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0045751"
+          ]
+        },
+        {
+          "option_index": 4,
+          "logic": "or",
+          "coursedog_group_ids": [
+            "0046011",
+            "0165231",
+            "0218951"
+          ]
+        }
+      ]
+    },
+    {
+      "coursedog_rule_id": "mcAsXWxO",
+      "parent_coursedog_rule_id": null,
+      "name": "Two Courses",
+      "group_type": "compound_any",
+      "n_required": null,
+      "credit_hours_required": null,
+      "notes_html": null,
+      "requires_manual_definition": false,
+      "options": []
+    },
+    {
+      "coursedog_rule_id": "bBp5BF7P",
+      "parent_coursedog_rule_id": "mcAsXWxO",
+      "name": "Content Area 1, Biology",
+      "group_type": "enumerated_all",
+      "n_required": null,
+      "credit_hours_required": null,
+      "notes_html": null,
+      "requires_manual_definition": false,
+      "options": [
+        {
+          "option_index": 0,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0019411",
+            "0019371"
+          ]
+        },
+        {
+          "option_index": 1,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0019421",
+            "0019381"
+          ]
+        }
+      ]
+    },
+    {
+      "coursedog_rule_id": "SOymRgOH",
+      "parent_coursedog_rule_id": "mcAsXWxO",
+      "name": "Content Area 2, Chemistry",
+      "group_type": "enumerated_all",
+      "n_required": null,
+      "credit_hours_required": null,
+      "notes_html": null,
+      "requires_manual_definition": false,
+      "options": [
+        {
+          "option_index": 0,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0033981",
+            "0033911"
+          ]
+        },
+        {
+          "option_index": 1,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0033991",
+            "0033921"
+          ]
+        }
+      ]
+    },
+    {
+      "coursedog_rule_id": "xcVMAEuK",
+      "parent_coursedog_rule_id": "mcAsXWxO",
+      "name": "Content Area 3, Geology",
+      "group_type": "enumerated_at_least_n",
+      "n_required": 2,
+      "credit_hours_required": null,
+      "notes_html": null,
+      "requires_manual_definition": false,
+      "options": [
+        {
+          "option_index": 0,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0075331"
+          ]
+        },
+        {
+          "option_index": 1,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0075361"
+          ]
+        },
+        {
+          "option_index": 2,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0075371"
+          ]
+        },
+        {
+          "option_index": 3,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0075391"
+          ]
+        },
+        {
+          "option_index": 4,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0075401"
+          ]
+        }
+      ]
+    },
+    {
+      "coursedog_rule_id": "T6z1BLsv",
+      "parent_coursedog_rule_id": "mcAsXWxO",
+      "name": "Content Area 4, Physics",
+      "group_type": "enumerated_all",
+      "n_required": null,
+      "credit_hours_required": 7,
+      "notes_html": null,
+      "requires_manual_definition": false,
+      "options": [
+        {
+          "option_index": 0,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0139911",
+            "0139861"
+          ]
+        },
+        {
+          "option_index": 1,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0139921",
+            "0139871"
+          ]
+        },
+        {
+          "option_index": 2,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0140111"
+          ]
+        }
+      ]
+    },
+    {
+      "coursedog_rule_id": "yz6zCXU9",
+      "parent_coursedog_rule_id": null,
+      "name": "Computer Science Core (33 Credit Hours)",
+      "group_type": "enumerated_all",
+      "n_required": null,
+      "credit_hours_required": 33,
+      "notes_html": null,
+      "requires_manual_definition": false,
+      "options": [
+        {
+          "option_index": 0,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0045691"
+          ]
+        },
+        {
+          "option_index": 1,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0243541"
+          ]
+        },
+        {
+          "option_index": 2,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0278101"
+          ]
+        },
+        {
+          "option_index": 3,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0045741"
+          ]
+        },
+        {
+          "option_index": 4,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0278091"
+          ]
+        },
+        {
+          "option_index": 5,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0210241"
+          ]
+        },
+        {
+          "option_index": 6,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0278081"
+          ]
+        },
+        {
+          "option_index": 7,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0046421"
+          ]
+        },
+        {
+          "option_index": 8,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0046481"
+          ]
+        },
+        {
+          "option_index": 9,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0222401"
+          ]
+        },
+        {
+          "option_index": 10,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0249511"
+          ]
+        }
+      ]
+    },
+    {
+      "coursedog_rule_id": "AjzAZTn4",
+      "parent_coursedog_rule_id": null,
+      "name": "Technical Electives (9 Credit Hours)",
+      "group_type": "freeform",
+      "n_required": null,
+      "credit_hours_required": 9,
+      "notes_html": "<p data-indent=\"1\">Nine credit hours of CS courses at the 3000 level or above as approved by the adviser. The adviser may approve other sufficiently technical courses from other departments to satisfy the Technical elective requirements. Technical electives cannot be satisfied by courses that are part of the student’s chosen track.</p>",
+      "requires_manual_definition": true,
+      "options": []
+    },
+    {
+      "coursedog_rule_id": "pi5Mxbgo",
+      "parent_coursedog_rule_id": null,
+      "name": "Engineering Leadership (6 Credit Hours)",
+      "group_type": "enumerated_at_least_n",
+      "n_required": 2,
+      "credit_hours_required": 6,
+      "notes_html": "<p data-indent=\"1\">Students who are also enrolled in a major or minor program in the Cox School of Business may request leadership courses from these programs to substitute for the Computer Science leadership courses. These requests must be approved by the Computer Science Department. Other courses at the 3000 level or above may be petitioned to meet this requirement with prior approval by adviser. CS courses used to meet this requirement may not also meet a CS elective requirement.</p>",
+      "requires_manual_definition": false,
+      "options": [
+        {
+          "option_index": 0,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0275631"
+          ]
+        },
+        {
+          "option_index": 1,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0220321"
+          ]
+        },
+        {
+          "option_index": 2,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0248931"
+          ]
+        },
+        {
+          "option_index": 3,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0267561"
+          ]
+        },
+        {
+          "option_index": 4,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0218661"
+          ]
+        },
+        {
+          "option_index": 5,
+          "logic": "and",
+          "coursedog_group_ids": [
+            "0220931"
+          ]
+        }
+      ]
+    },
+    {
+      "coursedog_rule_id": "ugGrn4NL",
+      "parent_coursedog_rule_id": null,
+      "name": "Advanced Major Electives (3-5 Credit Hours)",
+      "group_type": "freeform",
+      "n_required": null,
+      "credit_hours_required": 3,
+      "notes_html": "<p data-indent=\"1\"> Students must complete advanced major electives in Computer Science courses numbered 4000 or above as approved by the adviser. CS 4340 may not be used to meet this requirement.</p><p data-indent=\"1\">Note: Students who take CS 5315 to fulfill the Lyle EDGE Leadership and Mentoring requirements are required to take 3 credits of advanced major electives. All other students must take 5 credits of advanced major electives. Students may petition to count up to 6 credit hours of Lyle courses from other departments numbered 4000 or above toward advanced major electives with advisor approval</p>",
+      "requires_manual_definition": true,
+      "options": []
+    }
+  ]
+}

@@ -185,7 +185,7 @@ test('authenticated dashboard covers canonical states, routing, themes, errors, 
     await page.getByRole('button', { name: 'Academic', exact: true }).getAttribute('aria-current'),
     'page',
   )
-  await page.getByText('Find courses at your school that build the skills your target role needs.').waitFor()
+  await page.getByText('Explore courses at your school that could build skills for your career goals.').waitFor()
 
   await page.getByRole('button', { name: 'Career' }).click()
   await page.getByRole('heading', { name: 'Career Overview' }).waitFor()

@@ -21,7 +21,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/ZASE/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0274331"
   },
   {
     "code": "ZPRV 4001",
@@ -45,7 +46,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/ZPRV/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0273901"
   },
   {
     "code": "ZPRV 4101",
@@ -69,7 +71,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/ZPRV/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0283071"
   },
   {
     "code": "ZPRV 4301",
@@ -93,7 +96,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/ZPRV/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0282451"
   },
   {
     "code": "ZPRV 4401",
@@ -117,7 +121,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/ZPRV/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0283081"
   },
   {
     "code": "ZPRV 4601",
@@ -141,6 +146,7 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/ZPRV/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0282461"
   }
 ]

@@ -21,7 +21,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/ACCT/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0000031"
   },
   {
     "code": "ACCT 2302",
@@ -47,7 +48,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/ACCT/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0000041"
   },
   {
     "code": "ACCT 3311",
@@ -73,7 +75,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/ACCT/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0000051"
   },
   {
     "code": "ACCT 3312",
@@ -99,7 +102,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/ACCT/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0000061"
   },
   {
     "code": "ACCT 3315",
@@ -126,7 +130,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/ACCT/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0284881"
   },
   {
     "code": "ACCT 3415",
@@ -153,7 +158,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/ACCT/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0282251"
   },
   {
     "code": "ACCT 4227",
@@ -177,7 +183,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/ACCT/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0285271"
   },
   {
     "code": "ACCT 4307",
@@ -206,7 +213,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/ACCT/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0000281"
   },
   {
     "code": "ACCT 4311",
@@ -232,7 +240,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/ACCT/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0000121"
   },
   {
     "code": "ACCT 4314",
@@ -258,7 +267,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/ACCT/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0000231"
   },
   {
     "code": "ACCT 4315",
@@ -284,7 +294,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/ACCT/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0000141"
   },
   {
     "code": "ACCT 4317",
@@ -310,7 +321,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/ACCT/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0000251"
   },
   {
     "code": "ACCT 4318",
@@ -336,14 +348,15 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/ACCT/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0000261"
   },
   {
     "code": "ACCT 4325",
     "title": "Accounting Internship",
     "credit_hours": 3,
     "description": "Prerequisites: Senior standing and departmental approval.",
-    "prerequisites": "Prerequisites: Senior standing and departmental approval.",
+    "prerequisites": null,
     "department": "Accounting",
     "prefix": "ACCT",
     "number": "4325",
@@ -360,14 +373,15 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/ACCT/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0000301"
   },
   {
     "code": "ACCT 4326",
     "title": "Accounting Internship",
     "credit_hours": 3,
     "description": "Prerequisites: Senior standing and departmental approval.",
-    "prerequisites": "Prerequisites: Senior standing and departmental approval.",
+    "prerequisites": null,
     "department": "Accounting",
     "prefix": "ACCT",
     "number": "4326",
@@ -384,7 +398,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/ACCT/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0000311"
   },
   {
     "code": "ACCT 4327",
@@ -410,7 +425,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/ACCT/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0278921"
   },
   {
     "code": "ACCT 4420",
@@ -437,7 +453,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/ACCT/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0284961"
   },
   {
     "code": "BA 3300",
@@ -461,7 +478,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/BA/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0016821"
   },
   {
     "code": "BA 4180",
@@ -485,7 +503,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/BA/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0017031"
   },
   {
     "code": "BA 4280",
@@ -511,7 +530,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/BA/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0017061"
   },
   {
     "code": "BA 4311",
@@ -535,7 +555,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/BA/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0270501"
   },
   {
     "code": "BA 4360",
@@ -559,7 +580,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/BA/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0270491"
   },
   {
     "code": "BA 4380",
@@ -585,14 +607,15 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/BA/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0017111"
   },
   {
     "code": "BL 3300",
     "title": "Special Topics: International Business Law",
     "credit_hours": 3,
     "description": "Special topics in international business law taught abroad.",
-    "prerequisites": null,
+    "prerequisites": "Restricted to Cox majors and minors in business fall 2021 and beyond, and minors in business with energy management fall 2024 and beyond.",
     "department": "Real Estate, Risk Management & Business Law",
     "prefix": "BL",
     "number": "3300",
@@ -609,7 +632,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/BL/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0102461"
   },
   {
     "code": "BL 3335",
@@ -636,7 +660,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/BL/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0102471"
   },
   {
     "code": "BLI 1110",
@@ -660,7 +685,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/BLI/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0223881"
   },
   {
     "code": "BLI 1210",
@@ -684,7 +710,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/BLI/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0274301"
   },
   {
     "code": "BUSE 2301",
@@ -708,7 +735,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/BUSE/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0261221"
   },
   {
     "code": "BUSE 2311",
@@ -734,14 +762,15 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/BUSE/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0260981"
   },
   {
     "code": "BUSE 3300",
     "title": "Evolution of American Capitalism",
     "credit_hours": 3,
     "description": "Discusses the evolution of capitalism in the American economy from the Colonial Period to the present. Topics include the evolution of women in the workforce, the economic situation for minorities in America, structural changes and the disappearance of the middle class, the growing income gap between rich and poor, the growth of government, the drift towards socialism, the intense competition among states for jobs and challenges to America's leadership in the global economy.",
-    "prerequisites": "Prerequisites: ECO 1311, ECO 1312. Restricted to Cox majors.",
+    "prerequisites": "Prerequisites: ECO 1311, ECO 1312. Restricted to Cox majors and minors in business fall 2021 and beyond, and minors in business with energy management fall 2024 and beyond.",
     "department": "Strategy & Entrepreneurship",
     "prefix": "BUSE",
     "number": "3300",
@@ -761,7 +790,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/BUSE/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0250011"
   },
   {
     "code": "BUSE 3310",
@@ -785,7 +815,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/BUSE/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0240341"
   },
   {
     "code": "BUSE 3331",
@@ -809,7 +840,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/BUSE/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0253591"
   },
   {
     "code": "BUSE 3332",
@@ -833,7 +865,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/BUSE/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0276261"
   },
   {
     "code": "BUSE 3338",
@@ -857,7 +890,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/BUSE/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0283611"
   },
   {
     "code": "BUSE 4135",
@@ -883,7 +917,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/BUSE/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0274131"
   },
   {
     "code": "BUSE 4137",
@@ -907,7 +942,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/BUSE/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0279131"
   },
   {
     "code": "BUSE 4332",
@@ -933,7 +969,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/BUSE/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0253601"
   },
   {
     "code": "BUSE 4333",
@@ -959,7 +996,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/BUSE/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0253611"
   },
   {
     "code": "BUSE 4334",
@@ -985,7 +1023,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/BUSE/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0253621"
   },
   {
     "code": "CISB 2330",
@@ -1009,7 +1048,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/CISB/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0284101"
   },
   {
     "code": "CISB 2379",
@@ -1033,7 +1073,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/CISB/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0242971"
   },
   {
     "code": "CISB 4340",
@@ -1057,7 +1098,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/CISB/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0275931"
   },
   {
     "code": "CISB 4397",
@@ -1089,7 +1131,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/CISB/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0035051"
   },
   {
     "code": "CISB 4398",
@@ -1115,14 +1158,15 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/CISB/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0035061"
   },
   {
     "code": "FINA 3300",
     "title": "Topics in International Finance",
     "credit_hours": 3,
     "description": "Offered through SMU Abroad.",
-    "prerequisites": "Prerequisite: Junior standing.",
+    "prerequisites": "Prerequisite: Junior standing. Restricted to Cox majors and minors in business fall 2021 and beyond, and minors in business with energy management fall 2024 and beyond.",
     "department": "Finance",
     "prefix": "FINA",
     "number": "3300",
@@ -1139,7 +1183,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/FINA/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0069731"
   },
   {
     "code": "FINA 3320",
@@ -1171,7 +1216,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/FINA/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0069761"
   },
   {
     "code": "FINA 4125",
@@ -1200,7 +1246,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/FINA/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0272441"
   },
   {
     "code": "FINA 4126",
@@ -1231,7 +1278,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/FINA/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0272451"
   },
   {
     "code": "FINA 4241",
@@ -1262,7 +1310,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/FINA/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0270911"
   },
   {
     "code": "FINA 4244",
@@ -1291,7 +1340,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/FINA/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0272961"
   },
   {
     "code": "FINA 4300",
@@ -1317,7 +1367,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/FINA/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0069991"
   },
   {
     "code": "FINA 4325",
@@ -1344,7 +1395,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/FINA/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0069851"
   },
   {
     "code": "FINA 4326",
@@ -1372,7 +1424,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/FINA/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0069861"
   },
   {
     "code": "FINA 4327",
@@ -1401,7 +1454,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/FINA/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0069871"
   },
   {
     "code": "FINA 4329",
@@ -1430,7 +1484,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/FINA/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0069891"
   },
   {
     "code": "FINA 4331",
@@ -1459,7 +1514,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/FINA/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0070051"
   },
   {
     "code": "FINA 4332",
@@ -1488,7 +1544,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/FINA/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0272461"
   },
   {
     "code": "FINA 4343",
@@ -1515,7 +1572,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/FINA/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0272311"
   },
   {
     "code": "FINA 4347",
@@ -1545,7 +1603,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/FINA/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0280141"
   },
   {
     "code": "FINA 4441",
@@ -1575,7 +1634,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/FINA/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0240361"
   },
   {
     "code": "ITOM 2308",
@@ -1602,14 +1662,15 @@
     ],
     "source_url": "https://catalog.smu.edu/departments/ITOM/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0209821"
   },
   {
     "code": "ITOM 3300",
     "title": "International Topics in Information Technology and Operations Management",
     "credit_hours": 3,
     "description": "Offered through SMU Abroad.",
-    "prerequisites": "Prerequisite: Junior standing.",
+    "prerequisites": "Prerequisite: Junior standing. Restricted to Cox majors and minors in business fall 2021 and beyond, and minors in business with energy management fall 2024 and beyond.",
     "department": "Information Technology & Operations Management",
     "prefix": "ITOM",
     "number": "3300",
@@ -1626,7 +1687,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/ITOM/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0281371"
   },
   {
     "code": "ITOM 3306",
@@ -1664,7 +1726,8 @@
     ],
     "source_url": "https://catalog.smu.edu/departments/ITOM/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0223521"
   },
   {
     "code": "ITOM 3355",
@@ -1690,7 +1753,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/ITOM/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0274351"
   },
   {
     "code": "ITOM 3360",
@@ -1717,7 +1781,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/ITOM/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0274361"
   },
   {
     "code": "ITOM 4207",
@@ -1741,7 +1806,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/ITOM/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0278691"
   },
   {
     "code": "ITOM 4299",
@@ -1767,7 +1833,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/ITOM/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0284891"
   },
   {
     "code": "ITOM 4307",
@@ -1795,7 +1862,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/ITOM/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0223071"
   },
   {
     "code": "ITOM 4320",
@@ -1822,7 +1890,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/ITOM/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0274381"
   },
   {
     "code": "ITOM 4321",
@@ -1852,7 +1921,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/ITOM/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0274451"
   },
   {
     "code": "ITOM 4334",
@@ -1879,7 +1949,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/ITOM/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0274371"
   },
   {
     "code": "ITOM 4336",
@@ -1908,7 +1979,8 @@
     ],
     "source_url": "https://catalog.smu.edu/departments/ITOM/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0281891"
   },
   {
     "code": "ITOM 4350",
@@ -1934,7 +2006,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/ITOM/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0274341"
   },
   {
     "code": "ITOM 4355",
@@ -1961,7 +2034,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/ITOM/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0283361"
   },
   {
     "code": "MKTG 3300",
@@ -1985,7 +2059,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/MKTG/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0109461"
   },
   {
     "code": "MKTG 3340",
@@ -2009,7 +2084,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/MKTG/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0109471"
   },
   {
     "code": "MKTG 3342",
@@ -2036,7 +2112,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/MKTG/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0109481"
   },
   {
     "code": "MKTG 3343",
@@ -2063,7 +2140,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/MKTG/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0109491"
   },
   {
     "code": "MKTG 3345",
@@ -2090,7 +2168,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/MKTG/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0109511"
   },
   {
     "code": "MKTG 3346",
@@ -2117,7 +2196,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/MKTG/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0109521"
   },
   {
     "code": "MKTG 3348",
@@ -2144,7 +2224,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/MKTG/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0109541"
   },
   {
     "code": "MKTG 3349",
@@ -2171,7 +2252,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/MKTG/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0109551"
   },
   {
     "code": "MKTG 3350",
@@ -2198,7 +2280,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/MKTG/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0266751"
   },
   {
     "code": "MKTG 3351",
@@ -2225,7 +2308,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/MKTG/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0278471"
   },
   {
     "code": "MKTG 3352",
@@ -2252,7 +2336,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/MKTG/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0281491"
   },
   {
     "code": "MKTG 4341",
@@ -2279,7 +2364,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/MKTG/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0109691"
   },
   {
     "code": "MKTG 4345",
@@ -2303,7 +2389,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/MKTG/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0229431"
   },
   {
     "code": "MNO 2375",
@@ -2327,7 +2414,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/MNO/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0282631"
   },
   {
     "code": "MNO 3300",
@@ -2351,7 +2439,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/MNO/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0125901"
   },
   {
     "code": "MNO 3301",
@@ -2375,7 +2464,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/MNO/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0125911"
   },
   {
     "code": "MNO 3370",
@@ -2399,7 +2489,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/MNO/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0125931"
   },
   {
     "code": "MNO 3371",
@@ -2425,7 +2516,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/MNO/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0125941"
   },
   {
     "code": "MNO 3373",
@@ -2451,7 +2543,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/MNO/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0125961"
   },
   {
     "code": "MNO 3375",
@@ -2477,7 +2570,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/MNO/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0231111"
   },
   {
     "code": "MNO 4325",
@@ -2503,7 +2597,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/MNO/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0282621"
   },
   {
     "code": "MNO 4330",
@@ -2529,7 +2624,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/MNO/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0253581"
   },
   {
     "code": "MNO 4344",
@@ -2553,7 +2649,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/MNO/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0275181"
   },
   {
     "code": "MNO 4345",
@@ -2577,7 +2674,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/MNO/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0269791"
   },
   {
     "code": "MNO 4361",
@@ -2603,7 +2701,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/MNO/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0242471"
   },
   {
     "code": "MNO 4371",
@@ -2629,7 +2728,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/MNO/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0213411"
   },
   {
     "code": "MNO 4372",
@@ -2657,7 +2757,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/MNO/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0261781"
   },
   {
     "code": "MNO 4375",
@@ -2684,7 +2785,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/MNO/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0282611"
   },
   {
     "code": "MNO 4378",
@@ -2710,14 +2812,15 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/MNO/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0126061"
   },
   {
     "code": "RE 3300",
     "title": "Topics in International Real Estate",
     "credit_hours": 3,
     "description": "Offered through SMU Abroad.",
-    "prerequisites": "Prerequisite: Junior standing.",
+    "prerequisites": "Prerequisite: Junior standing. Restricted to Cox majors and minors in business fall 2021 and beyond, and minors in business with energy management fall 2024 and beyond.",
     "department": "Real Estate, Risk Management & Business Law",
     "prefix": "RE",
     "number": "3300",
@@ -2734,7 +2837,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/RE/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0278671"
   },
   {
     "code": "RE 3381",
@@ -2761,7 +2865,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/RE/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0148411"
   },
   {
     "code": "RE 4220",
@@ -2787,7 +2892,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/RE/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0273321"
   },
   {
     "code": "RE 4221",
@@ -2813,7 +2919,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/RE/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0276191"
   },
   {
     "code": "RE 4330",
@@ -2839,7 +2946,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/RE/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0277261"
   },
   {
     "code": "RE 4338",
@@ -2865,7 +2973,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/RE/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0148421"
   },
   {
     "code": "RE 4382",
@@ -2892,7 +3001,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/RE/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0148441"
   },
   {
     "code": "RE 4389",
@@ -2919,7 +3029,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/RE/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0148431"
   },
   {
     "code": "RE 4392",
@@ -2945,7 +3056,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/RE/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0273561"
   },
   {
     "code": "STRA 4370",
@@ -2984,6 +3096,7 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/STRA/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0126101"
   }
 ]

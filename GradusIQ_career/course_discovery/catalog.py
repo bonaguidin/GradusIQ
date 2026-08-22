@@ -102,6 +102,10 @@ class LocalCatalogRepository:
     def count(self, institution: CatalogInstitution) -> int:
         return len(self._records[institution])
 
+    def records(self, institution: CatalogInstitution) -> tuple[CourseCatalogRecord, ...]:
+        """Return the immutable institution snapshot for deterministic audits."""
+        return self._records[institution]
+
     def prerequisite_coverage(self, institution: CatalogInstitution) -> PrerequisiteCoverage:
         records = self._records[institution]
         return PrerequisiteCoverage(

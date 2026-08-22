@@ -21,7 +21,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/BB/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0270101"
   },
   {
     "code": "CM 4120",
@@ -45,7 +46,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/CM/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0275971"
   },
   {
     "code": "CM 4330",
@@ -69,7 +71,8 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/CM/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0275991"
   },
   {
     "code": "CM 4332",
@@ -93,6 +96,7 @@
     "restrictions": [],
     "source_url": "https://catalog.smu.edu/departments/CM/courses",
     "catalog_year": "2026-2027",
-    "source_last_checked": "2026-08-08"
+    "source_last_checked": "2026-08-18",
+    "coursedog_group_id": "0275981"
   }
 ]

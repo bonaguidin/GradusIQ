@@ -201,6 +201,86 @@ class PrerequisiteEvaluation(StrictModel):
     reasons: list[str] = Field(default_factory=list)
 
 
+class PrerequisiteClause(StrictModel):
+    """One AND-ed slot of a structured prerequisite: satisfied by completing
+    (or, if the same code also appears in StructuredPrerequisite.coreq_allowed,
+    concurrently enrolling in) any single course in course_codes.
+
+    course_codes is an OR-set, not an ordered preference -- "CSCE 222/ECEN 222
+    or ECEN 222/CSCE 222" (the same cross-listed course under two department
+    codes) and "CSCE 120 or CSCE 121" (two genuinely different courses) are
+    both represented the same way here; StructuredPrerequisite does not
+    attempt to distinguish "these codes are the same course" from "these
+    codes are interchangeable alternatives" because both satisfy the clause
+    identically from a scheduling standpoint.
+    """
+
+    course_codes: list[str] = Field(min_length=1)
+    grade_min: str | None = None
+    # Unverifiable alternative paths that also satisfy this clause, named
+    # alongside the course requirement rather than mixed with an unrelated
+    # course code -- "C- or better in CS 2341 or equivalent", "CS 5324 or
+    # permission of instructor" (both confirmed live, data/catalog/smu/).
+    # requires_all still only names the real course(s); this is a footnote,
+    # never itself enforced or resolved by the scheduler -- a student who
+    # satisfied the requirement via AP-equivalent credit or an instructor's
+    # sign-off is not otherwise represented anywhere in this model, and
+    # dropping the qualifier would erase that possibility silently instead
+    # of surfacing it for a future consumer to act on.
+    alternate_paths: list[str] = Field(default_factory=list)
+
+
+class StructuredPrerequisite(StrictModel):
+    """Richer structured parse of CourseCatalogRecord.prerequisite_text, for
+    the degree-planner scheduler (planning-docs/degree-planner-spec.md §4).
+
+    Deliberately NOT what prerequisite_requirement()/evaluate_prerequisites()
+    return -- see course_discovery/prerequisites.py's structured_prerequisite()
+    docstring for why this is a separate function in the same module rather
+    than a change to those, and README.md for C1's existing conservative
+    boundary that this does not alter.
+
+    requires_all is an AND of PrerequisiteClause OR-sets -- every clause must
+    be satisfied. An empty list means no hard course prerequisite (matches
+    prerequisite_requirement()'s NONE semantics when prerequisite_text is
+    also None; a non-None prerequisite_text with only non-course content --
+    e.g. "Restricted to Lyle seniors." -- also yields an empty requires_all,
+    since there is no course to require).
+    """
+
+    requires_all: list[PrerequisiteClause] = Field(default_factory=list)
+    # Course codes satisfiable by concurrent enrollment rather than strict
+    # prior completion. A code appearing both here and in some requires_all
+    # clause means "complete OR concurrently enroll"; a code appearing only
+    # here (never in requires_all) is a pure corequisite with no completion
+    # requirement at all -- confirmed both shapes exist live, e.g. CSCE 313
+    # ("concurrent enrollment in CSCE 313", its own clause, no prior
+    # completion required) vs CSCE 221 ("Grade of C or better in CSCE 221,
+    # or concurrent enrollment.", completion OR concurrent enrollment).
+    coreq_allowed: list[str] = Field(default_factory=list)
+    # Non-course eligibility text: classification, instructor/department
+    # approval, majors-only, campus notes, and similar. Informational only --
+    # not enforced by the scheduler. Deliberately not the same list as
+    # CourseCatalogRecord.restrictions: that field is derived from a fixed
+    # pattern set at catalog-normalization time and may not cover every
+    # clause this parser recognizes as non-course (e.g. "also taught at
+    # Galveston campus"), so this field is derived independently rather than
+    # assumed to be a superset or subset of it.
+    restrictions: list[str] = Field(default_factory=list)
+    # Raw clause text the parser could not confidently structure into
+    # requires_all/coreq_allowed/restrictions -- mixed AND/OR within one
+    # clause with no reliable precedence ("STAT 211, and STAT 404 or CSCE
+    # 221, or ECEN 303, and CSCE 121 or CSCE 120", confirmed live), or a
+    # clause mixing a real course code with a non-course alternative path
+    # ("C- or better in CS 1341, ... or departmental consent" -- CS 1341 is
+    # NOT added to requires_all in that case, because doing so would wrongly
+    # block a student who satisfied the requirement via the unverifiable
+    # consent/AP-credit path instead). Kept verbatim, never silently
+    # dropped, so a human can review what the parser declined to resolve.
+    needs_review: list[str] = Field(default_factory=list)
+    raw_text: str | None = None
+
+
 class CourseEligibilityStatus(str, Enum):
     ELIGIBLE = "ELIGIBLE"
     INELIGIBLE = "INELIGIBLE"

@@ -24,9 +24,9 @@ for students:
 Gradus IQ/
 
 (student profiles live at repo root in data/students/, not inside this folder)
-data/students/                       # Five A&M mock student profiles
+data/students/                       # Five mock student profiles (4 A&M, 1 SMU)
 ├── student_jordanReyes.json         # Jordan Reyes — Business Administration (pre-major), Freshman — PRIMARY demo student
-├── student_ethanBrooks.json         # Ethan Brooks — General Engineering, Freshman
+├── student_ethanBrooks.json         # Ethan Brooks — Computer Science, Sophomore (SMU)
 ├── student_marcusWebb.json          # Marcus Webb — Psychology, Sophomore
 ├── student_priyaNair.json           # Priya Nair — Aerospace Engineering, Sophomore
 └── student_sofiaRamirez.json        # Sofia Ramirez — Biology, Sophomore

@@ -63,20 +63,24 @@ attempted hours.
 | PBSI 209    | Psychology of Culture and Diversity | 3           |
 | PBSI 211    | Stereotyping, Prejudice & Discrim.  | 3           |
 
-## Example Calculation — Ethan Brooks (Spring 2026)
+## Example Calculation — Jordan Reyes (Spring 2026)
+
+Ethan Brooks was previously the worked example here; he was converted to an
+SMU Computer Science student (planning-docs/degree-planner-spec.md §8.4) and
+no longer has a TAMU transcript, so this example uses Jordan Reyes's real
+course_records instead.
 
 | Course   | Canvas Grade | Base Grade | Pts | Cr Hrs | Weighted |
 |----------|-------------|-----------|-----|--------|---------|
-| ENGR 102 | B+          | B         | 3.0 | 2      | 6.0     |
-| MATH 151 | C+          | C         | 2.0 | 4      | 8.0     |
-| CHEM 107 | C+          | C         | 2.0 | 3      | 6.0     |
-| CHEM 117 | B-          | B         | 3.0 | 1      | 3.0     |
-| ENGL 104 | B           | B         | 3.0 | 3      | 9.0     |
-| KINE 199 | A           | A         | 4.0 | 1      | 4.0     |
+| BUSN 101 | A-          | A         | 4.0 | 3      | 12.0    |
+| ACCT 229 | B           | B         | 3.0 | 3      | 9.0     |
+| MATH 140 | C+          | C         | 2.0 | 3      | 6.0     |
+| ENGL 104 | B+          | B         | 3.0 | 3      | 9.0     |
+| POLS 206 | B           | B         | 3.0 | 3      | 9.0     |
 
-Total grade points: 36.0
-Total credit hours: 14
-GPA = 36.0 / 14 = **2.57**
+Total grade points: 45.0
+Total credit hours: 15
+GPA = 45.0 / 15 = **3.00**
 
 ## Rules for AI Features
 

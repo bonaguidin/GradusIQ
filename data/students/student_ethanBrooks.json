@@ -1,180 +1,230 @@
 {
   "_notes": [
-    "Mock Canvas LMS data — Ethan Brooks. Freshman, intends Computer Engineering. Texas A&M University.",
-    "As a freshman, Ethan hasn't declared yet. TAMU engineering students share a common first-year curriculum (general engineering: ENGR/MATH/CHEM) and apply to a specific discipline like Computer Engineering after completing 'Entry to a Major' (ETAM) requirements, typically after year one. So his current courses are General Engineering, not ECEN-prefixed.",
-    "courses[4]: KINE 199 (Health and Physical Fitness) is a required Kinesiology component for all engineering freshmen. Code verified against TAMU catalog.",
-    "ENGR 111 removed — not part of the Computer Engineering degree plan. CpE freshmen take ENGR 102 in fall; ENGR 216/PHYS 216 follows in spring of freshman year.",
-    "CHEM 107 + CHEM 117 are the correct chemistry sequence for Computer Engineering freshmen. CHEM 119 is for chemical/biomedical/materials engineering only. Verified against TAMU catalog.",
-    "ENGL 104 (Composition and Rhetoric) added — required freshman fall course for all engineering students. Verified against TAMU catalog.",
-    "Recurring pattern: skipping intermediate steps / under-documenting process — shows up in both his math and engineering-design feedback.",
+    "CONVERTED from TAMU/General-Engineering(intended Computer Engineering)/Freshman to SMU/Computer Science/Sophomore -- planning-docs/degree-planner-spec.md §8.4. Production students/student_institutions/course_records rewritten to match; this fixture's student/courses/enrollments blocks updated to mirror production.",
+    "NOT YET UPDATED, deliberately: career (target_roles/interests/career_goals/geographic_preference/skills_self_reported/work_experience/projects), assignments, submissions, and examTopicTags all still describe the OLD TAMU/Computer-Engineering profile (ETAM, College Station, MATH-151/CHEM-107-style assignments and professor comments). No replacement SMU/CS narrative content has been drafted or approved yet -- this is a known, flagged inconsistency, not an oversight. Do not treat career.* as authoritative for this student until it is rewritten.",
+    "assignments/submissions/examTopicTags previously referenced course_ids 3010/3012/3014/3023/3024/3025 (the old TAMU courses). Those course_ids no longer exist in courses[] below -- left in place rather than deleted, since removing them would lose real fixture-authoring work and new SMU-specific assignment content hasn't been drafted to replace it. A future pass must either rewrite them against the new course_ids or remove them explicitly.",
+    "gpa_current recomputed against the new SMU transcript using SMU's own plus/minus grade_point_map (uses_plus_minus=true, unlike TAMU's stripped scale) -- not carried over from the old TAMU value.",
+    "expected_graduation reformatted from 'YYYY-MM' to 'Spring YYYY' to match production's students.expected_graduation format (20260812143000_profile_completion_field_formats.sql) -- this fixture had never picked up that migration's format change, since it only touched the live DB.",
     "examTopicTags: Gradus IQ's own topic layer — NOT part of real Canvas data."
   ],
   "student": {
     "id": 603,
     "name": "Ethan Brooks",
-    "major_current": "General Engineering",
-    "major_intended": "Computer Engineering",
-    "classification": "Freshman",
-    "institution": "Texas A&M University",
-    "gpa_current": 2.57,
-    "expected_graduation": "2029-05"
+    "major_current": "Computer Science",
+    "major_intended": "N/A",
+    "classification": "Sophomore",
+    "institution": "Southern Methodist University",
+    "gpa_current": 3.28,
+    "expected_graduation": "Spring 2029"
   },
   "onboarding_stage": 3,
   "courses": [
     {
-      "id": 3010,
-      "name": "Engineering Lab I: Computation",
-      "course_code": "ENGR 102",
-      "workflow_state": "available",
-      "credit_hours": 2
+      "id": 3030,
+      "name": "Principles of Computer Science I",
+      "course_code": "CS 1341",
+      "workflow_state": "completed",
+      "credit_hours": 3
     },
     {
-      "id": 3012,
-      "name": "Engineering Mathematics I",
-      "course_code": "MATH 151",
-      "workflow_state": "available",
-      "credit_hours": 4
+      "id": 3031,
+      "name": "Calculus I",
+      "course_code": "MATH 1337",
+      "workflow_state": "completed",
+      "credit_hours": 3
     },
     {
-      "id": 3014,
-      "name": "Health and Fitness",
-      "course_code": "KINE 199",
-      "workflow_state": "available",
+      "id": 3032,
+      "name": "AI for Every Mustang",
+      "course_code": "CS 1311",
+      "workflow_state": "completed",
+      "credit_hours": 3
+    },
+    {
+      "id": 3033,
+      "name": "Interdisciplinary Project: Design Process and Teams",
+      "course_code": "ENGR 2101",
+      "workflow_state": "completed",
       "credit_hours": 1
     },
     {
-      "id": 3023,
-      "name": "General Chemistry for Engineering Students",
-      "course_code": "CHEM 107",
+      "id": 3034,
+      "name": "Principles of Computer Science II",
+      "course_code": "CS 1342",
       "workflow_state": "available",
       "credit_hours": 3
     },
     {
-      "id": 3024,
-      "name": "General Chemistry for Engineering Students Laboratory",
-      "course_code": "CHEM 117",
-      "workflow_state": "available",
-      "credit_hours": 1
-    },
-    {
-      "id": 3025,
-      "name": "Composition and Rhetoric",
-      "course_code": "ENGL 104",
+      "id": 3035,
+      "name": "Calculus II",
+      "course_code": "MATH 1338",
       "workflow_state": "available",
       "credit_hours": 3
+    },
+    {
+      "id": 3036,
+      "name": "Computer Organization",
+      "course_code": "CS 2340",
+      "workflow_state": "available",
+      "credit_hours": 3
+    },
+    {
+      "id": 3037,
+      "name": "Leadership and Mentorship for Engineers",
+      "course_code": "ENGR 2111",
+      "workflow_state": "available",
+      "credit_hours": 1
     }
   ],
   "enrollments": [
     {
-      "id": 9109,
-      "course_id": 3010,
+      "id": 9130,
+      "course_id": 3030,
       "course_section_id": 1,
       "user_id": 603,
       "type": "StudentEnrollment",
       "role": "StudentEnrollment",
       "role_id": 3,
-      "enrollment_state": "active",
-      "created_at": "2026-01-12T08:00:00Z",
-      "updated_at": "2026-06-01T08:00:00Z",
+      "enrollment_state": "completed",
+      "created_at": "2025-08-25T08:00:00Z",
+      "updated_at": "2025-12-15T08:00:00Z",
       "grades": {
-        "html_url": "https://canvas.tamu.edu/courses/3010/grades/603",
+        "html_url": "https://canvas.smu.edu/courses/3030/grades/603",
+        "current_grade": "A-",
+        "current_score": 91.0,
+        "final_grade": "A-",
+        "final_score": 91.0
+      }
+    },
+    {
+      "id": 9131,
+      "course_id": 3031,
+      "course_section_id": 1,
+      "user_id": 603,
+      "type": "StudentEnrollment",
+      "role": "StudentEnrollment",
+      "role_id": 3,
+      "enrollment_state": "completed",
+      "created_at": "2025-08-25T08:00:00Z",
+      "updated_at": "2025-12-15T08:00:00Z",
+      "grades": {
+        "html_url": "https://canvas.smu.edu/courses/3031/grades/603",
         "current_grade": "B+",
-        "current_score": 88.0,
-        "final_grade": null,
-        "final_score": null
+        "current_score": 87.0,
+        "final_grade": "B+",
+        "final_score": 87.0
       }
     },
     {
-      "id": 9111,
-      "course_id": 3012,
+      "id": 9132,
+      "course_id": 3032,
       "course_section_id": 1,
       "user_id": 603,
       "type": "StudentEnrollment",
       "role": "StudentEnrollment",
       "role_id": 3,
-      "enrollment_state": "active",
-      "created_at": "2026-01-12T08:00:00Z",
-      "updated_at": "2026-06-01T08:00:00Z",
+      "enrollment_state": "completed",
+      "created_at": "2025-08-25T08:00:00Z",
+      "updated_at": "2025-12-15T08:00:00Z",
       "grades": {
-        "html_url": "https://canvas.tamu.edu/courses/3012/grades/603",
-        "current_grade": "C+",
-        "current_score": 76.0,
-        "final_grade": null,
-        "final_score": null
-      }
-    },
-    {
-      "id": 9113,
-      "course_id": 3014,
-      "course_section_id": 1,
-      "user_id": 603,
-      "type": "StudentEnrollment",
-      "role": "StudentEnrollment",
-      "role_id": 3,
-      "enrollment_state": "active",
-      "created_at": "2026-01-12T08:00:00Z",
-      "updated_at": "2026-06-01T08:00:00Z",
-      "grades": {
-        "html_url": "https://canvas.tamu.edu/courses/3014/grades/603",
+        "html_url": "https://canvas.smu.edu/courses/3032/grades/603",
         "current_grade": "A",
-        "current_score": 96.0,
-        "final_grade": null,
-        "final_score": null
+        "current_score": 95.0,
+        "final_grade": "A",
+        "final_score": 95.0
       }
     },
     {
-      "id": 9122,
-      "course_id": 3023,
+      "id": 9133,
+      "course_id": 3033,
       "course_section_id": 1,
       "user_id": 603,
       "type": "StudentEnrollment",
       "role": "StudentEnrollment",
       "role_id": 3,
-      "enrollment_state": "active",
-      "created_at": "2026-01-12T08:00:00Z",
-      "updated_at": "2026-06-01T08:00:00Z",
+      "enrollment_state": "completed",
+      "created_at": "2025-08-25T08:00:00Z",
+      "updated_at": "2025-12-15T08:00:00Z",
       "grades": {
-        "html_url": "https://canvas.tamu.edu/courses/3023/grades/603",
-        "current_grade": "C+",
-        "current_score": 78.0,
-        "final_grade": null,
-        "final_score": null
-      }
-    },
-    {
-      "id": 9123,
-      "course_id": 3024,
-      "course_section_id": 1,
-      "user_id": 603,
-      "type": "StudentEnrollment",
-      "role": "StudentEnrollment",
-      "role_id": 3,
-      "enrollment_state": "active",
-      "created_at": "2026-01-12T08:00:00Z",
-      "updated_at": "2026-06-01T08:00:00Z",
-      "grades": {
-        "html_url": "https://canvas.tamu.edu/courses/3024/grades/603",
-        "current_grade": "B-",
-        "current_score": 80.5,
-        "final_grade": null,
-        "final_score": null
-      }
-    },
-    {
-      "id": 9124,
-      "course_id": 3025,
-      "course_section_id": 1,
-      "user_id": 603,
-      "type": "StudentEnrollment",
-      "role": "StudentEnrollment",
-      "role_id": 3,
-      "enrollment_state": "active",
-      "created_at": "2026-01-12T08:00:00Z",
-      "updated_at": "2026-06-01T08:00:00Z",
-      "grades": {
-        "html_url": "https://canvas.tamu.edu/courses/3025/grades/603",
+        "html_url": "https://canvas.smu.edu/courses/3033/grades/603",
         "current_grade": "B",
         "current_score": 85.0,
+        "final_grade": "B",
+        "final_score": 85.0
+      }
+    },
+    {
+      "id": 9134,
+      "course_id": 3034,
+      "course_section_id": 1,
+      "user_id": 603,
+      "type": "StudentEnrollment",
+      "role": "StudentEnrollment",
+      "role_id": 3,
+      "enrollment_state": "active",
+      "created_at": "2026-01-12T08:00:00Z",
+      "updated_at": "2026-06-01T08:00:00Z",
+      "grades": {
+        "html_url": "https://canvas.smu.edu/courses/3034/grades/603",
+        "current_grade": "B+",
+        "current_score": 87.0,
+        "final_grade": null,
+        "final_score": null
+      }
+    },
+    {
+      "id": 9135,
+      "course_id": 3035,
+      "course_section_id": 1,
+      "user_id": 603,
+      "type": "StudentEnrollment",
+      "role": "StudentEnrollment",
+      "role_id": 3,
+      "enrollment_state": "active",
+      "created_at": "2026-01-12T08:00:00Z",
+      "updated_at": "2026-06-01T08:00:00Z",
+      "grades": {
+        "html_url": "https://canvas.smu.edu/courses/3035/grades/603",
+        "current_grade": "B",
+        "current_score": 84.0,
+        "final_grade": null,
+        "final_score": null
+      }
+    },
+    {
+      "id": 9136,
+      "course_id": 3036,
+      "course_section_id": 1,
+      "user_id": 603,
+      "type": "StudentEnrollment",
+      "role": "StudentEnrollment",
+      "role_id": 3,
+      "enrollment_state": "active",
+      "created_at": "2026-01-12T08:00:00Z",
+      "updated_at": "2026-06-01T08:00:00Z",
+      "grades": {
+        "html_url": "https://canvas.smu.edu/courses/3036/grades/603",
+        "current_grade": "C+",
+        "current_score": 77.0,
+        "final_grade": null,
+        "final_score": null
+      }
+    },
+    {
+      "id": 9137,
+      "course_id": 3037,
+      "course_section_id": 1,
+      "user_id": 603,
+      "type": "StudentEnrollment",
+      "role": "StudentEnrollment",
+      "role_id": 3,
+      "enrollment_state": "active",
+      "created_at": "2026-01-12T08:00:00Z",
+      "updated_at": "2026-06-01T08:00:00Z",
+      "grades": {
+        "html_url": "https://canvas.smu.edu/courses/3037/grades/603",
+        "current_grade": "A-",
+        "current_score": 91.0,
         "final_grade": null,
         "final_score": null
       }
@@ -817,9 +867,7 @@
   ],
   "career": {
     "target_roles": [
-      "Software Engineering Intern",
-      "Computer Engineering Intern",
-      "Embedded Systems Intern"
+      "Software Engineering Intern"
     ],
     "interests": [
       "embedded systems",
@@ -833,8 +881,6 @@
     "skills_self_reported": {
       "technical": [
         "Python basics",
-        "MATLAB basics",
-        "engineering computation",
         "technical writing",
         "Excel basics"
       ],

@@ -1,0 +1,58 @@
+{
+  "_notes": [
+    "Real prerequisite text pulled live this session from data/catalog/smu/*.json for the corrected 13-course v1 scope (spec §10.1): the 3 single fills, Interdisciplinary Projects' remaining ENGR 3101/ENGR 4101, and CS Core's 8 remaining courses. requirement_group_id values match the live 23-group SMU CS-BS tree in ethan_brooks_requirement_tree.json.",
+    "FIXED, this session: structured_prerequisite() used to merge a comma-only course list with no 'and'/'or' connector word into one OR-set PrerequisiteClause, even when the source text was actually an AND-list -- CS 3353 ('CS 2341, CS 2353') and CS 5330/CS 5343 ('X, Y, and Z') both hit this. Now splits into one clause per course (AND semantics), matching catalog convention confirmed across 230 real courses corpus-wide. See GradusIQ_career/course_discovery/prerequisites.py's _clauses_for_codes() and tests/test_structured_prerequisite.py's bare-comma test group. CS 3353 now correctly lands strictly after CS 2341/CS 2353 in the computed schedule, not in the same term.",
+    "FIXED in Degree Planner Phase 2: CS 5328's 'Corequisite: CS 5330' now routes CS 5330 into coreq_allowed. CS 3341 remains a strict prerequisite, while CS 5328 and CS 5330 may share a term. The same semantics remove the false mutual-corequisite cycle from Biology lecture/lab pairs."
+  ],
+  "student_id": "b0bc8ff6-0df3-4e5f-a107-a4e5c263f604",
+  "program_id": "beed8b0a-5843-472f-b554-d1bb02f025a2",
+  "courses": [
+    {"course_code": "ENGR 2112", "credit_hours": 1, "requirement_group_id": "e7fee06a-f192-4cb4-b271-44d799e67ab3", "requirement_group_name": "Innovation and Entrepreneurship (1 Credit Hour)"},
+    {"course_code": "MATH 3304", "credit_hours": 3, "requirement_group_id": "7dfc3679-6c89-4b7e-b418-384f82e92429", "requirement_group_name": "Linear Algebra"},
+    {"course_code": "CS 2353", "credit_hours": 3, "requirement_group_id": "705f095c-55c2-45f5-90e3-f5423e05cc80", "requirement_group_name": "Discrete Computational Structures"},
+    {"course_code": "ENGR 3101", "credit_hours": 1, "requirement_group_id": "a2ad6bcf-0915-4542-8de0-947720bcbda6", "requirement_group_name": "Interdisciplinary Projects (3 Credit Hours)"},
+    {"course_code": "ENGR 4101", "credit_hours": 1, "requirement_group_id": "a2ad6bcf-0915-4542-8de0-947720bcbda6", "requirement_group_name": "Interdisciplinary Projects (3 Credit Hours)"},
+    {"course_code": "CS 2341", "credit_hours": 3, "requirement_group_id": "ca2e41c0-839d-433a-8a1f-416fa9bc1522", "requirement_group_name": "Computer Science Core (33 Credit Hours)"},
+    {"course_code": "CS 3341", "credit_hours": 3, "requirement_group_id": "ca2e41c0-839d-433a-8a1f-416fa9bc1522", "requirement_group_name": "Computer Science Core (33 Credit Hours)"},
+    {"course_code": "CS 3353", "credit_hours": 3, "requirement_group_id": "ca2e41c0-839d-433a-8a1f-416fa9bc1522", "requirement_group_name": "Computer Science Core (33 Credit Hours)"},
+    {"course_code": "CS 5328", "credit_hours": 3, "requirement_group_id": "ca2e41c0-839d-433a-8a1f-416fa9bc1522", "requirement_group_name": "Computer Science Core (33 Credit Hours)"},
+    {"course_code": "CS 5330", "credit_hours": 3, "requirement_group_id": "ca2e41c0-839d-433a-8a1f-416fa9bc1522", "requirement_group_name": "Computer Science Core (33 Credit Hours)"},
+    {"course_code": "CS 5343", "credit_hours": 3, "requirement_group_id": "ca2e41c0-839d-433a-8a1f-416fa9bc1522", "requirement_group_name": "Computer Science Core (33 Credit Hours)"},
+    {"course_code": "CS 5344", "credit_hours": 3, "requirement_group_id": "ca2e41c0-839d-433a-8a1f-416fa9bc1522", "requirement_group_name": "Computer Science Core (33 Credit Hours)"},
+    {"course_code": "CS 5351", "credit_hours": 3, "requirement_group_id": "ca2e41c0-839d-433a-8a1f-416fa9bc1522", "requirement_group_name": "Computer Science Core (33 Credit Hours)"}
+  ],
+  "prerequisites": {
+    "ENGR 2112": {"text": null, "courses": []},
+    "MATH 3304": {"text": "Prerequisites: C- or higher in MATH 1338 or MATH 1340.", "courses": ["MATH 1338", "MATH 1340"]},
+    "CS 2353": {"text": "Prerequisite: C- or better in CS 1341.", "courses": ["CS 1341"]},
+    "ENGR 3101": {"text": null, "courses": []},
+    "ENGR 4101": {"text": null, "courses": []},
+    "CS 2341": {"text": "Prerequisite: C- or better in CS 1342 or equivalent.", "courses": ["CS 1342"]},
+    "CS 3341": {"text": "Prerequisites: C- or better in CS 2341.", "courses": ["CS 2341"]},
+    "CS 3353": {"text": "Prerequisites: C- or better in CS 2341, CS 2353.", "courses": ["CS 2341", "CS 2353"]},
+    "CS 5328": {"text": "Prerequisite: CS 3341. Corequisite: CS 5330.", "courses": ["CS 3341", "CS 5330"]},
+    "CS 5330": {"text": "Prerequisites: C- or better in CS 2341, CS 2353, and CS 3341.", "courses": ["CS 2341", "CS 2353", "CS 3341"]},
+    "CS 5343": {"text": "Prerequisites: C- or better in CS 2340, CS 3353, and CS 3341.", "courses": ["CS 2340", "CS 3353", "CS 3341"]},
+    "CS 5344": {"text": "Prerequisites: C- or better in CS 3341.", "courses": ["CS 3341"]},
+    "CS 5351": {"text": "Prerequisites: C- or better in CS 5328.", "courses": ["CS 5328"]}
+  },
+  "course_records": [
+    {"course_code": "CS 1341", "status": "completed"},
+    {"course_code": "MATH 1337", "status": "completed"},
+    {"course_code": "CS 1311", "status": "completed"},
+    {"course_code": "ENGR 2101", "status": "completed"},
+    {"course_code": "CS 1342", "status": "in_progress"},
+    {"course_code": "MATH 1338", "status": "in_progress"},
+    {"course_code": "CS 2340", "status": "in_progress"},
+    {"course_code": "ENGR 2111", "status": "in_progress"}
+  ],
+  "unscheduled": [
+    {"requirement_group_id": "3f025209-079d-47c3-b41f-de143346e53a", "name": "Advanced/Domain Specific Use/Design of AI", "reason": "SELECTION_DEFERRED"},
+    {"requirement_group_id": "3c8d3e1a-53d9-4aca-9aea-40428c83e5ae", "name": "Experiential Learning (1-3 Credit Hours)", "reason": "SELECTION_DEFERRED"},
+    {"requirement_group_id": "157c580e-2a9c-496e-ae4a-6a6c4436856b", "name": "Statistical Methods", "reason": "SELECTION_DEFERRED"},
+    {"requirement_group_id": "4d4fd494-f958-454f-9d0f-c448c73c9010", "name": "Two Courses", "reason": "SELECTION_DEFERRED"},
+    {"requirement_group_id": "3e927b68-ec73-422d-a3cd-a6cc46082959", "name": "Engineering Leadership (6 Credit Hours)", "reason": "SELECTION_DEFERRED"},
+    {"requirement_group_id": "3693d16f-f47f-48b2-886f-6c8f647b9bde", "name": "Technical Electives (9 Credit Hours)", "reason": "FREEFORM_MANUAL_REVIEW"},
+    {"requirement_group_id": "657e31db-4498-4ad3-88d6-0f29917dad3f", "name": "Advanced Major Electives (3-5 Credit Hours)", "reason": "FREEFORM_MANUAL_REVIEW"}
+  ]
+}

@@ -1,0 +1,117 @@
+# Nightly job postings ingest.
+#
+# This is the first workflow in the repo -- there was no .github/workflows/
+# directory before it, no vercel cron, no pg_cron, and no Supabase edge
+# function. "Nightly" was a plan, not a thing that ran.
+#
+# GitHub Actions over the alternatives because the schedule then lives in a
+# reviewable file next to the code it runs, secrets reuse the SUPABASE_SECRET_KEY
+# pattern the existing fetch scripts already use, and run history is visible
+# without standing anything else up. pg_cron would work too and hides the
+# schedule inside the database; swapping later is cheap, since everything real
+# is in the Python entrypoint rather than here.
+#
+# QUOTA IS THE BINDING CONSTRAINT. Adzuna allows ~1,000 calls/month and this
+# spends 14 a night -- roughly 420, comfortably inside it. JSearch is
+# deliberately NOT in the nightly sweep: at ~200/month, 14 a night would
+# exhaust the quota in a fortnight, and the integration spec narrows it to
+# LinkedIn-source confirmation anyway. Run it by hand with explicit roles.
+
+name: Postings ingest
+
+on:
+  schedule:
+    # 07:15 UTC ~ 01:15 America/Chicago. Off the hour on purpose: the top of
+    # the hour is when every other scheduled job on the platform fires, and
+    # Actions queues hardest there.
+    - cron: "15 7 * * *"
+  workflow_dispatch:
+    inputs:
+      live:
+        description: "Actually call the vendors (spends quota)"
+        type: boolean
+        default: false
+      write:
+        description: "Write to Supabase (requires live, and the migration to be applied)"
+        type: boolean
+        default: false
+
+# One ingest at a time. A second run overlapping the first would double-spend
+# quota to fetch rows the first run is already upserting.
+concurrency:
+  group: postings-ingest
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Sync dependencies
+        run: uv sync --frozen
+
+      # Merging this file enables the schedule immediately, but the credentials
+      # and the tables land later and on someone else's clock. Without this
+      # check every night would go red for a reason nobody needs telling twice,
+      # and a workflow that always fails is one nobody reads when it fails for
+      # a real reason. Not configured is a skip; configured and broken is a
+      # failure.
+      - name: Check configuration
+        id: config
+        env:
+          ADZUNA_APP_ID: ${{ secrets.ADZUNA_APP_ID }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          set -euo pipefail
+          missing=""
+          [ -z "${ADZUNA_APP_ID:-}" ]       && missing="$missing ADZUNA_APP_ID"
+          [ -z "${SUPABASE_URL:-}" ]        && missing="$missing SUPABASE_URL"
+          [ -z "${SUPABASE_SECRET_KEY:-}" ] && missing="$missing SUPABASE_SECRET_KEY"
+          if [ -n "$missing" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Postings ingest skipped -- missing secrets:$missing"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Ingest
+        if: steps.config.outputs.ready == 'true'
+        env:
+          ADZUNA_APP_ID: ${{ secrets.ADZUNA_APP_ID }}
+          ADZUNA_APP_KEY: ${{ secrets.ADZUNA_APP_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        # On the schedule this runs live and writes. On a manual dispatch it
+        # obeys the inputs, so the default manual run is a harmless dry run.
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            FLAGS="--live --write"
+          else
+            FLAGS=""
+            [ "${{ inputs.live }}" = "true" ]  && FLAGS="$FLAGS --live"
+            [ "${{ inputs.write }}" = "true" ] && FLAGS="$FLAGS --write"
+          fi
+          echo "running: ingest.py $FLAGS"
+          uv run python scripts/job_postings/ingest.py $FLAGS
+
+      - name: Age out raw payloads
+        # Only after a write actually happened, and never on a dry run --
+        # there is nothing to expire and the credentials may not be present.
+        if: github.event_name == 'schedule' && steps.config.outputs.ready == 'true'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: uv run python scripts/job_postings/retention.py --apply

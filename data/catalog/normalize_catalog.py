@@ -133,9 +133,42 @@ def extract_cross_listings(prerequisites: Any) -> list[str]:
     )
 
 
+# Abbreviations whose internal period must not always be read as a sentence
+# terminator by split_sentences() below -- but only when what immediately
+# follows is a lowercase word, the actual signal that this is a same-
+# sentence continuation rather than a new sentence. Confirmed live, SMU
+# CCPA 5315/5320/5325: "...enrollment in the B.A. in corporate communication
+# and public affairs..." was being split right after "B.A.", leaving the
+# lowercase continuation as its own bogus "sentence" starting mid-phrase.
+#
+# Suppressing the split unconditionally after these abbreviations is too
+# aggressive, though -- confirmed live against SPAN 3356/4378, where
+# "...Hispanic groups in the U.S. Prerequisite: C- or better..." is a real
+# sentence boundary (the next sentence starts uppercase, as real sentences
+# do); masking "U.S." there unconditionally swallowed a genuine prerequisite
+# sentence into the description, a regression this lowercase check exists
+# specifically to avoid.
+#
+# Add to this list only on a confirmed real case, the same way
+# PERMISSION_PHRASE in fetch_smu_catalog.py grew from actual audited rows
+# rather than a guessed general list.
+SENTENCE_ABBREVIATIONS = ("B.A.", "B.S.", "M.A.", "M.S.", "Ph.D.", "U.S.")
+_ABBREVIATION_PERIOD_MASK = "\x00"
+_FALSE_ABBREVIATION_BOUNDARY = re.compile(
+    "(?:" + "|".join(re.escape(a) for a in SENTENCE_ABBREVIATIONS) + r")(?=\s+[a-z])"
+)
+
+
 def split_sentences(text: str) -> list[str]:
-    chunks = re.split(r"(?<=[.!?])\s+", text)
-    return [" ".join(chunk.strip().split()) for chunk in chunks if chunk.strip()]
+    masked = _FALSE_ABBREVIATION_BOUNDARY.sub(
+        lambda m: m.group(0).replace(".", _ABBREVIATION_PERIOD_MASK), text
+    )
+    chunks = re.split(r"(?<=[.!?])\s+", masked)
+    return [
+        " ".join(chunk.replace(_ABBREVIATION_PERIOD_MASK, ".").strip().split())
+        for chunk in chunks
+        if chunk.strip()
+    ]
 
 
 def extract_repeatability(description: Any, prerequisites: Any) -> str | None:

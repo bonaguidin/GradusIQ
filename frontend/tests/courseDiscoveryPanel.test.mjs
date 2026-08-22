@@ -178,7 +178,7 @@ test('Course Discovery panel: CTA, loading, three typed outcomes, empty/failure 
   await page.getByRole('button', { name: 'Course Discovery' }).click()
   await page.getByRole('heading', { name: 'Course Discovery' }).waitFor()
   assert.equal(await page.locator('#course-discovery-target-role').count(), 0)
-  await page.getByText('Find courses at your school that build the skills your target role needs.').waitFor()
+  await page.getByText('Explore courses at your school that could build skills for your career goals.').waitFor()
 
   // Course Discovery no longer renders inside Career's Profile sub-tab.
   await page.getByRole('button', { name: 'Career' }).click()
