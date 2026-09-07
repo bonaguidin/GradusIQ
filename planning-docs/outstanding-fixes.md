@@ -29,7 +29,11 @@ _Session 2026-09-06: syllabus grade-calculator follow-on — editable category w
 
 ## 🟡 Data coverage — no API needed, pure data work
 
-- [ ] **No generation script for the O*NET file** — `data/onet/build_onet.py` exists (375 lines) but coverage is still curated/manual, not automated against the full O*NET release.
+- [ ] **O*NET coverage is broad, but two of the 14 student roles are not fully grounded.** The static file contains **1,016 occupations from O*NET 30.3**, generated 2026-08-10 by `data/onet/build_onet.py`. Twelve of the 14 student roles resolve fully; Finance Intern borrows from a neighbouring SOC; Operations Intern (`13-1199.00`) is a hard stub with no borrow possible. `build_onet.py` exists, but it is **not on an automated refresh**.
+
+- [ ] **`dfw_employers_ats.csv` still uses the mid-career Career OS role taxonomy.** Its `target_role_families` column is loaded verbatim by `load_employers.py`, so employer targeting diverges from the 14 student roles. `role_families.yaml` was realigned on 2026-08-19 but remains unreviewed.
+
+- [ ] **FIT has no research-agent fallback for `no_data` SOCs.** A labelling fix is pending on `fix/fit-ungrounded-role-disclosure`, but the underlying answer remains ungrounded. Options: give FIT the agent fallback, or remap Operations Intern off `13-1199.00` to a rated SOC.
 
 ## 🟡 Job posting data — vendor decided, infra built, cache-pattern caveats remain
 
@@ -198,6 +202,8 @@ Proposed agents, roughly in order of leverage:
 ## 🟡 Test suite — flake watch list (not confirmed broken)
 
 - [ ] **`test_career_optimization_cache_changes_with_selection_add_change_and_clear`** (`tests/test_api_v2_schedule.py`) failed exactly once, on PR #52's CI run, with `assert 4 == 3` (a fingerprint set had one extra unique value). Never reproduced since: clean across 6 isolated local runs (3× on `dev`, 3× on the PR branch), clean across 3 full-suite runs on `dev` (1981 passed each time, this test included), and clean on a same-commit CI re-run. Logging as a watch-item in case it recurs — not treated as a confirmed bug. If it fails again, the fingerprint-uniqueness assertion and whatever seeds/orders the four `OPTIMIZE_URL` calls in that test are the place to start.
+
+- [ ] **`career profile: Course Discovery role selector marks unsupported roles instead of letting them run silently`** (`frontend/tests/careerProfile.test.mjs:851`) failed exactly once, with `AssertionError [ERR_ASSERTION]: false !== true`, surfaced incidentally during unrelated full-suite verification runs for PR #58 (the `courseDiscoveryPanel.test.mjs` race-condition fix). Not re-investigated or reproduced on purpose beyond that — two immediate full-suite re-runs afterward were clean. Unlike the `courseDiscoveryPanel` fix in the same session, no mechanism is known yet for this one. Logging as a watch-item in case it recurs.
 
 - [ ] **Frontend Playwright suites flake under default `npm test` concurrency.** `frontend/tests/careerProfile.test.mjs` (Course Discovery role selector), `processingStages`, and `transcriptFlow` have each hit the 300s per-test timeout during a full `frontend` `npm test` run, while passing in isolation and at `--test-concurrency=4`. Observed first-hand 2026-09-06: `careerProfile.test.mjs` timed out once in a full run, then passed on rerun and standalone (full suite was 445/445 on the retry). Each `.test.mjs` spins up its own Vite dev server + Chromium, so under default `node --test` concurrency several run at once and contend for CPU/ports. A suite that only stays green with a concurrency cap is one we can't fully trust — needs either a concurrency limit committed to the `test` script or the contention root-caused.
 
