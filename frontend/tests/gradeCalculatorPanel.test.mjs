@@ -1585,6 +1585,7 @@ test('Grade Calculator: "Save & calculate" persists the actuals then calculates,
 
 test('Grade Calculator: entering a What-if score recalculates with no button press and no save', { timeout: 45_000 }, async (t) => {
   const calls = []
+  let calcBody = null
 
   const page = await mountCutoffPanel(t, 'grade-calculator-reactive-whatif', async (path, method, request, response) => {
     if (path === `/api/v2/student/me/syllabus-grade-profiles/${PROFILE_ID}` && method === 'GET') {
@@ -1598,7 +1599,7 @@ test('Grade Calculator: entering a What-if score recalculates with no button pre
     }
     if (path === `/api/v2/student/me/syllabus-grade-profiles/${PROFILE_ID}/calculate` && method === 'POST') {
       calls.push('calculate')
-      await readBody(request)
+      calcBody = JSON.parse(await readBody(request))
       json(response, 200, calcResponse({ projected_grade: 91.2 }))
       return true
     }
@@ -1617,6 +1618,183 @@ test('Grade Calculator: entering a What-if score recalculates with no button pre
   // writes grade-state
   await page.waitForTimeout(700)
   assert.deepEqual(calls, ['calculate'])
+
+  // a What-if-only row is submitted as a projected score, never an actual
+  assert.deepEqual(calcBody.category_scores, [{ category_name: 'Mid-term Exam', projected_score: 95 }])
+  assert.deepEqual(calcBody.assessment_scores, [])
+})
+
+test('Grade Calculator: a What-if takes precedence over that row\'s actual in the /calculate body', { timeout: 45_000 }, async (t) => {
+  let calcBody = null
+
+  const page = await mountCutoffPanel(t, 'grade-calculator-whatif-precedence', async (path, method, request, response) => {
+    if (path === `/api/v2/student/me/syllabus-grade-profiles/${PROFILE_ID}` && method === 'GET') {
+      json(response, 200, PROJECTION_READY_DETAIL())
+      return true
+    }
+    if (path === `/api/v2/student/me/syllabus-grade-profiles/${PROFILE_ID}/calculate` && method === 'POST') {
+      calcBody = JSON.parse(await readBody(request))
+      json(response, 200, calcResponse({ projected_grade: 62.5 }))
+      return true
+    }
+    return false
+  })
+
+  await page.getByRole('heading', { name: 'Enter your grades' }).waitFor()
+
+  // Mid-term: a real score AND a hypothetical -- the hypothetical wins.
+  await page.fill('#actual-category\\:Mid-term\\ Exam', '20')
+  await page.fill('#hypo-category\\:Mid-term\\ Exam', '70')
+  // Final: actual only.
+  await page.fill('#actual-category\\:Final\\ Exam', '100')
+  // Lecture Quizzes: What-if only.
+  await page.fill('#hypo-category\\:Lecture\\ Quizzes', '88')
+
+  await page.locator('.overview-stat-value', { hasText: '62.5%' }).waitFor()
+  await page.waitForTimeout(700)
+
+  const sorted = [...calcBody.category_scores].sort((a, b) => a.category_name.localeCompare(b.category_name))
+  assert.deepEqual(sorted, [
+    { category_name: 'Final Exam', actual_score: 100 },        // actual only -> actual_score, no projected_score
+    { category_name: 'Lecture Quizzes', projected_score: 88 }, // What-if only -> projected_score (unchanged)
+    { category_name: 'Mid-term Exam', projected_score: 70 },   // actual 20 + What-if 70 -> projected_score 70, no actual_score
+  ])
+  assert.deepEqual(calcBody.assessment_scores, [])
+  // never both keys on one row -- the backend validator (exactly_one_score) forbids it
+  for (const row of calcBody.category_scores) {
+    assert.equal(
+      ('actual_score' in row ? 1 : 0) + ('projected_score' in row ? 1 : 0),
+      1,
+      `${row.category_name} must carry exactly one of actual_score / projected_score`,
+    )
+  }
+})
+
+test('Grade Calculator: "Save & calculate" persists actuals only even when a What-if overrides a row', { timeout: 45_000 }, async (t) => {
+  const calls = []
+  let gradeStateBody = null
+  let calcBody = null
+
+  const page = await mountCutoffPanel(t, 'grade-calculator-whatif-save-actuals-only', async (path, method, request, response) => {
+    if (path === `/api/v2/student/me/syllabus-grade-profiles/${PROFILE_ID}` && method === 'GET') {
+      json(response, 200, PROJECTION_READY_DETAIL())
+      return true
+    }
+    if (path === `/api/v2/student/me/syllabus-grade-profiles/${PROFILE_ID}/grade-state` && method === 'PUT') {
+      calls.push('grade-state')
+      gradeStateBody = JSON.parse(await readBody(request))
+      json(response, 200, { revision: 5, category_scores: gradeStateBody.category_scores, assessment_scores: gradeStateBody.assessment_scores })
+      return true
+    }
+    if (path === `/api/v2/student/me/syllabus-grade-profiles/${PROFILE_ID}/calculate` && method === 'POST') {
+      calls.push('calculate')
+      calcBody = JSON.parse(await readBody(request))
+      json(response, 200, calcResponse({ completed_weight: 50, current_grade: 100, projected_grade: 62.5 }))
+      return true
+    }
+    return false
+  })
+
+  await page.getByRole('heading', { name: 'Enter your grades' }).waitFor()
+  await page.fill('#actual-category\\:Mid-term\\ Exam', '20')
+  await page.fill('#hypo-category\\:Mid-term\\ Exam', '70')
+  await page.fill('#actual-category\\:Final\\ Exam', '100')
+
+  // cancels the pending debounce, so /calculate here is the button's
+  await page.getByRole('button', { name: 'Save & calculate' }).click()
+  await page.getByText('Based on 50% of the course completed').waitFor()
+  await page.waitForFunction(() => !document.querySelector('button[aria-busy="true"]'))
+
+  assert.deepEqual(calls, ['grade-state', 'calculate'])
+
+  // the persisted state keeps the real score for the overridden row and
+  // carries no projected_score anywhere -- hypotheticals are never saved
+  const savedSorted = [...gradeStateBody.category_scores].sort((a, b) => a.category_name.localeCompare(b.category_name))
+  assert.deepEqual(savedSorted, [
+    { category_name: 'Final Exam', actual_score: 100 },
+    { category_name: 'Mid-term Exam', actual_score: 20 },
+  ])
+  assert.deepEqual(gradeStateBody.assessment_scores, [])
+  for (const row of gradeStateBody.category_scores) {
+    assert.ok(!('projected_score' in row), `${row.category_name} must not be persisted with a projected_score`)
+  }
+
+  // ...but the calculation that follows still applies the What-if
+  const midterm = calcBody.category_scores.find((r) => r.category_name === 'Mid-term Exam')
+  assert.deepEqual(midterm, { category_name: 'Mid-term Exam', projected_score: 70 })
+})
+
+test('Grade Calculator: clearing a What-if reverts that row to sending its actual', { timeout: 45_000 }, async (t) => {
+  let calcBody = null
+
+  const page = await mountCutoffPanel(t, 'grade-calculator-whatif-cleared', async (path, method, request, response) => {
+    if (path === `/api/v2/student/me/syllabus-grade-profiles/${PROFILE_ID}` && method === 'GET') {
+      json(response, 200, PROJECTION_READY_DETAIL())
+      return true
+    }
+    if (path === `/api/v2/student/me/syllabus-grade-profiles/${PROFILE_ID}/calculate` && method === 'POST') {
+      calcBody = JSON.parse(await readBody(request))
+      const midterm = calcBody.category_scores.find((r) => r.category_name === 'Mid-term Exam') ?? {}
+      // echo the row back through the card so each recalculation is observable
+      json(response, 200, calcResponse({
+        projected_grade: midterm.projected_score ?? null,
+        current_grade: midterm.actual_score ?? null,
+        completed_weight: midterm.actual_score != null ? 35 : null,
+      }))
+      return true
+    }
+    return false
+  })
+
+  await page.getByRole('heading', { name: 'Enter your grades' }).waitFor()
+  await page.fill('#actual-category\\:Mid-term\\ Exam', '20')
+  await page.fill('#hypo-category\\:Mid-term\\ Exam', '70')
+
+  // while the What-if is set, the row goes out as a projected score
+  await page.locator('.overview-stat-value', { hasText: '70%' }).waitFor()
+  assert.deepEqual(calcBody.category_scores, [{ category_name: 'Mid-term Exam', projected_score: 70 }])
+
+  // clear it -- the row falls back to its actual
+  await page.fill('#hypo-category\\:Mid-term\\ Exam', '')
+  await page.getByText('Based on 35% of the course completed').waitFor()
+  await page.locator('.overview-stat-value', { hasText: '20%' }).waitFor()
+  await page.waitForTimeout(700)
+  assert.deepEqual(calcBody.category_scores, [{ category_name: 'Mid-term Exam', actual_score: 20 }])
+})
+
+test('Grade Calculator: the current-grade card flags when a What-if has displaced a real score', { timeout: 45_000 }, async (t) => {
+  const page = await mountCutoffPanel(t, 'grade-calculator-displaced-actual-note', async (path, method, request, response) => {
+    if (path === `/api/v2/student/me/syllabus-grade-profiles/${PROFILE_ID}` && method === 'GET') {
+      json(response, 200, PROJECTION_READY_DETAIL())
+      return true
+    }
+    if (path === `/api/v2/student/me/syllabus-grade-profiles/${PROFILE_ID}/calculate` && method === 'POST') {
+      await readBody(request)
+      json(response, 200, calcResponse({ completed_weight: 50, current_grade: 88, projected_grade: 79 }))
+      return true
+    }
+    return false
+  })
+
+  const note = page.getByText('projected from a What-if score instead of counted')
+
+  await page.getByRole('heading', { name: 'Enter your grades' }).waitFor()
+
+  // a What-if on an EMPTY row: it never counted, so nothing is displaced
+  await page.fill('#hypo-category\\:Lecture\\ Quizzes', '95')
+  await page.getByText('Based on 50% of the course completed').waitFor()
+  await page.waitForTimeout(700)
+  assert.equal(await note.count(), 0, 'no note when the What-if only sits on an empty row')
+
+  // now put a What-if over a row that also has a real score -> note appears
+  await page.fill('#actual-category\\:Mid-term\\ Exam', '80')
+  await page.fill('#hypo-category\\:Mid-term\\ Exam', '40')
+  await note.waitFor()
+
+  // clear that What-if -> the row is counted again, note disappears
+  await page.fill('#hypo-category\\:Mid-term\\ Exam', '')
+  await page.waitForTimeout(700)
+  assert.equal(await note.count(), 0, 'note clears once the displacing What-if is removed')
 })
 
 test('Grade Calculator: clicking "Save & calculate" cancels a pending live projection (one result, from the button)', { timeout: 45_000 }, async (t) => {

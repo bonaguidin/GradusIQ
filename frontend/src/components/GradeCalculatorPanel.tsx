@@ -449,7 +449,16 @@ function draftFromSavedState(draft: GradeStateDraft, detail: SyllabusProfileDeta
   return next;
 }
 
-function buildGradeState(draft: GradeStateDraft, useProjectedFallback: boolean) {
+// `allowProjected` splits the two consumers of the draft:
+//   false -> persistence (PUT /grade-state): actuals only, What-if ignored.
+//   true  -> the /calculate path: a non-empty What-if takes PRECEDENCE over
+//            the row's actual. The student is asking "what if this score were
+//            X instead", so the row is submitted as { projected_score } with
+//            no actual_score -- CategoryScoreInput / AssessmentScoreInput
+//            forbid setting both (exactly_one_score), and a projected row is
+//            deliberately pulled out of the completed-weight pool, so the
+//            current grade re-normalises over the remaining real scores.
+function buildGradeState(draft: GradeStateDraft, allowProjected: boolean) {
   const category_scores: { category_name: string; actual_score?: number; projected_score?: number }[] = [];
   const assessment_scores: { assessment_name: string; actual_score?: number; projected_score?: number }[] = [];
   for (const [key, values] of Object.entries(draft)) {
@@ -457,10 +466,10 @@ function buildGradeState(draft: GradeStateDraft, useProjectedFallback: boolean) 
     const actual = values.actual.trim() === '' ? null : Number(values.actual);
     const projected = values.projected.trim() === '' ? null : Number(values.projected);
     let entry: { actual_score?: number; projected_score?: number } | null = null;
-    if (actual !== null && !Number.isNaN(actual)) {
-      entry = { actual_score: actual };
-    } else if (useProjectedFallback && projected !== null && !Number.isNaN(projected)) {
+    if (allowProjected && projected !== null && !Number.isNaN(projected)) {
       entry = { projected_score: projected };
+    } else if (actual !== null && !Number.isNaN(actual)) {
+      entry = { actual_score: actual };
     }
     if (!entry) continue;
     if (kind === 'category') category_scores.push({ category_name: name, ...entry });
@@ -761,8 +770,8 @@ export function GradeCalculatorPanel({ accessToken, courses, institutionName }: 
   // projection and by "Save & calculate". Every call takes a fresh run id;
   // a resolved response whose id has since been superseded is dropped, so
   // out-of-order arrivals never overwrite a newer calculation. Sends
-  // What-If scores as the projected fallback (buildGradeState(..., true))
-  // and never persists anything.
+  // What-If scores with precedence over their row's actual
+  // (buildGradeState(..., true)) and never persists anything.
   async function dispatchCalculation() {
     if (!accessToken || !selectedProfileId) return;
     const runId = ++calcRunIdRef.current;
@@ -851,6 +860,17 @@ export function GradeCalculatorPanel({ accessToken, courses, institutionName }: 
     for (const a of model.assessments) if ((a.weight !== null || a.points !== null) && a.category === null) names.push(a.name);
     return names;
   }, [detail]);
+
+  // Rows where a What-if is standing in for a real score the student also
+  // entered: buildGradeState(.., true) submits these as projected_score, so
+  // they drop out of the completed-weight pool and the current grade shifts.
+  // A What-if on an empty row displaces nothing (it never counted), so it
+  // is not tallied here.
+  const displacedActualCount = useMemo(
+    () =>
+      Object.values(gradeDraft).filter((v) => v.actual.trim() !== '' && v.projected.trim() !== '').length,
+    [gradeDraft],
+  );
 
   // Reselecting a calculator (or the initial load of one) starts review
   // findings fresh -- dismissal is session-only and must not leak between
@@ -1079,6 +1099,13 @@ export function GradeCalculatorPanel({ accessToken, courses, institutionName }: 
                           ? `Based on ${calcResult.completed_weight}% of the course completed.`
                           : 'No grades entered yet.'}
                       </p>
+                      {displacedActualCount > 0 && (
+                        <p className="empty-state">
+                          {displacedActualCount === 1
+                            ? '1 category is projected from a What-if score instead of counted.'
+                            : `${displacedActualCount} categories are projected from What-if scores instead of counted.`}
+                        </p>
+                      )}
 
                       <h3 className="card-heading">Projected grade</h3>
                       {calcResult.projected_grade !== null ? (
