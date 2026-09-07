@@ -61,7 +61,16 @@ import { CourseSearchAdd } from './CourseSearchAdd';
  */
 
 interface TermPlannerProps {
-  identity: AnalysisIdentity;
+  /**
+   * The session identity, passed as two primitives rather than a prebuilt
+   * `{ slug, accessToken }` object. A parent that constructs that object inline
+   * hands a fresh reference on every render; this component's terms-loading
+   * effect keys on it, so an unstable identity re-fires that effect on every
+   * unrelated parent re-render and resets the term dropdown. Taking primitives
+   * moves the single memoized construction in here, where it belongs.
+   */
+  slug: string | null;
+  accessToken: string | null;
   /** course_records rows the dashboard already loaded, for the selected term. */
   courses: Array<{
     id: string;
@@ -82,7 +91,7 @@ interface TermPlannerProps {
   onCourseRecordsChanged: () => void;
 }
 
-export function TermPlanner({ identity, courses, onCourseRecordsChanged }: TermPlannerProps) {
+export function TermPlanner({ slug, accessToken, courses, onCourseRecordsChanged }: TermPlannerProps) {
   const [terms, setTerms] = useState<PlanningTerm[]>([]);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [planned, setPlanned] = useState<PlannedCourse[]>([]);
@@ -100,19 +109,38 @@ export function TermPlanner({ identity, courses, onCourseRecordsChanged }: TermP
   // a term cannot change status midway through a render pass.
   const today = useMemo(() => new Date(), []);
 
+  // The one place the identity object is built. Memoized on the primitives so
+  // every effect and callback below that lists `identity` as a dependency sees
+  // a stable reference until the session actually changes -- see the prop
+  // comment for what an unstable one breaks.
+  const identity = useMemo<AnalysisIdentity>(
+    () => ({ slug, accessToken }),
+    [slug, accessToken],
+  );
+
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       const result = await fetchTerms(identity);
       if (cancelled) return;
       setTerms(result.terms);
-      setSelectedKey(
-        pickDefaultTermKey({ terms: result.terms, upcoming_term_key: result.upcomingTermKey }),
+      // Only pick a default when there is nothing to preserve: the first load
+      // (selectedKey still null), or a refetch whose term list no longer
+      // contains what the user had chosen. Otherwise this effect running again
+      // -- a discarded useMemo cache, a StrictMode double-invoke, a later
+      // identity change -- must not overwrite a live selection.
+      setSelectedKey((current) =>
+        current !== null && result.terms.some((term) => term.key === current)
+          ? current
+          : pickDefaultTermKey(
+              { terms: result.terms, upcoming_term_key: result.upcomingTermKey },
+              today,
+            ),
       );
       setTermsLoaded(true);
     })();
     return () => { cancelled = true; };
-  }, [identity]);
+  }, [identity, today]);
 
   // Every planned course for the student, not per-term: the payload is small,
   // and refetching on each dropdown change would make switching terms flicker

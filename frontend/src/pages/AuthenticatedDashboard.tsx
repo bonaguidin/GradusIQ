@@ -582,7 +582,8 @@ export function AuthenticatedDashboard() {
                     {accessToken
                       ? (
                         <TermPlanner
-                          identity={{ slug: null, accessToken }}
+                          slug={null}
+                          accessToken={accessToken}
                           courses={dashboard.courses}
                           onCourseRecordsChanged={() => { void reloadStudentProfile(); }}
                         />

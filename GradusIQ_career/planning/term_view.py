@@ -18,20 +18,27 @@ time.
 WHAT "UPCOMING" MEANS
 ---------------------
 The next term that has not started yet: the earliest start_date strictly after
-today. Not "the term containing today" -- during the fall semester, a student
-planning courses is planning spring, and defaulting them to the term they are
-already sitting in would put the search box on a term whose registration
-closed months ago.
+today. This is a PLANNING signal -- during the fall semester a student adding
+courses is adding them for spring, and the search box for that belongs on the
+term whose registration is still open, not the one already underway.
+
+It is no longer, on its own, where the GPA Calculator's term dropdown opens.
+That view now defaults to the term in progress (pickDefaultTermKey in
+frontend/src/lib/termPlanning.mjs), because its "Projected GPA" is a projection
+from grades being earned right now; `upcoming_term_key` is that dropdown's
+second choice, used only when no term contains today. The signal computed here
+is unchanged -- what consumes it shifted.
 
 Consequences worth stating, because each is a real case rather than a corner:
 
-  * Mid-term, the term in progress is NOT the default. It is still selectable;
-    it just is not where the dropdown opens.
-  * A term with no dates row can never be the default. It is not that it sorts
-    late -- it has no start_date to compare, so "has it started?" is
-    unanswerable. This is what happens to the five seeded 'Current Term' rows
-    (season='current', no calendar row) and to Fall 2025 / Spring 2026, which
-    predate the seeded window. All still appear in the dropdown.
+  * Mid-term, `upcoming_term_key` still points PAST the term in progress to the
+    next one. The GPA dropdown does not follow it there by default anymore, but
+    the planning affordance does, and both terms stay in the list either way.
+  * A term with no dates row can never be `upcoming` -- it has no start_date to
+    compare, so "has it started?" is unanswerable. This is what happens to the
+    five seeded 'Current Term' rows (season='current', no calendar row) and to
+    Fall 2025 / Spring 2026, which predate the seeded window. All still appear
+    in the dropdown.
   * The upcoming term may be one the student has no academic_terms row for --
     a term they have never enrolled in is exactly the one they want to plan.
     Those are returned too, flagged `enrolled: false`, with a null id. Adding a

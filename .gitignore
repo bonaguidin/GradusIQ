@@ -23,6 +23,9 @@ frontend/.vite/
 frontend/node_modules/
 frontend/dist/
 
+# Scratch verification harnesses (ad-hoc, not part of the test suite)
+frontend/__verify_*.mjs
+
 # Local agent/tool state
 .claude/
 .serena/

@@ -107,7 +107,10 @@ export declare function plannedRemoveUrl(id: string): string;
 export declare function plannedListUrl(termId: string | null | undefined): string;
 export declare function catalogSearchUrl(query: string): string;
 export declare function sortTerms(terms: PlanningTerm[]): PlanningTerm[];
-export declare function pickDefaultTermKey(payload: Partial<TermsPayload> | null | undefined): string | null;
+export declare function pickDefaultTermKey(
+  payload: Partial<TermsPayload> | null | undefined,
+  today?: Date,
+): string | null;
 export declare function termStatus(term: PlanningTerm | null | undefined, today: Date): TermStatus;
 export declare function parseDate(value: string | null | undefined): Date | null;
 export declare function formatTermDates(term: PlanningTerm | null | undefined): string | null;

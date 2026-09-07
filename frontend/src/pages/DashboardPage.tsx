@@ -572,7 +572,8 @@ function DemoDashboardPage() {
                     : 'Enter current grades below to see your projected GPA.'}
                 </p>
                 <TermPlanner
-                  identity={identity}
+                  slug={identity.slug}
+                  accessToken={identity.accessToken}
                   courses={demoCourseRecords}
                   onCourseRecordsChanged={refreshCourseRecords}
                 />

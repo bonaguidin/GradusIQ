@@ -81,46 +81,125 @@ test('seasonOrdinal does not resolve inherited object properties', () => {
 })
 
 // ── default term selection ──────────────────────────────────────────────────
+//
+// `today` is injected everywhere here: pickDefaultTermKey's rule 1 is a
+// date-containment check, so a test that let it read the real clock would pass
+// or fail depending on the day the suite runs.
 
-test('the dropdown opens on the term the backend named', () => {
-  const key = pickDefaultTermKey({
-    terms: [SUMMER_2026, FALL_2026, SPRING_2027],
-    upcoming_term_key: '2026-Fall',
-  })
+const BEFORE_ALL = new Date(2026, 0, 1)      // nothing in progress yet
+const MID_FALL_2026 = new Date(2026, 8, 6)   // inside Fall 2026 (Aug 24 - Dec 10)
+const BETWEEN_TERMS = new Date(2026, 11, 20) // Fall 2026 over, Spring 2027 not begun
+const AFTER_ALL = new Date(2028, 0, 1)       // every known term is past
+
+test('opens on the term in progress, not the upcoming one', () => {
+  // The regression: Sep 2026, Fall 2026 underway, Spring 2027 is upcoming.
+  const key = pickDefaultTermKey(
+    { terms: [FALL_2026, SPRING_2027], upcoming_term_key: '2027-Spring' },
+    MID_FALL_2026,
+  )
+  assert.equal(key, '2026-Fall')
+})
+
+test('between terms, falls back to the backend upcoming_term_key', () => {
+  const key = pickDefaultTermKey(
+    { terms: [FALL_2026, SPRING_2027], upcoming_term_key: '2027-Spring' },
+    BETWEEN_TERMS,
+  )
+  assert.equal(key, '2027-Spring')
+})
+
+test('the dropdown opens on the term the backend named when nothing is in progress', () => {
+  const key = pickDefaultTermKey(
+    { terms: [SUMMER_2026, FALL_2026, SPRING_2027], upcoming_term_key: '2026-Fall' },
+    BEFORE_ALL,
+  )
   assert.equal(key, '2026-Fall')
 })
 
 test('falls back to the is_upcoming flag when no key is named', () => {
-  const key = pickDefaultTermKey({
-    terms: [SUMMER_2026, { ...FALL_2026, is_upcoming: true }],
-    upcoming_term_key: null,
+  const key = pickDefaultTermKey(
+    { terms: [SUMMER_2026, { ...FALL_2026, is_upcoming: true }], upcoming_term_key: null },
+    BEFORE_ALL,
+  )
+  assert.equal(key, '2026-Fall')
+})
+
+test('after every known term, falls back to the latest enrolled term without throwing', () => {
+  let key
+  assert.doesNotThrow(() => {
+    key = pickDefaultTermKey(
+      {
+        terms: [
+          { ...SUMMER_2026, enrolled: true },
+          { ...FALL_2026, enrolled: true },
+          SPRING_2027,
+        ],
+        upcoming_term_key: null,
+      },
+      AFTER_ALL,
+    )
   })
   assert.equal(key, '2026-Fall')
 })
 
-test('with no future term, falls back to the latest enrolled term', () => {
-  const key = pickDefaultTermKey({
-    terms: [
-      { ...SUMMER_2026, enrolled: true },
-      { ...FALL_2026, enrolled: true },
-      SPRING_2027,
-    ],
-    upcoming_term_key: null,
+test('after the last known term with no upcoming key still returns a term, not a throw', () => {
+  let key
+  assert.doesNotThrow(() => {
+    key = pickDefaultTermKey(
+      { terms: [FALL_2026, SPRING_2027], upcoming_term_key: null },
+      AFTER_ALL,
+    )
   })
-  assert.equal(key, '2026-Fall')
+  assert.equal(key, '2027-Spring')
 })
 
 test('an unknown upcoming key does not select a term that is not there', () => {
-  const key = pickDefaultTermKey({
-    terms: [SUMMER_2026, FALL_2026],
-    upcoming_term_key: '2099-Fall',
-  })
+  const key = pickDefaultTermKey(
+    { terms: [SUMMER_2026, FALL_2026], upcoming_term_key: '2099-Fall' },
+    BEFORE_ALL,
+  )
   assert.equal(key, '2026-Fall')
 })
 
+test('a term with null or malformed dates never matches the in-progress rule and never throws', () => {
+  const noDates = term({ year: 2026, season: 'current', label: 'Current Term' }) // start/end null
+  const badDates = term({ year: 2026, season: 'Spring', start_date: 'not-a-date', end_date: 'nope' })
+  let key
+  assert.doesNotThrow(() => {
+    key = pickDefaultTermKey(
+      { terms: [noDates, badDates, FALL_2026], upcoming_term_key: null },
+      MID_FALL_2026,
+    )
+  })
+  // Only FALL_2026 has parseable dates that contain `today`, so it wins rule 1
+  // even though two other terms are present and unparseable.
+  assert.equal(key, '2026-Fall')
+})
+
+test('with an in-progress enrolled term and an in-progress non-enrolled one, the enrolled term wins', () => {
+  const overlapStart = new Date(2026, 8, 1) // Sep 1 -- inside both ranges below
+  const intersession = term({ year: 2026, season: 'Summer', start_date: '2026-08-01', end_date: '2026-09-15' })
+  assert.equal(
+    pickDefaultTermKey(
+      { terms: [{ ...intersession, enrolled: false }, { ...FALL_2026, enrolled: true }], upcoming_term_key: null },
+      overlapStart,
+    ),
+    '2026-Fall',
+  )
+  // And it is the `enrolled` flag doing the work, not the list order.
+  assert.equal(
+    pickDefaultTermKey(
+      { terms: [{ ...intersession, enrolled: true }, { ...FALL_2026, enrolled: false }], upcoming_term_key: null },
+      overlapStart,
+    ),
+    '2026-Summer',
+  )
+})
+
 test('no terms means no selection', () => {
+  assert.equal(pickDefaultTermKey({ terms: [], upcoming_term_key: null }, MID_FALL_2026), null)
+  assert.equal(pickDefaultTermKey(null, MID_FALL_2026), null)
   assert.equal(pickDefaultTermKey({ terms: [], upcoming_term_key: null }), null)
-  assert.equal(pickDefaultTermKey(null), null)
 })
 
 // ── term status ─────────────────────────────────────────────────────────────

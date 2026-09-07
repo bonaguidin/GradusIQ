@@ -126,33 +126,57 @@ export function sortTerms(terms) {
 }
 
 /**
- * The term the dropdown should open on.
+ * The term the GPA Calculator's dropdown should open on.
  *
- * Prefers the backend's own answer (`upcoming_term_key`), which is computed
- * against the server's date. The client-side fallback exists for the case
- * where every term predates today and the backend returned null -- then the
- * most recent term is a better landing place than an empty selection.
+ * Preference order:
+ *   1. The term happening now -- start_date <= today <= end_date -- preferring
+ *      one the student is enrolled in over one they are not. Summer sessions a
+ *      student never registered for still come back as `enrolled: false`
+ *      options, and an overlapping intersession must not win over the real
+ *      term.
+ *   2. The backend's `upcoming_term_key` (earliest start strictly after the
+ *      server's date -- see term_view.py).
+ *   3. Any term the payload flags `is_upcoming`.
+ *   4. The latest term the student has coursework in, else the latest term of
+ *      any kind -- a landing place for when every term predates today.
  *
- * "Upcoming" is the next term that has NOT started, not the one containing
- * today: mid-semester, a student planning courses is planning the next term,
- * and opening on the current one would put the search box on a term whose
- * registration has closed. term_view.py carries the same reasoning.
+ * Why the current term wins here, when it used to be `upcoming_term_key`
+ * first: this dropdown lives under the GPA Calculator, whose "Projected GPA"
+ * is a projection FROM the grades being earned right now. Opening on a future
+ * term the student has no grades in points the whole view at an empty term
+ * while the projection above it describes the current one. Course PLANNING
+ * still wants the next term -- a student mid-semester registers for what comes
+ * next, not the term whose registration has closed -- which is why the
+ * planning/search affordance inside TermPlanner keys off termStatus() and
+ * `is_upcoming` for its own behaviour rather than off this default.
+ *
+ * `today` is injectable for tests and defaults to now. Rule 1 goes through
+ * termStatus(), the same date-containment check the status badge uses, so
+ * "is this term happening now" has exactly one implementation. A term with a
+ * missing or malformed start_date/end_date resolves to 'unknown' there, so it
+ * never matches rule 1 and never throws.
  */
-export function pickDefaultTermKey(payload) {
+export function pickDefaultTermKey(payload, today = new Date()) {
   const terms = Array.isArray(payload?.terms) ? payload.terms : []
   if (terms.length === 0) return null
+
+  const sorted = sortTerms(terms)
+
+  const inProgress = sorted.filter((term) => termStatus(term, today) === 'in_progress')
+  if (inProgress.length > 0) {
+    return (inProgress.find((term) => term.enrolled) ?? inProgress[0]).key
+  }
 
   if (payload?.upcoming_term_key) {
     const named = terms.find((term) => term.key === payload.upcoming_term_key)
     if (named) return named.key
   }
 
-  const sorted = sortTerms(terms)
   const flagged = sorted.find((term) => term.is_upcoming)
   if (flagged) return flagged.key
 
-  // No future term has dates. Fall back to the latest term the student
-  // actually has coursework in, then to the latest term of any kind.
+  // Nothing is in progress and nothing is upcoming. Fall back to the latest
+  // term the student actually has coursework in, then to the latest of any kind.
   const enrolled = sorted.filter((term) => term.enrolled)
   const pool = enrolled.length > 0 ? enrolled : sorted
   return pool[pool.length - 1].key
