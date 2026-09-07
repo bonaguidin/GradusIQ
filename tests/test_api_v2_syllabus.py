@@ -1131,3 +1131,69 @@ def test_list_card_payload_empty_for_ready_profile_with_no_saved_grades(client, 
     assert summary["current_grade"] is None
     assert summary["current_letter_grade"] is None
     assert summary["components"] == []
+
+
+# --- list-card course title: dug out of the grade-model JSONB, defensively -------------
+
+
+def _only_revision(db):
+    rows = db.tables["syllabus_grade_revisions"]
+    assert len(rows) == 1
+    return rows[0]
+
+
+def test_list_card_course_title_present(client, db, monkeypatch):
+    patch_session(monkeypatch, db)
+    profile_id = _confirmed_phys_profile(client, db, monkeypatch)
+    rev = _only_revision(db)
+    rev["confirmed_grade_model"] = {
+        **rev["confirmed_grade_model"],
+        "course": {
+            "course_code": "PHYS 207",
+            "course_title": "Electricity and Magnetism",
+            "section": None,
+            "term": "Fall 2026",
+            "instructor": None,
+        },
+    }
+
+    assert _list_summary(client, profile_id)["course_title"] == "Electricity and Magnetism"
+
+
+def test_list_card_course_title_course_key_absent_does_not_raise(client, db, monkeypatch):
+    patch_session(monkeypatch, db)
+    profile_id = _confirmed_phys_profile(client, db, monkeypatch)
+    rev = _only_revision(db)
+    # a malformed extraction with no 'course' block at all, on both models
+    rev["confirmed_grade_model"] = {"grading_method": "weighted", "categories": []}
+    rev["extracted_grade_model"] = {"grading_method": "weighted", "categories": []}
+
+    response = client.get(LIST_URL, headers=HEADERS)
+    assert response.status_code == 200
+    summary = next(p for p in response.json()["syllabus_grade_profiles"] if p["id"] == profile_id)
+    assert summary["course_title"] is None
+
+
+def test_list_card_course_title_null_stays_null(client, db, monkeypatch):
+    patch_session(monkeypatch, db)
+    profile_id = _confirmed_phys_profile(client, db, monkeypatch)
+    rev = _only_revision(db)
+    rev["confirmed_grade_model"] = {**rev["confirmed_grade_model"], "course": {"course_code": "PHYS 207", "course_title": None}}
+    rev["extracted_grade_model"] = {**rev["extracted_grade_model"], "course": {"course_code": "PHYS 207", "course_title": None}}
+
+    assert _list_summary(client, profile_id)["course_title"] is None
+
+
+def test_list_card_course_title_no_revision_does_not_raise(client, db, monkeypatch):
+    patch_session(monkeypatch, db)
+    profile_id = _confirmed_phys_profile(client, db, monkeypatch)
+    # profile with no current revision at all
+    profile = next(p for p in db.tables["syllabus_grade_profiles"] if p["id"] == profile_id)
+    profile["current_revision_id"] = None
+    db.tables["syllabus_grade_revisions"].clear()
+
+    response = client.get(LIST_URL, headers=HEADERS)
+    assert response.status_code == 200
+    summary = next(p for p in response.json()["syllabus_grade_profiles"] if p["id"] == profile_id)
+    assert summary["course_title"] is None
+    assert summary["calculator_ready"] is False

@@ -1715,6 +1715,22 @@ test('Grade Calculator: the list renders a segmented ring card per calculator', 
         { name: 'Project 2', source_type: 'assessment', weight_percent: 50, effective_score: 94, status: 'completed' },
       ],
     },
+    // A pair identical except for course_title, to check the title renders
+    // and does not change the card's height.
+    {
+      id: 'p-title', institution: 'tamu', course_code: 'PHYS 218', term: 'Fall 2026', section: '500',
+      review_state: 'confirmed', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+      calculator_ready: true, current_grade: 80, current_letter_grade: 'B',
+      course_title: 'Mechanics for Engineering and Science Majors',
+      components: [{ name: 'Exams', source_type: 'category', weight_percent: 100, effective_score: 80, status: 'completed' }],
+    },
+    {
+      id: 'p-notitle', institution: 'tamu', course_code: 'PHYS 219', term: 'Fall 2026', section: '500',
+      review_state: 'confirmed', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+      calculator_ready: true, current_grade: 80, current_letter_grade: 'B',
+      course_title: null,
+      components: [{ name: 'Exams', source_type: 'category', weight_percent: 100, effective_score: 80, status: 'completed' }],
+    },
   ]
 
   const apiPlugin = {
@@ -1807,6 +1823,18 @@ test('Grade Calculator: the list renders a segmented ring card per calculator', 
   await points.locator('.grade-card-center-secondary', { hasText: '91%' }).waitFor()
   const pointsLabel = await points.locator('svg.grade-card-ring').getAttribute('aria-label')
   assert.match(pointsLabel, /Graded by individual assessments, not weighted categories\./)
+
+  // --- course title: rendered under the code when present; identical card
+  //     height when absent (reserved line, no placeholder, no shift) ---
+  const titled = page.locator('.grade-card', { hasText: 'PHYS 218' })
+  const untitled = page.locator('.grade-card', { hasText: 'PHYS 219' })
+  await titled.locator('.grade-card-title-name', { hasText: 'Mechanics for Engineering and Science Majors' }).waitFor()
+  assert.equal((await untitled.locator('.grade-card-title-name').textContent()).trim(), '', 'no title -> empty, no placeholder text')
+  const [ht, hu] = await Promise.all([
+    titled.evaluate((el) => el.getBoundingClientRect().height),
+    untitled.evaluate((el) => el.getBoundingClientRect().height),
+  ])
+  assert.ok(Math.abs(ht - hu) < 0.5, `card height is identical with (${ht}) and without (${hu}) a title`)
 
   // --- grade colour ramp: a continuous green -> red hue sweep, one step per
   //     grade, no blue break, A vs B still a clear hue apart ---

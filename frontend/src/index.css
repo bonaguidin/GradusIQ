@@ -6930,6 +6930,17 @@ label.profile-form-check { display: flex; flex-direction: row; align-items: cent
   white-space: nowrap;
 }
 .grade-card-title small { font-size: var(--text-xs); color: var(--muted); }
+/* Course title under the code. Always in the DOM (empty when there is no
+   title) with its line-box height reserved, so the card is identical in
+   height whether or not a title is present. One line, ellipsis on overflow. */
+.grade-card-title-name {
+  display: block;
+  line-height: 1.35;
+  height: 1.35em; /* fixed one-line box: empty and filled are the exact same height */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /* Always visible, not hover-gated: discoverable without a pointer and stable
    for tests. Sits over the card's top-right padding, clear of the ring. */

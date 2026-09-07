@@ -46,9 +46,13 @@ export function GradeCard({ profile, onOpen, onRemove, removing }: GradeCardProp
   // the <svg role="img">; for setup / categoryless (no svg) it goes on the
   // button. Either way the visible title is redundant to AT -- hide it so the
   // card announces once, not "…breakdown… PHYS 207 Fall 2026".
+  // The title row is always rendered, even when there's no title: its height
+  // is reserved in CSS so a card is exactly the same height with or without
+  // one (no placeholder text, no layout shift).
   const courseTitle = (
     <span className="grade-card-title" aria-hidden="true">
       <strong>{model.courseLabel}</strong>
+      <small className="grade-card-title-name">{profile.course_title ?? ''}</small>
       {model.term ? <small>{model.term}</small> : null}
     </span>
   );

@@ -2313,6 +2313,37 @@ def _list_card_components(result: GradeCalculationResult) -> list[dict]:
     ]
 
 
+def _course_title_from_revision(revision: dict | None) -> str | None:
+    """The course title for a list card, dug out of the revision's grade-model
+    JSONB. Prefers the confirmed model, falls back to the raw extraction.
+
+    Every level is defensive -- this is LLM-produced JSONB that a poor
+    extraction or a hand-edited row could malform: a missing revision, a
+    non-dict model, an absent 'course' block, or a null/blank title all yield
+    None, never a raise. A malformed model on one profile must not break the
+    whole list response.
+
+    Confirmed-vs-extracted is not actually ambiguous here: corrections never
+    touch the 'course' block (see corrections.py -- no handler for it) and
+    apply_grade_model_corrections deep-copies the extracted model, so a
+    confirmed model's title already equals the extracted one. The fallback
+    only matters for a not-yet-confirmed profile or a genuinely malformed
+    confirmed model.
+    """
+    if not isinstance(revision, dict):
+        return None
+    model = revision.get("confirmed_grade_model") or revision.get("extracted_grade_model")
+    if not isinstance(model, dict):
+        return None
+    course = model.get("course")
+    if not isinstance(course, dict):
+        return None
+    title = course.get("course_title")
+    if not isinstance(title, str):
+        return None
+    return title.strip() or None
+
+
 def _syllabus_revision_summary(revision_row: dict | None) -> dict | None:
     if revision_row is None:
         return None
@@ -2545,6 +2576,7 @@ def get_me_syllabus_grade_profiles(request: Request) -> dict:
                 client, revision_id=profile["current_revision_id"], student_id=student_id
             )
         summary = _syllabus_profile_summary(profile)
+        summary["course_title"] = _course_title_from_revision(current_revision)
         summary["calculator_ready"] = syllabus_read.calculator_ready(profile, current_revision)
 
         # Current grade, letter, and the trimmed per-component breakdown are

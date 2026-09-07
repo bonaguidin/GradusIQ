@@ -173,6 +173,10 @@ export interface SyllabusProfileSummary {
   current_grade?: number | null;
   current_letter_grade?: string | null;
   components?: SyllabusListCardComponent[];
+  // Dug out of the confirmed/extracted grade model's course block by the list
+  // endpoint; null when the syllabus never named a title (or the model is
+  // malformed). See _course_title_from_revision.
+  course_title?: string | null;
 }
 
 export interface SyllabusProfileDetail {
