@@ -188,6 +188,11 @@ export interface SyllabusProfileDetail {
   corrections: SyllabusCorrection[];
   clarifying_answers: SyllabusClarifyingAnswers;
   cutoff_overlap_resolution: SyllabusCutoffOverlapResolution;
+  // Names of confirmed_grade_model categories the backend proves decomposable
+  // (weighting._decomposition_children): their assessments can be scored
+  // individually. Empty when there is no confirmed model. Source of truth is
+  // the backend -- never re-derive the gate client-side.
+  decomposable_categories: string[];
   grade_state: SyllabusGradeState | null;
   grade_state_revision: number | null;
   possible_duplicate_profiles?: SyllabusProfileSummary[];

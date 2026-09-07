@@ -90,6 +90,7 @@ from GradusIQ_career.syllabus.cutoff_resolution import resolve_cutoff_overlaps
 from GradusIQ_career.syllabus.reconciliation import reconcile_grade_model
 from GradusIQ_career.syllabus.relevance import select_relevant_syllabus_content
 from GradusIQ_career.syllabus.store import GradeStateConflictError
+from GradusIQ_career.syllabus.weighting import get_effective_course_weights
 from GradusIQ_career.planning.requirement_selections import (
     RequirementSelectionIdentity,
     load_requirement_selection_identities,
@@ -2404,6 +2405,21 @@ def _syllabus_profile_detail_response(assembled: dict) -> dict:
         current_model.grade_thresholds if current_model else []
     ).model_dump(mode="json")
 
+    # Category names whose assessments the model proves can be scored
+    # individually (weighting._decomposition_children is the single
+    # definition -- never re-derive the gate anywhere else). Confirmed model
+    # only: the calculator runs against the confirmed model, and an
+    # unconfirmed course has no per-assessment scoring to offer yet.
+    # get_effective_course_weights is pure and O(categories x assessments)
+    # over a handful of rows; reconcile_grade_model above already invokes it
+    # transitively via validate_category_weights, but does not surface the
+    # result, so this recomputes it directly rather than threading it out.
+    decomposable_categories = (
+        [c.name for c in get_effective_course_weights(assembled["confirmed_grade_model"]).decomposable_categories]
+        if assembled["confirmed_grade_model"]
+        else []
+    )
+
     return {
         "id": assembled["profile"]["id"],
         "course": {
@@ -2432,6 +2448,7 @@ def _syllabus_profile_detail_response(assembled: dict) -> dict:
         "corrections": current_revision.get("corrections", []) if current_revision else [],
         "clarifying_answers": current_revision.get("clarifying_answers", {}) if current_revision else {},
         "cutoff_overlap_resolution": cutoff_overlap_resolution,
+        "decomposable_categories": decomposable_categories,
         "grade_state": grade_state.model_dump(mode="json") if grade_state else None,
         "grade_state_revision": assembled["grade_state_revision"],
     }
