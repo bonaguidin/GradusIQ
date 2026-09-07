@@ -998,3 +998,202 @@ def test_solve_target_b_and_a(client, db, monkeypatch):
     )
     assert a.status_code == 200
     assert abs(a.json()["required_score"] - 90.12) < 0.01
+
+
+# --- list-card payload: letter grade + trimmed per-component breakdown ------------------
+
+
+def _ready_scaled_profile(client, db, monkeypatch):
+    """A calculator_ready profile whose confirmed model carries a usable A-F
+    grade scale (so current_letter_grade classifies) over three weighted
+    categories -- Midterm 30, Final 40, Project 30. Mirrors the confirm flow
+    in test_confirming_threshold_value_claims_re_reconciles_and_unblocks_
+    calculator_ready.
+    """
+    monkeypatch.setattr(
+        api, "build_client", lambda: FakeAI(text=json.dumps(UNVERIFIABLE_THRESHOLDS_MODEL_RESPONSE))
+    )
+    created = ingest(
+        client, pdf_bytes=unverifiable_thresholds_pdf(), course_code="ECEN 248", term="Fall 2026"
+    ).json()
+    client.post(
+        f"{profile_url(created['id'])}/corrections",
+        headers=HEADERS,
+        json={
+            "corrections": [
+                {"target_type": "threshold", "operation": "confirm_threshold_value", "threshold_letter": letter}
+                for letter in ("A", "B", "C", "D", "F")
+            ]
+        },
+    )
+    confirmed = client.post(f"{profile_url(created['id'])}/confirm", headers=HEADERS)
+    assert confirmed.json()["calculator_ready"] is True
+    return created["id"]
+
+
+def _list_summary(client, profile_id):
+    body = client.get(LIST_URL, headers=HEADERS).json()
+    return next(p for p in body["syllabus_grade_profiles"] if p["id"] == profile_id)
+
+
+def test_list_card_payload_has_letter_grade_and_trimmed_components(client, db, monkeypatch):
+    patch_session(monkeypatch, db)
+    profile_id = _ready_scaled_profile(client, db, monkeypatch)
+    client.put(
+        f"{profile_url(profile_id)}/grade-state",
+        headers=HEADERS,
+        json={
+            "category_scores": [
+                {"category_name": "Midterm", "actual_score": 90},
+                {"category_name": "Final", "actual_score": 85},
+                {"category_name": "Project", "actual_score": 100},
+            ]
+        },
+    )
+
+    summary = _list_summary(client, profile_id)
+
+    # 90*0.30 + 85*0.40 + 100*0.30 = 91.0 -> "A" on the confirmed A-F scale
+    assert summary["current_grade"] == 91.0
+    assert summary["current_letter_grade"] == "A"
+
+    assert {c["name"] for c in summary["components"]} == {"Midterm", "Final", "Project"}
+    midterm = next(c for c in summary["components"] if c["name"] == "Midterm")
+    assert midterm == {
+        "name": "Midterm",
+        "source_type": "category",
+        "weight_percent": 30.0,
+        "effective_score": 90.0,
+        "status": "completed",
+    }
+
+
+def test_list_card_component_carries_only_the_five_named_fields(client, db, monkeypatch):
+    patch_session(monkeypatch, db)
+    profile_id = _ready_scaled_profile(client, db, monkeypatch)
+    client.put(
+        f"{profile_url(profile_id)}/grade-state",
+        headers=HEADERS,
+        json={"category_scores": [{"category_name": "Midterm", "actual_score": 88}]},
+    )
+
+    components = _list_summary(client, profile_id)["components"]
+    assert components
+    for component in components:
+        assert set(component) == {"name", "source_type", "weight_percent", "effective_score", "status"}
+    # explicitly none of the fuller CalculationComponent fields leak through
+    for dropped in ("original_score", "contribution", "earned_points", "possible_points"):
+        assert all(dropped not in component for component in components)
+
+
+def test_list_card_component_distinguishes_ungraded_from_a_scored_zero(client, db, monkeypatch):
+    patch_session(monkeypatch, db)
+    profile_id = _ready_scaled_profile(client, db, monkeypatch)
+    client.put(
+        f"{profile_url(profile_id)}/grade-state",
+        headers=HEADERS,
+        json={"category_scores": [{"category_name": "Midterm", "actual_score": 0}]},
+    )
+
+    by_name = {c["name"]: c for c in _list_summary(client, profile_id)["components"]}
+
+    # Midterm was explicitly entered as 0 -- a real scored zero
+    assert by_name["Midterm"]["effective_score"] == 0.0
+    assert by_name["Midterm"]["status"] == "completed"
+
+    # Final / Project were never entered -- ungraded, an empty ring segment
+    for ungraded in ("Final", "Project"):
+        assert by_name[ungraded]["effective_score"] is None
+        assert by_name[ungraded]["status"] is None
+
+
+def test_list_card_payload_null_and_empty_when_not_calculator_ready(client, db, monkeypatch):
+    patch_session(monkeypatch, db)
+    monkeypatch.setattr(api, "build_client", lambda: FakeAI(text=json.dumps(REVIEW_REQUIRED_MODEL_RESPONSE)))
+    created = ingest(client).json()
+    assert created["calculator_ready"] is False
+
+    summary = _list_summary(client, created["id"])
+    assert summary["calculator_ready"] is False
+    assert summary["current_grade"] is None
+    assert summary["current_letter_grade"] is None
+    assert summary["components"] == []
+
+
+def test_list_card_payload_empty_for_ready_profile_with_no_saved_grades(client, db, monkeypatch):
+    patch_session(monkeypatch, db)
+    profile_id = _ready_scaled_profile(client, db, monkeypatch)
+
+    # no grade-state PUT: a ready course the student hasn't scored yet must
+    # render as an empty ring, never an error
+    summary = _list_summary(client, profile_id)
+    assert summary["calculator_ready"] is True
+    assert summary["current_grade"] is None
+    assert summary["current_letter_grade"] is None
+    assert summary["components"] == []
+
+
+# --- list-card course title: dug out of the grade-model JSONB, defensively -------------
+
+
+def _only_revision(db):
+    rows = db.tables["syllabus_grade_revisions"]
+    assert len(rows) == 1
+    return rows[0]
+
+
+def test_list_card_course_title_present(client, db, monkeypatch):
+    patch_session(monkeypatch, db)
+    profile_id = _confirmed_phys_profile(client, db, monkeypatch)
+    rev = _only_revision(db)
+    rev["confirmed_grade_model"] = {
+        **rev["confirmed_grade_model"],
+        "course": {
+            "course_code": "PHYS 207",
+            "course_title": "Electricity and Magnetism",
+            "section": None,
+            "term": "Fall 2026",
+            "instructor": None,
+        },
+    }
+
+    assert _list_summary(client, profile_id)["course_title"] == "Electricity and Magnetism"
+
+
+def test_list_card_course_title_course_key_absent_does_not_raise(client, db, monkeypatch):
+    patch_session(monkeypatch, db)
+    profile_id = _confirmed_phys_profile(client, db, monkeypatch)
+    rev = _only_revision(db)
+    # a malformed extraction with no 'course' block at all, on both models
+    rev["confirmed_grade_model"] = {"grading_method": "weighted", "categories": []}
+    rev["extracted_grade_model"] = {"grading_method": "weighted", "categories": []}
+
+    response = client.get(LIST_URL, headers=HEADERS)
+    assert response.status_code == 200
+    summary = next(p for p in response.json()["syllabus_grade_profiles"] if p["id"] == profile_id)
+    assert summary["course_title"] is None
+
+
+def test_list_card_course_title_null_stays_null(client, db, monkeypatch):
+    patch_session(monkeypatch, db)
+    profile_id = _confirmed_phys_profile(client, db, monkeypatch)
+    rev = _only_revision(db)
+    rev["confirmed_grade_model"] = {**rev["confirmed_grade_model"], "course": {"course_code": "PHYS 207", "course_title": None}}
+    rev["extracted_grade_model"] = {**rev["extracted_grade_model"], "course": {"course_code": "PHYS 207", "course_title": None}}
+
+    assert _list_summary(client, profile_id)["course_title"] is None
+
+
+def test_list_card_course_title_no_revision_does_not_raise(client, db, monkeypatch):
+    patch_session(monkeypatch, db)
+    profile_id = _confirmed_phys_profile(client, db, monkeypatch)
+    # profile with no current revision at all
+    profile = next(p for p in db.tables["syllabus_grade_profiles"] if p["id"] == profile_id)
+    profile["current_revision_id"] = None
+    db.tables["syllabus_grade_revisions"].clear()
+
+    response = client.get(LIST_URL, headers=HEADERS)
+    assert response.status_code == 200
+    summary = next(p for p in response.json()["syllabus_grade_profiles"] if p["id"] == profile_id)
+    assert summary["course_title"] is None
+    assert summary["calculator_ready"] is False

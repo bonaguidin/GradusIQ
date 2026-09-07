@@ -38,6 +38,12 @@ class RequirementDecisionState(str, Enum):
     CHOICE_REQUIRED = "CHOICE_REQUIRED"
     ADVISER_REVIEW = "ADVISER_REVIEW"
     DATA_UNRESOLVED = "DATA_UNRESOLVED"
+    # The student deliberately removed an otherwise no-choice requirement from
+    # their plan. Distinct from ADVISER_REVIEW/DATA_UNRESOLVED (which mean the
+    # system could not resolve the requirement): here it resolves fine, the
+    # student chose to set it aside. Carries no feasible ids and no selected
+    # candidate, same shape as the unresolved states.
+    EXCLUDED = "EXCLUDED"
 
 
 def stable_candidate_id(
@@ -138,6 +144,7 @@ class RequirementDecision(StrictModel):
         if self.state in {
             RequirementDecisionState.ADVISER_REVIEW,
             RequirementDecisionState.DATA_UNRESOLVED,
+            RequirementDecisionState.EXCLUDED,
         } and self.feasible_candidate_ids:
             raise ValueError("an unresolved decision cannot carry feasible candidates")
         return self

@@ -66,6 +66,7 @@ from GradusIQ_career.syllabus.calculator import (
     AssessmentScoreInput,
     CategoryScoreInput,
     GradeCalculationError,
+    GradeCalculationResult,
     GradeModelNotReadyError,
     StudentGradeState,
     calculate_grade_projection,
@@ -89,9 +90,13 @@ from GradusIQ_career.syllabus.cutoff_resolution import resolve_cutoff_overlaps
 from GradusIQ_career.syllabus.reconciliation import reconcile_grade_model
 from GradusIQ_career.syllabus.relevance import select_relevant_syllabus_content
 from GradusIQ_career.syllabus.store import GradeStateConflictError
+from GradusIQ_career.syllabus.weighting import get_effective_course_weights
 from GradusIQ_career.planning.requirement_selections import (
     RequirementSelectionIdentity,
     load_requirement_selection_identities,
+)
+from GradusIQ_career.planning.requirement_exclusions import (
+    load_requirement_exclusion_group_ids,
 )
 from GradusIQ_career.planning.search import CatalogSearchError, search_catalog
 from GradusIQ_career.planning.term_view import (
@@ -99,6 +104,7 @@ from GradusIQ_career.planning.term_view import (
     build_terms_view,
     capture_reconstruction_date,
     fetch_terms_view,
+    term_key,
 )
 from GradusIQ_career.planning.lifecycle import (
     CourseNotEditable,
@@ -112,6 +118,7 @@ from GradusIQ_career.planning.lifecycle import (
 from GradusIQ_career.action_planning import build_action_plan, dependency_order
 from GradusIQ_career.course_discovery.agent import CourseDiscoveryAgent
 from GradusIQ_career.course_discovery.catalog import LocalCatalogRepository
+from GradusIQ_career.course_discovery.cross_listing import cross_listing_map
 from GradusIQ_career.degree_schedule_semantics import (
     DegreeScheduleSemanticSnapshot,
     build_degree_schedule_semantic_snapshot,
@@ -163,6 +170,9 @@ from GradusIQ_career.degree_plan_career_optimization import (
 from GradusIQ_career.degree_schedule_version import build_degree_schedule_version
 from GradusIQ_career.degree_schedule_choice_service import (
     write_degree_schedule_choices,
+)
+from GradusIQ_career.degree_schedule_exclusion_service import (
+    write_degree_schedule_exclusions,
 )
 from GradusIQ_career.demo.profile_adapter import build_demo_intelligence_profile, local_course_records
 from GradusIQ_career.demo.local_requirement_tree import (
@@ -2279,6 +2289,61 @@ def _syllabus_profile_summary(profile_row: dict) -> dict:
     }
 
 
+def _list_card_components(result: GradeCalculationResult) -> list[dict]:
+    """The slice of GradeCalculationResult.components a list card renders: one
+    ring segment per component, sized by weight_percent, filled by
+    effective_score, with status distinguishing an ungraded component
+    (status/effective_score both None) from a real scored zero
+    (effective_score 0.0, status set).
+
+    Deliberately a hand-built projection, not component.model_dump(): the
+    per-assessment detail the detail page needs -- original_score,
+    contribution, earned_points, possible_points -- is intentionally left off
+    the list payload and only served by POST .../{profile_id}/calculate.
+    """
+    return [
+        {
+            "name": component.name,
+            "source_type": component.source_type.value,
+            "weight_percent": component.weight_percent,
+            "effective_score": component.effective_score,
+            "status": component.status.value if component.status is not None else None,
+        }
+        for component in result.components
+    ]
+
+
+def _course_title_from_revision(revision: dict | None) -> str | None:
+    """The course title for a list card, dug out of the revision's grade-model
+    JSONB. Prefers the confirmed model, falls back to the raw extraction.
+
+    Every level is defensive -- this is LLM-produced JSONB that a poor
+    extraction or a hand-edited row could malform: a missing revision, a
+    non-dict model, an absent 'course' block, or a null/blank title all yield
+    None, never a raise. A malformed model on one profile must not break the
+    whole list response.
+
+    Confirmed-vs-extracted is not actually ambiguous here: corrections never
+    touch the 'course' block (see corrections.py -- no handler for it) and
+    apply_grade_model_corrections deep-copies the extracted model, so a
+    confirmed model's title already equals the extracted one. The fallback
+    only matters for a not-yet-confirmed profile or a genuinely malformed
+    confirmed model.
+    """
+    if not isinstance(revision, dict):
+        return None
+    model = revision.get("confirmed_grade_model") or revision.get("extracted_grade_model")
+    if not isinstance(model, dict):
+        return None
+    course = model.get("course")
+    if not isinstance(course, dict):
+        return None
+    title = course.get("course_title")
+    if not isinstance(title, str):
+        return None
+    return title.strip() or None
+
+
 def _syllabus_revision_summary(revision_row: dict | None) -> dict | None:
     if revision_row is None:
         return None
@@ -2295,15 +2360,21 @@ def _syllabus_revision_summary(revision_row: dict | None) -> dict | None:
 
 def _confirmed_suppression_sets(
     clarifying_answers: dict,
-) -> tuple[set[frozenset[str]], set[str]]:
+) -> tuple[set[frozenset[str]], set[str], set[str]]:
     """Rebuild reconcile_grade_model's confirmed_cutoff_pairs /
-    confirmed_value_claims from the persisted clarifying_answers keyed log,
-    so a re-reconciliation in the read path honours questions the student
-    has already answered. Keys written by service.apply_student_corrections:
-    'cutoff_overlap:<winner>,<loser>' and 'claim_evidence:threshold:<letter>'.
+    confirmed_value_claims / confirmed_category_value_claims from the
+    persisted clarifying_answers keyed log, so a re-reconciliation in the
+    read path honours questions the student has already answered. Keys
+    written by service.apply_student_corrections: 'cutoff_overlap:
+    <winner>,<loser>', 'claim_evidence:threshold:<letter>', and
+    'claim_evidence:category:<normalized-name>' -- the last is a separate
+    key namespace from the threshold one, not a variant of it, mirroring
+    reconcile_grade_model's separate confirmed_category_value_claims
+    parameter.
     """
     cutoff_pairs: set[frozenset[str]] = set()
     value_claims: set[str] = set()
+    category_value_claims: set[str] = set()
     for key, answer in clarifying_answers.items():
         if not isinstance(answer, dict):
             continue
@@ -2315,7 +2386,11 @@ def _confirmed_suppression_sets(
             letter = answer.get("letter")
             if letter:
                 value_claims.add(str(letter).strip().lower())
-    return cutoff_pairs, value_claims
+        elif key.startswith("claim_evidence:category:"):
+            name = answer.get("category_name")
+            if name:
+                category_value_claims.add(" ".join(str(name).strip().lower().split()))
+    return cutoff_pairs, value_claims, category_value_claims
 
 
 def _syllabus_profile_detail_response(assembled: dict) -> dict:
@@ -2338,7 +2413,7 @@ def _syllabus_profile_detail_response(assembled: dict) -> dict:
     if current_revision is not None and current_revision.get("confirmed_grade_model") is not None:
         confirmed_model = syllabus_read.confirmed_grade_model_from_row(current_revision)
         confirmed_content = syllabus_read.relevant_content_from_row(current_revision)
-        confirmed_cutoff_pairs, confirmed_value_claims = _confirmed_suppression_sets(
+        confirmed_cutoff_pairs, confirmed_value_claims, confirmed_category_value_claims = _confirmed_suppression_sets(
             current_revision.get("clarifying_answers") or {}
         )
         confirmed_reconciliation = reconcile_grade_model(
@@ -2346,6 +2421,7 @@ def _syllabus_profile_detail_response(assembled: dict) -> dict:
             confirmed_content,
             confirmed_cutoff_pairs=confirmed_cutoff_pairs,
             confirmed_value_claims=confirmed_value_claims,
+            confirmed_category_value_claims=confirmed_category_value_claims,
         )
 
     # Cutoff-overlap resolution proposal, computed from whichever grade
@@ -2359,6 +2435,21 @@ def _syllabus_profile_detail_response(assembled: dict) -> dict:
     cutoff_overlap_resolution = resolve_cutoff_overlaps(
         current_model.grade_thresholds if current_model else []
     ).model_dump(mode="json")
+
+    # Category names whose assessments the model proves can be scored
+    # individually (weighting._decomposition_children is the single
+    # definition -- never re-derive the gate anywhere else). Confirmed model
+    # only: the calculator runs against the confirmed model, and an
+    # unconfirmed course has no per-assessment scoring to offer yet.
+    # get_effective_course_weights is pure and O(categories x assessments)
+    # over a handful of rows; reconcile_grade_model above already invokes it
+    # transitively via validate_category_weights, but does not surface the
+    # result, so this recomputes it directly rather than threading it out.
+    decomposable_categories = (
+        [c.name for c in get_effective_course_weights(assembled["confirmed_grade_model"]).decomposable_categories]
+        if assembled["confirmed_grade_model"]
+        else []
+    )
 
     return {
         "id": assembled["profile"]["id"],
@@ -2388,6 +2479,7 @@ def _syllabus_profile_detail_response(assembled: dict) -> dict:
         "corrections": current_revision.get("corrections", []) if current_revision else [],
         "clarifying_answers": current_revision.get("clarifying_answers", {}) if current_revision else {},
         "cutoff_overlap_resolution": cutoff_overlap_resolution,
+        "decomposable_categories": decomposable_categories,
         "grade_state": grade_state.model_dump(mode="json") if grade_state else None,
         "grade_state_revision": assembled["grade_state_revision"],
     }
@@ -2484,11 +2576,20 @@ def get_me_syllabus_grade_profiles(request: Request) -> dict:
                 client, revision_id=profile["current_revision_id"], student_id=student_id
             )
         summary = _syllabus_profile_summary(profile)
+        summary["course_title"] = _course_title_from_revision(current_revision)
         summary["calculator_ready"] = syllabus_read.calculator_ready(profile, current_revision)
 
-        # Current grade is computed from already-saved state only (pure
-        # Python calculator, no LLM/parsing) -- never recomputed via ingestion.
+        # Current grade, letter, and the trimmed per-component breakdown are
+        # computed from already-saved state only (pure Python calculator, no
+        # LLM/parsing) -- never recomputed via ingestion. All three share one
+        # calculate_grade_projection call and one set of failure fallbacks:
+        # anything short of a clean result (not calculator_ready, no saved
+        # grade state, an invalid persisted record, or a calculation error)
+        # leaves current_grade/current_letter_grade None and components []
+        # so a not-yet-scored course renders as an empty ring, never an error.
         summary["current_grade"] = None
+        summary["current_letter_grade"] = None
+        summary["components"] = []
         if summary["calculator_ready"]:
             grade_state_row = syllabus_store.get_grade_state(client, profile_id=profile["id"], student_id=student_id)
             if grade_state_row is not None:
@@ -2497,8 +2598,12 @@ def get_me_syllabus_grade_profiles(request: Request) -> dict:
                     grade_state = syllabus_read.grade_state_from_row(grade_state_row)
                     result = calculate_grade_projection(reconciliation, grade_state)
                     summary["current_grade"] = result.current_grade
+                    summary["current_letter_grade"] = result.current_letter_grade
+                    summary["components"] = _list_card_components(result)
                 except (syllabus_read.PersistedRecordInvalidError, GradeCalculationError):
                     summary["current_grade"] = None
+                    summary["current_letter_grade"] = None
+                    summary["components"] = []
         items.append(summary)
 
     return {"syllabus_grade_profiles": items}
@@ -2856,6 +2961,14 @@ class PlannedCourseRequest(BaseModel):
     `catalog_course_id` is accepted but never trusted for display -- title and
     credit_hours are taken from this body, which is what the student saw in the
     search result they clicked.
+
+    `force_planned` is set only by the year-view "add a course" action, which
+    offers planning strictly for terms it renders as 'future'. It guarantees a
+    planned_courses row even if the term is already inside its 30-day
+    activation window -- `add_course_respecting_activation`'s straight-to-
+    course_records promotion is intentional for TermPlanner and must not fire
+    for this caller. Default False; TermPlanner never sends it, so its
+    behavior is unchanged.
     """
 
     course_code: str
@@ -2865,6 +2978,7 @@ class PlannedCourseRequest(BaseModel):
     title: str | None = None
     credit_hours: float | None = None
     catalog_course_id: str | None = None
+    force_planned: bool = False
 
 
 @router.get(
@@ -2914,6 +3028,9 @@ def post_me_planned_course(request: Request, body: PlannedCourseRequest) -> dict
     that has already activated must never pass through a brief "planned"
     state, so this route decides which table to write to before writing
     anything.
+
+    Exception: body.force_planned (year-view add) skips that decision and
+    always writes a planned_courses row. See PlannedCourseRequest.
     """
     client = _session_client(request)
     student_id = _resolve_session_student_id(client)
@@ -2929,18 +3046,31 @@ def post_me_planned_course(request: Request, body: PlannedCourseRequest) -> dict
                 body.season,
                 label=body.term_label,
             )
-            result = add_course_respecting_activation(
-                client,
-                student_id,
-                institution_id,
-                term_id=term_id,
-                year=body.year,
-                season=body.season,
-                course_code=body.course_code,
-                title=body.title,
-                credit_hours=body.credit_hours,
-                catalog_course_id=body.catalog_course_id,
-            )
+            if body.force_planned:
+                planned = add_planned(
+                    client,
+                    student_id,
+                    institution_id,
+                    course_code=body.course_code,
+                    term_id=term_id,
+                    title=body.title,
+                    credit_hours=body.credit_hours,
+                    catalog_course_id=body.catalog_course_id,
+                )
+                result = planned.to_dict()
+            else:
+                result = add_course_respecting_activation(
+                    client,
+                    student_id,
+                    institution_id,
+                    term_id=term_id,
+                    year=body.year,
+                    season=body.season,
+                    course_code=body.course_code,
+                    title=body.title,
+                    credit_hours=body.credit_hours,
+                    catalog_course_id=body.catalog_course_id,
+                )
         else:
             planned = add_planned(
                 client,
@@ -2999,6 +3129,36 @@ def get_me_catalog_search(request: Request, q: str = "", limit: int = 20) -> dic
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     return {"results": [row.to_dict() for row in results], "query": q}
+
+
+@router.get(
+    "/api/v2/student/me/catalog/cross-listings",
+    dependencies=[Depends(authorize_proxy_request)],
+)
+def get_me_catalog_cross_listings(request: Request) -> dict:
+    """code -> its cross-listed partner codes, for the caller's home
+    institution's whole catalog -- one small bulk read, fetched once and
+    cached client-side (mirroring /me/grading-schema), not a round trip per
+    search keystroke or per already-added code.
+
+    Backed by LocalCatalogRepository (the in-process JSON catalog that
+    carries a real cross_listings field), not course_catalog -- the Supabase
+    table CourseSearchAdd's own search hits has no such column. See
+    cross_listing.py's module comment for why a from-scratch resolver was
+    built rather than reusing canonical_course_code or the prerequisite
+    parser's slash-chain regex.
+    """
+    client = _session_client(request)
+    student_id = _resolve_session_student_id(client)
+    institution_id = _home_institution_id(client, student_id)
+
+    institution_rows = client.table("institutions").select("name").eq("id", institution_id).execute().data
+    institution_name = institution_rows[0]["name"] if institution_rows else None
+    catalog_institution = resolve_institution(institution_name)
+    if catalog_institution is None:
+        return {"cross_listings": {}}
+
+    return {"cross_listings": cross_listing_map(LocalCatalogRepository(), catalog_institution)}
 
 
 @router.get(
@@ -3287,6 +3447,7 @@ class _AcademicScheduleState:
     active_selections: tuple[RequirementSelectionIdentity, ...]
     selection_state_status: str
     selection_state_failure: LockedSelectionFailure | None
+    active_exclusions: tuple[str, ...] = ()
 
 
 def _no_program_result() -> FeatureResult:
@@ -3347,6 +3508,11 @@ def _reconstruct_academic_schedule(
         if apply_persisted_selections
         else ()
     )
+    active_exclusions = (
+        load_requirement_exclusion_group_ids(client, str(student_id), str(program_id))
+        if apply_persisted_selections
+        else ()
+    )
     institution_rows = client.table("institutions").select("name").eq("id", institution_id).execute().data
     institution_name = institution_rows[0]["name"] if institution_rows else None
 
@@ -3355,15 +3521,82 @@ def _reconstruct_academic_schedule(
         raw=raw, expected_graduation=expected_graduation, terms_view=terms_view,
         reconstruction_date=reconstruction_date,
         active_selections=active_selections,
+        active_exclusions=active_exclusions,
     )
+
+
+def _resolve_decision_term_keys(state: _AcademicScheduleState) -> dict[str, str | None]:
+    """Map each requirement decision to the term card it belongs on.
+
+    LOCKED joins to the term its course was actually scheduled into.
+    CHOICE_REQUIRED / EXCLUDED resolve the relevant candidate's
+    completion_term_index -- an ordinal over long terms counted from the plan
+    start -- to a term key, advancing by the same Fall<->Spring cadence
+    schedule_courses itself uses (_next_long_term). AUTO_SELECTED is invisible
+    in the planner UI; ADVISER_REVIEW / DATA_UNRESOLVED carry no term signal
+    (zero feasible candidates by construction), so both resolve to None.
+    """
+
+    def term_key_for_index(index: int) -> str:
+        year, season = state.starting_year, state.starting_season
+        for _ in range(index):
+            year, season = _next_long_term(year, season)
+        return term_key(year, season)
+
+    candidates_by_id: dict[str, Any] = {}
+    for candidate_set in state.academic_selection.candidate_sets:
+        for candidate in (
+            list(candidate_set.feasible_candidates)
+            + list(candidate_set.excluded_candidates)
+        ):
+            candidates_by_id[candidate.candidate_id] = candidate
+
+    def earliest_index(candidate_ids: list[str]) -> int | None:
+        indices = [
+            candidates_by_id[cid].completion_term_index
+            for cid in candidate_ids
+            if cid in candidates_by_id
+            and candidates_by_id[cid].completion_term_index is not None
+        ]
+        return min(indices) if indices else None
+
+    resolved: dict[str, str | None] = {}
+    for decision in state.academic_selection.decisions:
+        group_id = decision.requirement_group_id
+        if decision.state == "LOCKED":
+            selected = candidates_by_id.get(decision.selected_candidate_id or "")
+            selected_codes = set(selected.course_codes) if selected is not None else set()
+            placed: str | None = None
+            for scheduled_term in state.academic_schedule.terms:
+                if any(
+                    course.course_code in selected_codes
+                    or course.requirement_group_id == group_id
+                    for course in scheduled_term.courses
+                ):
+                    placed = scheduled_term.term_key
+                    break
+            resolved[group_id] = placed
+        elif decision.state == "CHOICE_REQUIRED":
+            index = earliest_index(list(decision.feasible_candidate_ids))
+            resolved[group_id] = term_key_for_index(index) if index is not None else None
+        elif decision.state == "EXCLUDED":
+            index = earliest_index(list(decision.excluded_candidate_ids))
+            resolved[group_id] = term_key_for_index(index) if index is not None else None
+        else:
+            resolved[group_id] = None
+    return resolved
 
 
 def _degree_schedule_payload(state: _AcademicScheduleState) -> dict:
     """Add internal academic decision evidence to the public schedule shape."""
     payload = state.academic_schedule.model_dump(mode="json")
     payload["schedule_version"] = build_degree_schedule_version(state)
+    resolved_term_keys = _resolve_decision_term_keys(state)
     payload["decisions"] = [
-        decision.model_dump(mode="json")
+        {
+            **decision.model_dump(mode="json"),
+            "resolved_term_key": resolved_term_keys.get(decision.requirement_group_id),
+        }
         for decision in state.academic_selection.decisions
     ]
     payload["candidate_sets"] = []
@@ -3403,6 +3636,9 @@ def _degree_schedule_payload(state: _AcademicScheduleState) -> dict:
             else None
         ),
     }
+    payload["exclusion_state"] = {
+        "excluded_group_ids": list(getattr(state, "active_exclusions", ())),
+    }
     return payload
 
 
@@ -3410,6 +3646,7 @@ def _build_academic_schedule_state(
     *, student_id: str, program_id: str, institution_name: str | None, raw: Any,
     expected_graduation: str | None, terms_view: Any, reconstruction_date: date,
     active_selections: tuple[RequirementSelectionIdentity, ...] = (),
+    active_exclusions: tuple[str, ...] = (),
 ) -> _AcademicScheduleState | FeatureResult:
     """Pure computation shared by the Postgres-backed and local-demo schedule
     paths -- no I/O of any kind. Given the same RawTreeInputs/TermsView shape
@@ -3438,9 +3675,11 @@ def _build_academic_schedule_state(
         raw.groups, raw.options, raw.option_courses, raw.course_records, raw.catalog_by_gid, raw.catalog_by_code
     )
     already_satisfied = satisfied_course_codes(raw.course_records)
+    excluded_group_ids = set(active_exclusions)
     courses, unscheduled = scope_schedule_input(
         groups, raw.options, raw.option_courses, raw.catalog_by_gid, raw.catalog_credit_by_code,
         raw.catalog_by_code, already_satisfied,
+        excluded_group_ids=excluded_group_ids,
     )
     catalog_institution = resolve_institution(institution_name)
     catalog_repo = LocalCatalogRepository()
@@ -3479,6 +3718,7 @@ def _build_academic_schedule_state(
         student_id=str(student_id), program_id=str(program_id),
         catalog_by_code=raw.catalog_by_code,
         starting_year=starting_year, starting_season=starting_season, max_terms=max_terms,
+        excluded_group_ids=excluded_group_ids,
     )
     unlocked_selection = select_structured_requirements(
         groups, raw.groups, raw.options, raw.option_courses, raw.catalog_by_gid,
@@ -3529,6 +3769,7 @@ def _build_academic_schedule_state(
         active_selections=active_selections,
         selection_state_status=selection_state_status,
         selection_state_failure=selection_state_failure,
+        active_exclusions=tuple(active_exclusions),
     )
 
 
@@ -3701,6 +3942,110 @@ def put_me_schedule_choices(
     }
 
 
+class DegreeScheduleExclusionsPutRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schedule_version: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
+    excluded_group_ids: list[UUID]
+
+    @model_validator(mode="after")
+    def unique_requirements(self):
+        ids = [str(item) for item in self.excluded_group_ids]
+        if len(ids) != len(set(ids)):
+            raise ValueError("excluded_group_ids must not contain duplicates")
+        return self
+
+
+@router.put(
+    "/api/v2/student/me/schedule/exclusions",
+    dependencies=[Depends(authorize_proxy_request)],
+)
+def put_me_schedule_exclusions(
+    request: Request, body: DegreeScheduleExclusionsPutRequest
+) -> dict:
+    """Validate and atomically replace the caller's complete set of
+    student-excluded (set-aside) requirement groups. Structurally mirrors
+    put_me_schedule_choices -- same schedule_version + revision CAS, same
+    409 conflict codes -- for the opposite intent."""
+    reconstruction_date = capture_reconstruction_date()
+    session_client = _session_client(request)
+    student_id = str(_resolve_session_student_id(session_client))
+    program_id = _resolve_program_id_for_student(session_client, student_id)
+    if program_id is None:
+        raise HTTPException(
+            status_code=409, detail={"code": "SCHEDULE_VERSION_CONFLICT"}
+        )
+    program_id = str(program_id)
+    institution_id = str(_home_institution_id(session_client, student_id))
+    try:
+        institution_rows = (
+            session_client.table("institutions")
+            .select("name")
+            .eq("id", institution_id)
+            .execute()
+            .data
+            or []
+        )
+    except Exception as exc:  # noqa: BLE001 -- RLS/transport boundary
+        raise HTTPException(status_code=502, detail="Could not resolve institution.") from exc
+    catalog_institution = resolve_institution(
+        institution_rows[0].get("name") if institution_rows else None
+    )
+    if catalog_institution is None:
+        raise HTTPException(
+            status_code=409, detail={"code": "SCHEDULE_VERSION_CONFLICT"}
+        )
+    catalog_repo = LocalCatalogRepository()
+    semantic_snapshot = build_degree_schedule_semantic_snapshot(
+        institution=catalog_institution,
+        local_catalog_fingerprint=catalog_repo.semantic_fingerprint(catalog_institution),
+        reconstruction_date=reconstruction_date,
+    )
+    try:
+        service_client = build_service_client()
+    except SupabaseConfigError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    def reconstruct():
+        current = _reconstruct_academic_schedule(
+            request, reconstruction_date=reconstruction_date
+        )
+        if isinstance(current, FeatureResult):
+            raise HTTPException(
+                status_code=409, detail={"code": "SCHEDULE_VERSION_CONFLICT"}
+            )
+        return current
+
+    try:
+        outcome = write_degree_schedule_exclusions(
+            service_client=service_client,
+            student_id=student_id,
+            program_id=program_id,
+            institution_id=institution_id,
+            semantic_snapshot=semantic_snapshot,
+            submitted_schedule_version=body.schedule_version,
+            excluded_group_ids=[str(item) for item in body.excluded_group_ids],
+            reconstruct=reconstruct,
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001 -- trusted RPC/academic boundary
+        raise HTTPException(
+            status_code=502, detail="Schedule exclusions are unavailable."
+        ) from exc
+
+    if outcome.conflict is not None:
+        detail: dict[str, Any] = {"code": outcome.conflict.value}
+        if outcome.unknown_group_ids:
+            detail["unknown_group_ids"] = list(outcome.unknown_group_ids)
+        raise HTTPException(status_code=409, detail=detail)
+    return {
+        "status": outcome.status.value,
+        "schedule_version": outcome.schedule_version,
+        "excluded_group_ids": list(outcome.excluded_group_ids),
+    }
+
+
 def _technical_elective_candidates_from_state(state: _AcademicScheduleState) -> dict:
     """Shared by the /me and demo technical-electives routes: given an already
     -built _AcademicScheduleState, find every matched freeform technical/
@@ -3823,6 +4168,7 @@ def _reconstruct_academic_schedule_for_demo(
         expected_graduation=student.get("expected_graduation"), terms_view=terms_view,
         reconstruction_date=today,
         active_selections=(),
+        active_exclusions=(),
     )
 
 
@@ -3985,6 +4331,7 @@ def post_me_schedule_career_optimize(
             max_terms=state.max_terms,
             career_rank_by_candidate_id=career_ranks,
             locked_selections=persisted_locks,
+            excluded_group_ids=set(state.active_exclusions),
         )
         return schedule_courses(
             state.student_id, state.program_id, selection.courses,

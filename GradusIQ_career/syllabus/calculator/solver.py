@@ -34,6 +34,8 @@ other side), which is a fundamentally different, non-linear question this
 module does not attempt to answer -- see _target_is_replaced_side.
 """
 
+from typing import NoReturn
+
 from GradusIQ_career.syllabus.calculator.engine import build_components
 from GradusIQ_career.syllabus.calculator.models import (
     CalculationComponent,
@@ -47,6 +49,7 @@ from GradusIQ_career.syllabus.calculator.models import (
 from GradusIQ_career.syllabus.calculator.rules import apply_deterministic_rules, looks_like_simple_greater_than
 from GradusIQ_career.syllabus.models import GradeModel, GradingRule, GradingRuleType
 from GradusIQ_career.syllabus.reconciliation import GradeModelReconciliationResult
+from GradusIQ_career.syllabus.weighting import get_effective_course_weights
 
 _ROUND_DIGITS = 2
 
@@ -130,6 +133,30 @@ def _target_is_replaced_side(grade_model: GradeModel, target_name: str, rule: Gr
     return _normalize_name(rule.target) == _normalize_name(target_name)
 
 
+def _raise_for_missing_target(grade_model: GradeModel, target_component: str) -> NoReturn:
+    """`target_component` did not match any built component. If it names a
+    decomposable category, its own component was intentionally suppressed in
+    favor of one per child assessment (see weighting._decomposition_children /
+    engine._build_weighted_components) -- say so and name the children,
+    matching the category-input rejection's wording. Otherwise it is simply
+    unknown.
+    """
+    normalized = _normalize_name(target_component)
+    effective = get_effective_course_weights(grade_model)
+    for category in effective.decomposable_categories:
+        if _normalize_name(category.name) == normalized:
+            children = [
+                a.name
+                for a in effective.decomposed_assessments
+                if a.category is not None and _normalize_name(a.category) == normalized
+            ]
+            raise GradeInputValidationError(
+                f"category '{target_component}' is scored through its individual assessments in this "
+                f"GradeModel; solve for one of its components instead: {', '.join(children)}"
+            )
+    raise GradeInputValidationError(f"unknown target_component: '{target_component}'")
+
+
 def solve_required_score(
     reconciliation: GradeModelReconciliationResult,
     grade_state: StudentGradeState,
@@ -170,7 +197,7 @@ def solve_required_score(
 
     target = _find_component(components, target_component)
     if target is None:
-        raise GradeInputValidationError(f"unknown target_component: '{target_component}'")
+        _raise_for_missing_target(grade_model, target_component)
     if target.weight_percent is None or target.weight_percent <= 0:
         raise GradeModelStructureError(f"'{target_component}' has no known positive weight; cannot solve for it")
 

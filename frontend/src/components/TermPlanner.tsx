@@ -1,11 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  MIN_SEARCH_LENGTH,
-  SEARCH_DEBOUNCE_MS,
   TERM_STATUS_LABELS,
   currentGradeOptions,
+  existingCourseStatusIndex,
   finalGradeOptions,
-  formatCredits,
   formatTermDates,
   isTermActivated,
   pickDefaultTermKey,
@@ -15,6 +13,7 @@ import {
 } from '../lib/termPlanning.mjs';
 import type {
   CatalogSearchResult,
+  CrossListingMap,
   GradingSchema,
   PendingFinalGrade,
   PlannedCourse,
@@ -23,15 +22,16 @@ import type {
 import {
   addPlannedCourse,
   editInProgressCourse,
+  fetchCrossListings,
   fetchGradingSchema,
   fetchPendingFinalGrades,
   fetchPlannedCourses,
   fetchTerms,
   finalizeCourseGrade,
   removePlannedCourse,
-  searchCatalog,
 } from '../api/planning';
 import type { AnalysisIdentity } from '../api/analysisApi.mjs';
+import { CourseSearchAdd } from './CourseSearchAdd';
 
 /**
  * The Academic Record's term view: a term dropdown, that term's coursework, and
@@ -61,7 +61,16 @@ import type { AnalysisIdentity } from '../api/analysisApi.mjs';
  */
 
 interface TermPlannerProps {
-  identity: AnalysisIdentity;
+  /**
+   * The session identity, passed as two primitives rather than a prebuilt
+   * `{ slug, accessToken }` object. A parent that constructs that object inline
+   * hands a fresh reference on every render; this component's terms-loading
+   * effect keys on it, so an unstable identity re-fires that effect on every
+   * unrelated parent re-render and resets the term dropdown. Taking primitives
+   * moves the single memoized construction in here, where it belongs.
+   */
+  slug: string | null;
+  accessToken: string | null;
   /** course_records rows the dashboard already loaded, for the selected term. */
   courses: Array<{
     id: string;
@@ -82,17 +91,15 @@ interface TermPlannerProps {
   onCourseRecordsChanged: () => void;
 }
 
-export function TermPlanner({ identity, courses, onCourseRecordsChanged }: TermPlannerProps) {
+export function TermPlanner({ slug, accessToken, courses, onCourseRecordsChanged }: TermPlannerProps) {
   const [terms, setTerms] = useState<PlanningTerm[]>([]);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [planned, setPlanned] = useState<PlannedCourse[]>([]);
   const [termsLoaded, setTermsLoaded] = useState(false);
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState<CatalogSearchResult[]>([]);
-  const [searching, setSearching] = useState(false);
   const [busyCode, setBusyCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [gradingSchema, setGradingSchema] = useState<GradingSchema | null>(null);
+  const [crossListings, setCrossListings] = useState<CrossListingMap>({});
   const [pendingGrades, setPendingGrades] = useState<PendingFinalGrade[]>([]);
   const [finalizeDrafts, setFinalizeDrafts] = useState<Record<string, string>>({});
   const [finalizeBusyId, setFinalizeBusyId] = useState<string | null>(null);
@@ -102,19 +109,38 @@ export function TermPlanner({ identity, courses, onCourseRecordsChanged }: TermP
   // a term cannot change status midway through a render pass.
   const today = useMemo(() => new Date(), []);
 
+  // The one place the identity object is built. Memoized on the primitives so
+  // every effect and callback below that lists `identity` as a dependency sees
+  // a stable reference until the session actually changes -- see the prop
+  // comment for what an unstable one breaks.
+  const identity = useMemo<AnalysisIdentity>(
+    () => ({ slug, accessToken }),
+    [slug, accessToken],
+  );
+
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       const result = await fetchTerms(identity);
       if (cancelled) return;
       setTerms(result.terms);
-      setSelectedKey(
-        pickDefaultTermKey({ terms: result.terms, upcoming_term_key: result.upcomingTermKey }),
+      // Only pick a default when there is nothing to preserve: the first load
+      // (selectedKey still null), or a refetch whose term list no longer
+      // contains what the user had chosen. Otherwise this effect running again
+      // -- a discarded useMemo cache, a StrictMode double-invoke, a later
+      // identity change -- must not overwrite a live selection.
+      setSelectedKey((current) =>
+        current !== null && result.terms.some((term) => term.key === current)
+          ? current
+          : pickDefaultTermKey(
+              { terms: result.terms, upcoming_term_key: result.upcomingTermKey },
+              today,
+            ),
       );
       setTermsLoaded(true);
     })();
     return () => { cancelled = true; };
-  }, [identity]);
+  }, [identity, today]);
 
   // Every planned course for the student, not per-term: the payload is small,
   // and refetching on each dropdown change would make switching terms flicker
@@ -142,6 +168,26 @@ export function TermPlanner({ identity, courses, onCourseRecordsChanged }: TermP
 
   const currentGradeLetters = useMemo(() => currentGradeOptions(gradingSchema), [gradingSchema]);
   const finalGradeLetters = useMemo(() => finalGradeOptions(gradingSchema), [gradingSchema]);
+
+  // Same "load once" shape as gradingSchema above. Powers CourseSearchAdd's
+  // cross-listing-aware duplicate check: a course already in progress,
+  // completed, or planned under its OTHER departmental code must not look
+  // freely addable just because the exact searched code is new.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const result = await fetchCrossListings(identity);
+      if (!cancelled) setCrossListings(result.crossListings);
+    })();
+    return () => { cancelled = true; };
+  }, [identity]);
+
+  // Student-wide (every term, not just the one selected in the dropdown):
+  // see existingCourseStatusIndex.
+  const existingCourseIndex = useMemo(
+    () => existingCourseStatusIndex(courses, planned),
+    [courses, planned],
+  );
 
   // "How did last semester go?" -- confirmed courses from an ended term still
   // sitting at in_progress. Loaded once on mount alongside planned courses;
@@ -324,28 +370,6 @@ export function TermPlanner({ identity, courses, onCourseRecordsChanged }: TermP
     </div>
   );
 
-  // Debounced search. The timer is cleared on every keystroke and on unmount,
-  // so at most one request is in flight per pause.
-  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    if (searchTimer.current) clearTimeout(searchTimer.current);
-    const trimmed = query.trim();
-    if (trimmed.length < MIN_SEARCH_LENGTH) {
-      setResults([]);
-      setSearching(false);
-      return undefined;
-    }
-    setSearching(true);
-    searchTimer.current = setTimeout(() => {
-      void (async () => {
-        const result = await searchCatalog(identity, trimmed);
-        setResults(result.results);
-        setSearching(false);
-      })();
-    }, SEARCH_DEBOUNCE_MS);
-    return () => { if (searchTimer.current) clearTimeout(searchTimer.current); };
-  }, [query, identity]);
-
   async function handleAdd(result: CatalogSearchResult) {
     if (!selectedTerm) return;
     setBusyCode(result.code);
@@ -521,58 +545,20 @@ export function TermPlanner({ identity, courses, onCourseRecordsChanged }: TermP
       {canPlan && (
         <section className="term-search">
           <h3 className="term-courses-heading">Plan a course</h3>
-          <label className="term-search-label" htmlFor="course-search">
-            Search your course catalog by code or title
-          </label>
-          <input
-            id="course-search"
-            className="term-search-input"
-            type="search"
-            value={query}
-            placeholder="e.g. CSCE 121 or Data Structures"
-            onChange={(event) => setQuery(event.target.value)}
-            autoComplete="off"
+          <CourseSearchAdd
+            identity={identity}
+            alreadyAddedCodes={alreadyPlanned}
+            crossListings={crossListings}
+            existingCourseIndex={existingCourseIndex}
+            onAdd={(result) => { void handleAdd(result); }}
+            busyCode={busyCode}
+            hint={willActivateOnAdd ? (
+              <p className="term-search-hint term-search-hint--activation">
+                {selectedTerm?.label} starts soon &mdash; courses you add here will be treated as
+                current (in progress), not planned.
+              </p>
+            ) : null}
           />
-          {willActivateOnAdd && (
-            <p className="term-search-hint term-search-hint--activation">
-              {selectedTerm?.label} starts soon &mdash; courses you add here will be treated as
-              current (in progress), not planned.
-            </p>
-          )}
-          {query.trim().length > 0 && query.trim().length < MIN_SEARCH_LENGTH && (
-            <p className="term-search-hint">Keep typing…</p>
-          )}
-          {searching && <p className="term-search-hint">Searching…</p>}
-          {!searching && query.trim().length >= MIN_SEARCH_LENGTH && results.length === 0 && (
-            <p className="term-search-hint">
-              No matches. Search matches the start of a course code or title.
-            </p>
-          )}
-          {results.length > 0 && (
-            <ul className="term-search-results">
-              {results.map((result) => {
-                const isPlanned = alreadyPlanned.has(result.code.toUpperCase());
-                const credits = formatCredits(result.credit_min, result.credit_max);
-                return (
-                  <li className="term-search-result" key={result.id}>
-                    <span className="term-search-result-main">
-                      <strong>{result.code}</strong>
-                      <small>{result.title}</small>
-                    </span>
-                    {credits && <span className="term-search-result-credits">{credits}</span>}
-                    <button
-                      type="button"
-                      className="btn btn-primary btn-sm"
-                      disabled={isPlanned || busyCode === result.code}
-                      onClick={() => { void handleAdd(result); }}
-                    >
-                      {isPlanned ? 'Planned' : busyCode === result.code ? 'Adding…' : 'Add'}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
         </section>
       )}
     </div>

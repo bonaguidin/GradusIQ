@@ -195,7 +195,14 @@ def _build_dependencies(
             codes = clause.course_codes
             if any(code in satisfied for code in codes):
                 # At least one alternative is already cleared -- the whole
-                # clause is met, regardless of how many codes it names.
+                # clause is met, regardless of how many codes it names. Its
+                # coreq-eligible alternatives are met too: mark them seen so
+                # the pure-corequisite pass below does not re-flag a sibling
+                # alternative (or a cross-listing alias, e.g. CSCE 222 done /
+                # ECEN 222 unlisted) as an unmet external corequisite.
+                coreqs_seen_in_clauses.update(
+                    code for code in codes if code in coreq_allowed
+                )
                 continue
             clause_coreqs = [code for code in codes if code in coreq_allowed]
             coreqs_seen_in_clauses.update(clause_coreqs)

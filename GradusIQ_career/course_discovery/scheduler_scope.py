@@ -90,9 +90,11 @@ def scope_schedule_input(
     catalog_credit_by_code: Mapping[str, float],
     catalog_by_code: Mapping[str, list[str]] | None = None,
     transcript_course_codes: set[str] | None = None,
+    excluded_group_ids: set[str] | None = None,
 ) -> tuple[list[CourseToSchedule], list[UnscheduledRequirement]]:
     catalog_by_code = catalog_by_code or {}
     transcript_course_codes = transcript_course_codes or set()
+    excluded_group_ids = excluded_group_ids or set()
     options_by_group: dict[str, list[dict]] = {}
     for option in options:
         options_by_group.setdefault(option["requirement_group_id"], []).append(dict(option))
@@ -144,6 +146,17 @@ def scope_schedule_input(
 
         group_options = options_by_group.get(group.id, [])
         if _options_have_choice(group_options, courses_by_option):
+            defer(group, "SELECTION_DEFERRED")
+            return
+
+        # A genuinely no-choice leaf the student has deliberately set aside:
+        # defer it as SELECTION_DEFERRED instead of scheduling its courses, so
+        # select_structured_requirements() picks it up as `structured` and
+        # forces the EXCLUDED decision. Placed AFTER the SATISFIED early-return
+        # and the real-choice checks above -- exclusion only ever diverts the
+        # single-mandatory auto-schedule path, never a satisfied or a
+        # choice-shaped group.
+        if group.id in excluded_group_ids:
             defer(group, "SELECTION_DEFERRED")
             return
 

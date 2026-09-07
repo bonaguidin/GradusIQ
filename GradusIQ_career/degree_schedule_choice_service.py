@@ -115,6 +115,7 @@ def write_degree_schedule_choices(
         starting_season=state.starting_season,
         max_terms=state.max_terms,
         locked_selections=desired,
+        excluded_group_ids=set(getattr(state, "active_exclusions", ())),
     )
     if validated.locked_selection_failure is not None:
         failure = validated.locked_selection_failure

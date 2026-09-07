@@ -120,7 +120,11 @@ test('Career Optimize stays opt-in and preserves the academic plan through every
   await page.getByRole('button', { name: 'Academic' }).click()
   await page.getByRole('button', { name: 'Course Discovery' }).click()
   const degreePanel = page.locator('.degree-schedule-panel')
-  await degreePanel.getByText('CS 5323').waitFor()
+  // CS 5323 is scheduler headroom -- it now lives in the Edit-courses popup,
+  // not on the card. The rendered term column is the "academic plan is
+  // showing" proxy.
+  const academicPlanColumn = degreePanel.getByRole('region', { name: 'Fall 2026' })
+  await academicPlanColumn.waitFor()
   assert.equal(posts.length, 0, 'mount must issue no Career Optimize POST')
 
   const careerPanel = page.locator('.career-optimization')
@@ -130,7 +134,7 @@ test('Career Optimize stays opt-in and preserves the academic plan through every
   await optimize.click()
   await careerPanel.getByText('Finding career-aligned choices…').waitFor()
   assert.equal(await optimize.isDisabled(), true)
-  assert.equal(await degreePanel.getByText('CS 5323').count() > 0, true, 'academic plan remains visible while loading')
+  assert.equal(await academicPlanColumn.count() > 0, true, 'academic plan remains visible while loading')
   await postReceived
   assert.equal(posts.length, 1)
   assert.deepEqual(posts[0], { force_refresh: false })
@@ -176,7 +180,7 @@ test('Career Optimize stays opt-in and preserves the academic plan through every
   await page.getByRole('button', { name: 'Course Discovery' }).click()
   await page.locator('.career-optimization').getByRole('button', { name: 'Optimize for career' }).click()
   await page.getByText("Career optimization wasn't available right now").waitFor()
-  assert.equal(await page.locator('.degree-schedule-panel').getByText('CS 5323').count() > 0, true)
+  assert.equal(await page.locator('.degree-schedule-panel').getByRole('region', { name: 'Fall 2026' }).count() > 0, true)
 
   response = { status: 200, body: careerResponse('SKIPPED') }
   await page.reload()
@@ -191,7 +195,7 @@ test('Career Optimize stays opt-in and preserves the academic plan through every
   await page.getByRole('button', { name: 'Course Discovery' }).click()
   await page.locator('.career-optimization').getByRole('button', { name: 'Optimize for career' }).click()
   await page.getByText('Ranking service is busy. Your academic plan remains unchanged.').waitFor()
-  assert.equal(await page.locator('.degree-schedule-panel').getByText('CS 5323').count() > 0, true)
+  assert.equal(await page.locator('.degree-schedule-panel').getByRole('region', { name: 'Fall 2026' }).count() > 0, true)
 
   await page.setViewportSize({ width: 390, height: 844 })
   const overflow = await page.locator('.degree-planner-flow').evaluate((element) => element.scrollWidth - element.clientWidth)

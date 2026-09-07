@@ -7,7 +7,10 @@ from GradusIQ_career.course_discovery.catalog import LocalCatalogRepository
 from GradusIQ_career.course_discovery.models import PrerequisiteClause, StructuredPrerequisite
 from GradusIQ_career.course_discovery.models import CatalogInstitution
 from GradusIQ_career.course_discovery.prerequisites import structured_prerequisite
-from GradusIQ_career.course_discovery.requirement_candidates import RequirementDecisionState
+from GradusIQ_career.course_discovery.requirement_candidates import (
+    CandidateExclusionReason,
+    RequirementDecisionState,
+)
 from GradusIQ_career.course_discovery.requirement_satisfaction import evaluate_requirement_tree
 from GradusIQ_career.course_discovery.requirement_selection import (
     LockedRequirementSelection,
@@ -44,7 +47,7 @@ def course(option_id, gid=None, unresolved=None, code=None):
 def run(
     groups, options, option_courses, catalog, credits, *, catalog_by_code=None,
     records=None, prerequisites=None, max_terms=4, career_ranks=None,
-    locks=None,
+    locks=None, excluded=None,
 ):
     records = records or []
     catalog_by_code = catalog_by_code or {}
@@ -66,6 +69,7 @@ def run(
         starting_year=2026, starting_season="Fall", max_terms=max_terms,
         career_rank_by_candidate_id=career_ranks,
         locked_selections=locks or (),
+        excluded_group_ids=excluded or (),
     )
 
 
@@ -266,7 +270,12 @@ def test_lock_rejects_excluded_and_no_longer_choice_candidates():
     groups = [group("pick", "enumerated_at_least_n", n=1)]
     options = [option("oa", "pick", 0), option("ob", "pick", 1)]
     rows = [course("oa", "a"), course("ob", "b")]
-    restricted = {"B": StructuredPrerequisite(restrictions=["department approval"])}
+    # A course-referencing needs_review clause (not .restrictions, which is
+    # informational only per its own model contract and no longer excludes
+    # a candidate -- see test_needs_review_gate_ignores_course_free_prose_
+    # but_still_blocks_course_referencing_clauses) still legitimately
+    # excludes: it may hide a real, unmodelled course prerequisite.
+    restricted = {"B": StructuredPrerequisite(needs_review=["concurrent enrollment in ZZ 101"])}
     args = groups, options, rows, {"a": "A", "b": "B"}, {"A": 3, "B": 3}
     baseline = run(*args)
     excluded_lock = lock_for(baseline, "pick", ["B"])
@@ -529,33 +538,53 @@ def test_ethan_real_tree_resolves_five_structured_groups_globally():
     )
 
     base_codes = {course.course_code for course in base}
-    assert {course.course_code for course in result.courses} - base_codes == {"CEE 2302", "CS 3377"}
+    # Engineering Leadership no longer AUTO_SELECTS a sole feasible
+    # candidate: CS 5312's "Prerequisites: Junior standing" (and the other
+    # candidates' similar non-course prerequisite text) is
+    # StructuredPrerequisite.restrictions, informational by its own model
+    # contract (models.py:261-269, "not enforced by the scheduler"). With
+    # that no longer excluding, 6 candidates are genuinely feasible and the
+    # group is a real CHOICE_REQUIRED -- nothing beyond the base no-choice
+    # courses is auto-scheduled here.
+    assert {course.course_code for course in result.courses} - base_codes == set()
     decisions = {item.requirement_name: item for item in result.decisions}
     candidate_sets = {item.requirement_name: item for item in result.candidate_sets}
-    assert decisions["Engineering Leadership (6 Credit Hours)"].state == RequirementDecisionState.AUTO_SELECTED
-    assert decisions["Engineering Leadership (6 Credit Hours)"].selected_candidate_id is not None
+    assert decisions["Engineering Leadership (6 Credit Hours)"].state == RequirementDecisionState.CHOICE_REQUIRED
+    assert decisions["Engineering Leadership (6 Credit Hours)"].selected_candidate_id is None
     assert decisions["Statistical Methods"].state == RequirementDecisionState.CHOICE_REQUIRED
     assert decisions["Two Courses"].state == RequirementDecisionState.CHOICE_REQUIRED
     assert (
         len(candidate_sets["Engineering Leadership (6 Credit Hours)"].feasible_candidates),
         len(candidate_sets["Engineering Leadership (6 Credit Hours)"].excluded_candidates),
-    ) == (1, 7)
+    ) == (6, 2)
     assert (
         len(candidate_sets["Statistical Methods"].feasible_candidates),
         len(candidate_sets["Statistical Methods"].excluded_candidates),
     ) == (3, 0)
+    # 13 feasible / 3 excluded, not 11/5: candidates that carried only an
+    # informational restriction (e.g. a campus note) are no longer
+    # wrongly excluded. The CHEM 1113/1114/1303/1304 candidate is still
+    # excluded -- CHEM 1303's "...or a passing grade on the Chemistry
+    # Placement Exam" mixes a real course code (CHEM 1302) with an
+    # unverifiable alternative path, exactly the shape
+    # StructuredPrerequisite.needs_review's contract describes
+    # (models.py:270-280), so it may still hide a real, unresolved course
+    # prerequisite and correctly stays excluded under the narrowed gate.
     assert (
         len(candidate_sets["Two Courses"].feasible_candidates),
         len(candidate_sets["Two Courses"].excluded_candidates),
-    ) == (11, 5)
+    ) == (13, 3)
+    # Engineering Leadership now joins unscheduled too -- see above.
     assert {entry.name for entry in result.unscheduled} == {
         "Advanced/Domain Specific Use/Design of AI", "Experiential Learning (1-3 Credit Hours)",
-        "Statistical Methods", "Two Courses", "Technical Electives (9 Credit Hours)",
-        "Advanced Major Electives (3-5 Credit Hours)",
+        "Statistical Methods", "Two Courses", "Engineering Leadership (6 Credit Hours)",
+        "Technical Electives (9 Credit Hours)", "Advanced Major Electives (3-5 Credit Hours)",
     }
+    # More genuinely-feasible candidates (Engineering Leadership 1->6, Two
+    # Courses 11->13) multiply the combinatorial search space.
     assert result.search_stats.candidate_combinations_before_pruning == 19008
-    assert result.search_stats.candidate_combinations_after_structural_pruning == 1080
-    assert result.search_stats.candidate_combinations_evaluated == 1080
+    assert result.search_stats.candidate_combinations_after_structural_pruning == 15390
+    assert result.search_stats.candidate_combinations_evaluated == 15390
 
 
 # ---------------------------------------------------------------------------
@@ -609,6 +638,61 @@ def test_structured_candidate_codes_coursedog_group_id_path_unaffected():
         {"SOME OTHER CODE": ["SOME OTHER CODE"]},
     )
     assert without_param == with_unrelated_param == {"AAA 100"}
+
+
+def test_structured_candidate_codes_walks_full_tree_depth_not_just_two_levels():
+    """Regression: TAMU Computer Engineering nests its course-bearing leaves
+    three deep -- compound_all year -> compound_all season -> enumerated_*
+    leaf -- and every course row lives on the leaf. A traversal that stopped
+    at roots + direct children collected nothing for such a program, so the
+    caller's catalog-enrichment lookup never loaded those codes and their
+    candidate_courses rendered with no title and no credits. The walk must
+    reach every non-satisfied group at any depth, matching
+    select_structured_requirements' own fully-recursive group index.
+    """
+    raw_groups = [
+        group("Second Year", "compound_all"),
+        group("Second Year — Spring", "compound_all", parent="Second Year"),
+        group("Second Year — Spring — Required Courses", "enumerated_all",
+              parent="Second Year — Spring"),
+        group("Second Year — Spring — Select one of the following",
+              "enumerated_at_least_n", n=1, parent="Second Year — Spring"),
+    ]
+    required_id = "Second Year — Spring — Required Courses"
+    choose_id = "Second Year — Spring — Select one of the following"
+    options = [
+        option("o-csce-221", required_id, 0),
+        option("o-ecen-303", required_id, 1, "or"),
+        option("o-math-308", required_id, 2),
+        option("o-engl-210", choose_id, 0),
+        option("o-comm-205", choose_id, 1),
+    ]
+    option_courses = [
+        course("o-csce-221", code="CSCE 221"),
+        course("o-ecen-303", code="ECEN 303"),
+        course("o-ecen-303", code="STAT 211"),
+        course("o-math-308", code="MATH 308"),
+        course("o-engl-210", code="ENGL 210"),
+        course("o-comm-205", code="COMM 205"),
+    ]
+    catalog_by_code = {
+        "CSCE 221": ["CSCE 221"], "ECEN 303": ["ECEN 303"], "STAT 211": ["STAT 211"],
+        "MATH 308": ["MATH 308"], "ENGL 210": ["ENGL 210"], "COMM 205": ["COMM 205"],
+    }
+    evaluated = evaluate_requirement_tree(
+        raw_groups, options, option_courses, [], {}, catalog_by_code
+    )
+    # The leaves really are at depth 2 (roots -> season -> leaf).
+    assert [g.id for g in evaluated] == ["Second Year"]
+    assert [g.id for g in evaluated[0].children] == ["Second Year — Spring"]
+    assert {g.id for g in evaluated[0].children[0].children} == {required_id, choose_id}
+
+    codes = structured_candidate_codes(
+        evaluated, raw_groups, options, option_courses, {}, catalog_by_code
+    )
+    assert codes == {
+        "CSCE 221", "ECEN 303", "STAT 211", "MATH 308", "ENGL 210", "COMM 205",
+    }
 
 
 def test_tamu_mixed_fixed_and_or_requirement_preserves_complete_candidate_paths():
@@ -741,10 +825,16 @@ def test_tamu_sole_feasible_direct_code_is_auto_selected():
     groups = [group("pick", "enumerated_all")]
     options = [option("direct-or", "pick", 0, "or")]
     rows = [course("direct-or", code="A"), course("direct-or", code="B")]
+    # B's exclusion must come from a course-referencing needs_review clause,
+    # not .restrictions -- restrictions is informational per its own model
+    # contract (models.py:261-269, "not enforced by the scheduler") and no
+    # longer excludes a candidate on its own (a bare "Majors only." on B
+    # would leave both A and B feasible, i.e. CHOICE_REQUIRED -- see
+    # test_direct_course_code_or_produces_both_feasible_candidates).
     result = run(
         groups, options, rows, {}, {"A": 3, "B": 3},
         catalog_by_code={"A": ["A"], "B": ["B"]},
-        prerequisites={"B": StructuredPrerequisite(restrictions=["Majors only."])},
+        prerequisites={"B": StructuredPrerequisite(needs_review=["consult the department re: ZZ 202 equivalency"])},
     )
 
     requirement_decision = decision(result, "pick")
@@ -776,7 +866,12 @@ def test_unresolved_direct_course_code_fails_closed_with_typed_exclusion():
     assert decision(result, "pick").state == RequirementDecisionState.DATA_UNRESOLVED
 
 
-def test_zero_feasible_restriction_evidence_requires_adviser_review():
+def test_zero_feasible_needs_review_evidence_requires_adviser_review():
+    """Renamed from ...restriction_evidence...: .restrictions no longer
+    excludes a candidate (informational per its own model contract), so
+    zero-feasible-by-restriction is no longer a reachable state. The
+    equivalent needs_review shape (both candidates carry an unresolved,
+    course-referencing clause) still is."""
     groups = [group("pick", "enumerated_all")]
     options = [option("direct-or", "pick", 0, "or")]
     rows = [course("direct-or", code="A"), course("direct-or", code="B")]
@@ -784,13 +879,95 @@ def test_zero_feasible_restriction_evidence_requires_adviser_review():
         groups, options, rows, {}, {"A": 3, "B": 3},
         catalog_by_code={"A": ["A"], "B": ["B"]},
         prerequisites={
-            "A": StructuredPrerequisite(restrictions=["Majors only."]),
-            "B": StructuredPrerequisite(restrictions=["Department approval."]),
+            "A": StructuredPrerequisite(needs_review=["consult the department re: ZZ 101 equivalency"]),
+            "B": StructuredPrerequisite(needs_review=["consult the department re: ZZ 202 equivalency"]),
         },
     )
 
     assert selected(result) == []
     assert decision(result, "pick").state == RequirementDecisionState.ADVISER_REVIEW
+
+
+def test_campus_note_or_classification_restriction_does_not_exclude_a_candidate():
+    """Regression for the RESELECTION_REQUIRED false-positive a3c4746
+    exposed: StructuredPrerequisite.restrictions is informational by its
+    own model contract (models.py:261-269 -- "classification, ... campus
+    notes, and similar ... not enforced by the scheduler"), so a candidate
+    must not be excluded purely for carrying one. Covers the two live
+    shapes this session found (a bare campus note on one course; a
+    classification note alongside a real, satisfied prerequisite on
+    another), not just the four TAMU/SMU courses that originally
+    surfaced it."""
+    groups = [group("pick", "enumerated_all")]
+    options = [option("direct-or", "pick", 0, "or")]
+    rows = [course("direct-or", code="A"), course("direct-or", code="B")]
+    result = run(
+        groups, options, rows, {}, {"A": 3, "B": 3},
+        catalog_by_code={"A": ["A"], "B": ["B"]},
+        prerequisites={
+            "A": StructuredPrerequisite(restrictions=["also taught at Galveston and Qatar campuses"]),
+            "B": StructuredPrerequisite(
+                requires_all=[PrerequisiteClause(course_codes=["C"], grade_min="C")],
+                restrictions=["Freshman or sophomore classification"],
+            ),
+        },
+        records=[{"course_code": "C", "status": "completed", "counts_toward_credit": True, "credit_hours": 3}],
+    )
+
+    assert set(selected(result)) == set()
+    assert decision(result, "pick").state == RequirementDecisionState.CHOICE_REQUIRED
+    assert len(result.candidate_sets[0].feasible_candidates) == 2
+    assert result.candidate_sets[0].excluded_candidates == []
+
+
+def test_course_free_needs_review_prose_does_not_exclude_a_candidate():
+    """The interim _NEEDS_REVIEW_COURSE_REF heuristic (requirement_
+    selection.py) must not exclude a candidate for needs_review text that
+    names no course -- e.g. TAMU MATH 308's "knowledge of computer
+    algebra system", a competency note the parser currently files under
+    needs_review only because it has no rule recognizing it as non-course
+    (a gap logged as a follow-up: it belongs in .restrictions, like
+    "also taught at ... campuses" already does). Such text cannot hide an
+    unmodelled course dependency, so it must not gate."""
+    groups = [group("pick", "enumerated_all")]
+    options = [option("direct-or", "pick", 0, "or")]
+    rows = [course("direct-or", code="A"), course("direct-or", code="B")]
+    result = run(
+        groups, options, rows, {}, {"A": 3, "B": 3},
+        catalog_by_code={"A": ["A"], "B": ["B"]},
+        prerequisites={"B": StructuredPrerequisite(needs_review=["knowledge of computer algebra system"])},
+    )
+
+    assert decision(result, "pick").state == RequirementDecisionState.CHOICE_REQUIRED
+    assert len(result.candidate_sets[0].feasible_candidates) == 2
+    assert result.candidate_sets[0].excluded_candidates == []
+
+
+def test_course_referencing_needs_review_prose_still_excludes_a_candidate():
+    """Contrast case for the test above: needs_review text that DOES name
+    a course (e.g. real SMU CHEM 1303's "...or a passing grade on the
+    Chemistry Placement Exam", which mixes CHEM 1302 with an unverifiable
+    alternative path) may hide a real, unmodelled course prerequisite --
+    StructuredPrerequisite.needs_review's own contract (models.py:270-280)
+    is exactly this case, unlike .restrictions. It must keep excluding."""
+    groups = [group("pick", "enumerated_all")]
+    options = [option("direct-or", "pick", 0, "or")]
+    rows = [course("direct-or", code="A"), course("direct-or", code="B")]
+    result = run(
+        groups, options, rows, {}, {"A": 3, "B": 3},
+        catalog_by_code={"A": ["A"], "B": ["B"]},
+        prerequisites={
+            "B": StructuredPrerequisite(needs_review=["C- or better in ZZ 101, or a passing grade on the placement exam"]),
+        },
+    )
+
+    decision_ = decision(result, "pick")
+    assert decision_.state == RequirementDecisionState.AUTO_SELECTED
+    assert selected(result) == ["A"]
+    assert len(result.candidate_sets[0].feasible_candidates) == 1
+    excluded = result.candidate_sets[0].excluded_candidates
+    assert len(excluded) == 1
+    assert excluded[0].exclusion_reasons == [CandidateExclusionReason.PREREQUISITE_NEEDS_REVIEW]
 
 
 def test_or_clause_prereq_satisfied_within_the_same_combination_is_not_unschedulable():
@@ -846,3 +1023,138 @@ def test_or_clause_prereq_with_no_alternative_anywhere_still_blocks():
 
     assert selected(result) == []
     assert decision(result, "needs-or-prereq").state == RequirementDecisionState.ADVISER_REVIEW
+
+
+# ---------------------------------------------------------------------------
+# Student-excluded (set-aside) single-mandatory requirements --
+# supabase/migrations/20260903120000_degree_requirement_exclusions.sql
+# ---------------------------------------------------------------------------
+
+
+def _solo_mandatory_fixture():
+    """One genuinely no-choice enumerated_all group: exactly one option, one
+    course, logic 'and'. Without exclusion this is the textbook
+    sole-feasible -> AUTO_SELECTED case."""
+    groups = [group("solo", "enumerated_all")]
+    options = [option("solo-opt", "solo", 0)]
+    rows = [course("solo-opt", code="SOLO 101")]
+    return groups, options, rows, {}, {"SOLO 101": 3}, {"SOLO 101": ["SOLO 101"]}
+
+
+def test_excluded_single_mandatory_group_resolves_to_excluded_not_auto_selected():
+    """The AUTO_SELECTED trap regression. A single-mandatory group with
+    exactly one feasible candidate, once excluded, must resolve to EXCLUDED
+    with the candidate held off the feasible-count -- it must never silently
+    re-derive AUTO_SELECTED, on this reconstruction or any repeat of it."""
+    groups, options, rows, catalog, credits, by_code = _solo_mandatory_fixture()
+
+    baseline = run(groups, options, rows, catalog, credits, catalog_by_code=by_code)
+    assert decision(baseline, "solo").state == RequirementDecisionState.AUTO_SELECTED
+    assert selected(baseline) == ["SOLO 101"]
+    auto_candidate_id = decision(baseline, "solo").selected_candidate_id
+    assert auto_candidate_id is not None
+
+    result = run(
+        groups, options, rows, catalog, credits,
+        catalog_by_code=by_code, excluded=["solo"],
+    )
+    solo = decision(result, "solo")
+    assert solo.state == RequirementDecisionState.EXCLUDED
+    # Held off the feasible-count -- this is what stops the AUTO_SELECTED
+    # re-derivation.
+    assert solo.feasible_candidate_ids == []
+    assert solo.selected_candidate_id is None
+    # Underlying candidate preserved for the one-click restore.
+    assert auto_candidate_id in solo.excluded_candidate_ids
+    # Not scheduled, still surfaced for review.
+    assert "SOLO 101" not in selected(result)
+    assert "solo" in {item.requirement_group_id for item in result.unscheduled}
+
+    # Idempotent across repeated reconstructions -- still EXCLUDED, never
+    # flips back to AUTO_SELECTED.
+    again = run(
+        groups, options, rows, catalog, credits,
+        catalog_by_code=by_code, excluded=["solo"],
+    )
+    assert decision(again, "solo").state == RequirementDecisionState.EXCLUDED
+    assert "SOLO 101" not in selected(again)
+
+
+def test_excluded_group_is_not_scheduled_even_on_the_career_ranked_path():
+    """Career Optimization schedules the full winning combination, so the
+    exclusion has to be enforced there too -- an excluded group's course must
+    not appear in the ranked schedule, and the group must still surface as
+    unscheduled."""
+    groups, options, rows, catalog, credits, by_code = _solo_mandatory_fixture()
+    result = run(
+        groups, options, rows, catalog, credits,
+        catalog_by_code=by_code, excluded=["solo"], career_ranks={},
+    )
+    assert decision(result, "solo").state == RequirementDecisionState.EXCLUDED
+    assert "SOLO 101" not in selected(result)
+    assert "solo" in {item.requirement_group_id for item in result.unscheduled}
+
+
+def test_excluding_one_group_does_not_touch_a_sibling_choice_required_group():
+    """The forced-EXCLUDED branch runs before the feasible-count branching
+    and must only affect the named group -- a multi-candidate sibling keeps
+    its CHOICE_REQUIRED state and all its feasible candidates untouched."""
+    groups = [
+        group("solo", "enumerated_all"),
+        group("pick", "enumerated_at_least_n", n=1),
+    ]
+    options = [
+        option("solo-opt", "solo", 0),
+        option("pick-a", "pick", 0), option("pick-b", "pick", 1),
+    ]
+    rows = [
+        course("solo-opt", code="SOLO 101"),
+        course("pick-a", code="PICK 1"), course("pick-b", code="PICK 2"),
+    ]
+    by_code = {"SOLO 101": ["SOLO 101"], "PICK 1": ["PICK 1"], "PICK 2": ["PICK 2"]}
+    credits = {"SOLO 101": 3, "PICK 1": 3, "PICK 2": 3}
+
+    baseline = run(groups, options, rows, {}, credits, catalog_by_code=by_code)
+    assert decision(baseline, "pick").state == RequirementDecisionState.CHOICE_REQUIRED
+
+    result = run(groups, options, rows, {}, credits, catalog_by_code=by_code, excluded=["solo"])
+    assert decision(result, "solo").state == RequirementDecisionState.EXCLUDED
+    pick = decision(result, "pick")
+    assert pick.state == RequirementDecisionState.CHOICE_REQUIRED
+    assert len(pick.feasible_candidate_ids) == 2
+    pick_set = next(s for s in result.candidate_sets if s.requirement_group_id == "pick")
+    assert len(pick_set.feasible_candidates) == 2
+
+
+def test_scope_schedule_input_diverts_only_the_excluded_no_choice_leaf():
+    """The scheduler-scope half of the mechanism: an excluded no-choice leaf
+    is deferred as SELECTION_DEFERRED instead of scheduled, while a
+    non-excluded sibling still schedules normally."""
+    raw_groups = [
+        {"id": "keep", "coursedog_rule_id": "keep", "parent_group_id": None, "name": "Keep",
+         "group_type": "enumerated_all", "n_required": None, "credit_hours_required": None,
+         "requires_manual_definition": False},
+        {"id": "drop", "coursedog_rule_id": "drop", "parent_group_id": None, "name": "Drop",
+         "group_type": "enumerated_all", "n_required": None, "credit_hours_required": None,
+         "requires_manual_definition": False},
+    ]
+    options = [
+        {"id": "keep-opt", "requirement_group_id": "keep", "option_index": 0, "logic": "and"},
+        {"id": "drop-opt", "requirement_group_id": "drop", "option_index": 0, "logic": "and"},
+    ]
+    option_courses = [
+        {"requirement_group_option_id": "keep-opt", "coursedog_group_id": None,
+         "unresolved_course_ref": None, "course_code": "KEEP 1"},
+        {"requirement_group_option_id": "drop-opt", "coursedog_group_id": None,
+         "unresolved_course_ref": None, "course_code": "DROP 1"},
+    ]
+    by_code = {"KEEP 1": ["KEEP 1"], "DROP 1": ["DROP 1"]}
+
+    evaluated = evaluate_requirement_tree(raw_groups, options, option_courses, [], {}, by_code)
+    courses, unscheduled = scope_schedule_input(
+        evaluated, options, option_courses, {}, {"KEEP 1": 3.0, "DROP 1": 3.0}, by_code,
+        excluded_group_ids={"drop"},
+    )
+
+    assert [c.course_code for c in courses] == ["KEEP 1"]
+    assert [(u.name, u.reason) for u in unscheduled] == [("Drop", "SELECTION_DEFERRED")]

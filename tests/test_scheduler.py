@@ -250,6 +250,69 @@ def test_or_clause_trivially_satisfied_by_already_completed_alternative():
     assert result.terms[0].courses[0].limitations == []
 
 
+def test_satisfied_or_clauses_coreq_eligible_sibling_is_not_flagged_external():
+    """Regression: C requires (A or B), both A and B are coreq_allowed
+    ("Grade of C or better in A or B, or concurrent enrollment"), and A is
+    already satisfied. The clause is met via A, so B -- its sibling
+    alternative, also concurrent-eligible -- must not then be re-flagged
+    by the pure-corequisite pass as an unmet external corequisite. Before
+    this fix, the requires_all loop's early "clause already satisfied"
+    continue skipped marking B as seen, so the separate pure-corequisite
+    loop treated B as a completely unaddressed coreq and emitted
+    "corequisite B is outside the scheduled course set..." even though the
+    clause it belongs to was already resolved. Unreachable before a3c4746
+    populated structured prerequisites for TAMU's CSCE 221 (coreq_allowed
+    ["CSCE 222", "ECEN 222"], clause met by completed CSCE 222) and MATH
+    308 (coreq_allowed ["MATH 221", "MATH 251", "MATH 253"], clause met by
+    completed MATH 251)."""
+    courses = [
+        CourseToSchedule(course_code="C", credit_hours=3, requirement_group_id="g", requirement_group_name="C"),
+    ]
+    prerequisites = {
+        "C": StructuredPrerequisite(
+            requires_all=[PrerequisiteClause(course_codes=["A", "B"], grade_min="C")],
+            coreq_allowed=["A", "B"],
+        ),
+    }
+
+    result = schedule_courses(
+        student_id="stu-1", program_id="prog-1",
+        courses=courses, prerequisites=prerequisites, already_satisfied={"A"}, unscheduled=[],
+        starting_year=2026, starting_season="Fall", max_terms=4,
+    )
+
+    assert result.status == "SCHEDULED"
+    assert len(result.terms) == 1
+    assert result.terms[0].courses[0].limitations == []
+
+
+def test_satisfied_or_clause_cross_listing_alias_is_not_flagged_external():
+    """Same false-negative, cross-listing-alias shape: C requires
+    (CSCE 222 or ECEN 222) -- the same course under two department codes
+    -- both coreq_allowed, and the student completed it as CSCE 222 only.
+    ECEN 222, its unlisted alias, must not be flagged as an unmet external
+    corequisite once the clause is already met via CSCE 222."""
+    courses = [
+        CourseToSchedule(course_code="C", credit_hours=3, requirement_group_id="g", requirement_group_name="C"),
+    ]
+    prerequisites = {
+        "C": StructuredPrerequisite(
+            requires_all=[PrerequisiteClause(course_codes=["CSCE 222", "ECEN 222"], grade_min="C")],
+            coreq_allowed=["CSCE 222", "ECEN 222"],
+        ),
+    }
+
+    result = schedule_courses(
+        student_id="stu-1", program_id="prog-1",
+        courses=courses, prerequisites=prerequisites, already_satisfied={"CSCE 222"}, unscheduled=[],
+        starting_year=2026, starting_season="Fall", max_terms=4,
+    )
+
+    assert result.status == "SCHEDULED"
+    assert len(result.terms) == 1
+    assert result.terms[0].courses[0].limitations == []
+
+
 # ---------------------------------------------------------------------------
 # 3. Over-constrained: fails closed, no partial/silently-wrong plan
 # ---------------------------------------------------------------------------

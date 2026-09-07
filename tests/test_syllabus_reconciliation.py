@@ -25,6 +25,7 @@ from GradusIQ_career.syllabus.reconciliation import (
     reconcile_grade_model,
 )
 from GradusIQ_career.syllabus.relevance import RelevantPage, RelevantSyllabusContent
+from GradusIQ_career.syllabus.validation import ValidationSeverity
 
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "phys_207_grade_model.json"
 
@@ -580,6 +581,50 @@ def test_confirmed_value_claim_only_skips_a_finding_it_would_have_emitted():
     ]
 
 
+def test_confirmed_category_value_claim_suppresses_unverifiable_finding():
+    # weight=100 keeps category_weight_validation itself VALID, isolating
+    # the claim_evidence check under test. "2 midterms" (a count fact) has
+    # no percent for _PERCENT_RE to find -- exactly the shape a category
+    # whose weight was just filled in via SET_WEIGHT produces, since
+    # GradeCategory has one shared evidence field, not one per fact.
+    model = GradeModel(
+        grading_method=GradingMethod.WEIGHTED,
+        categories=[GradeCategory(name="Midterm Exam", weight=100, evidence=evidence(1, "2 midterms"))],
+    )
+    unconfirmed = reconcile_grade_model(model, content_from_pages([page(1, "x")]))
+    assert any(f.code == "claim_evidence_consistency_unverifiable" for f in unconfirmed.findings)
+
+    confirmed = reconcile_grade_model(
+        model, content_from_pages([page(1, "x")]), confirmed_category_value_claims={"midterm exam"}
+    )
+    assert not any(f.code == "claim_evidence_consistency_unverifiable" for f in confirmed.findings)
+    assert confirmed.status == ReconciliationStatus.ACCEPTED
+    # the category and its verbatim evidence are returned exactly as given
+    assert confirmed.grade_model.categories[0].weight == 100
+    assert confirmed.grade_model.categories[0].evidence.text == "2 midterms"
+
+
+def test_confirmed_category_value_claim_does_not_suppress_value_mismatch_error():
+    # Deliberately narrower than the threshold path (see
+    # _check_category_weight_consistency): weight=100 (so category_weight_
+    # validation itself stays VALID) but evidence explicitly cites 25% -- a
+    # positive, cited contradiction, not something the checker merely
+    # failed to parse. Affirming it must NOT clear this.
+    model = GradeModel(
+        grading_method=GradingMethod.WEIGHTED,
+        categories=[GradeCategory(name="Midterm Exam", weight=100, evidence=evidence(1, "Midterm Exam (25%)"))],
+    )
+    unconfirmed = reconcile_grade_model(model, content_from_pages([page(1, "x")]))
+    assert any(f.code == "claim_evidence_value_mismatch" for f in unconfirmed.findings)
+    assert unconfirmed.status == ReconciliationStatus.NEEDS_STUDENT_REVIEW
+
+    confirmed = reconcile_grade_model(
+        model, content_from_pages([page(1, "x")]), confirmed_category_value_claims={"midterm exam"}
+    )
+    assert any(f.code == "claim_evidence_value_mismatch" for f in confirmed.findings)
+    assert confirmed.status == ReconciliationStatus.NEEDS_STUDENT_REVIEW
+
+
 def test_unbounded_thresholds_are_allowed():
     model = GradeModel(
         grade_thresholds=[
@@ -799,12 +844,86 @@ def test_unresolved_assessment_category_reference_needs_review():
 # --- extraction warning mapping -----------------------------------------------------
 
 
-def test_unknown_weight_warning_forces_review():
+def test_unknown_weight_alone_does_not_force_review():
+    # unknown_weight is now non-blocking (NON_BLOCKING_WARNING_CODES):
+    # category_weight_validation (the deterministic check on the same fact
+    # -- do declared category weights sum to ~100) already gates confirm on
+    # its own; unknown_weight is an unfalsifiable ExtractionWarning no
+    # correction can clear (only DISMISS_WARNING touches GradeModel.warnings,
+    # and category/set_weight -- the correction that actually answers the
+    # question -- does not), so it stays purely informational. grading_
+    # method is set explicitly WEIGHTED with a fully-weighted category so the
+    # grading_method_unknown / category_weight_validation checks don't
+    # confound this: unknown_weight must be the ONLY thing that could force
+    # review here.
     model = GradeModel(
-        warnings=[ExtractionWarning(type=ExtractionWarningType.UNKNOWN_WEIGHT, description="Weight not stated.")]
+        grading_method=GradingMethod.WEIGHTED,
+        categories=[GradeCategory(name="Overall", weight=100, evidence=evidence(1, "Overall: 100%"))],
+        warnings=[ExtractionWarning(type=ExtractionWarningType.UNKNOWN_WEIGHT, description="Weight not stated.")],
+    )
+    result = reconcile_grade_model(model, content_from_pages([page(1, "x")]))
+    assert any(f.code == "unknown_weight" for f in result.findings)
+    assert result.status == ReconciliationStatus.ACCEPTED
+
+
+def test_category_weight_validation_still_blocks_with_unknown_weight_present():
+    # The deterministic check carries the gate on its own: a category whose
+    # weight is genuinely unstated (weight=None, with a matching
+    # unknown_weight warning) leaves the declared total under 100 --
+    # category_weight_validation's own WARNING (not in NON_BLOCKING_
+    # WARNING_CODES) still forces review, independent of whether
+    # unknown_weight blocks anything.
+    model = GradeModel(
+        grading_method=GradingMethod.WEIGHTED,
+        categories=[
+            GradeCategory(name="Homework", weight=35, evidence=evidence(1, "Homework: 35%")),
+            GradeCategory(name="Midterm Exam", weight=None, count=2, evidence=evidence(1, "2 midterms")),
+            GradeCategory(name="Final Exam", weight=35, evidence=evidence(1, "Final Exam: 35%")),
+        ],
+        warnings=[
+            ExtractionWarning(
+                type=ExtractionWarningType.UNKNOWN_WEIGHT,
+                description="The total weight for the Midterm Exam category is not stated.",
+                related_field="Midterm Exam",
+            )
+        ],
     )
     result = reconcile_grade_model(model, content_from_pages([page(1, "x")]))
     assert result.status == ReconciliationStatus.NEEDS_STUDENT_REVIEW
+    codes = {f.code for f in result.findings}
+    assert "category_weight_validation" in codes
+    assert "unknown_weight" in codes
+    weight_finding = next(f for f in result.findings if f.code == "category_weight_validation")
+    assert weight_finding.severity == ValidationSeverity.WARNING
+
+
+def test_complete_weights_with_stale_unknown_weight_reaches_accepted():
+    # Mirrors the CSCE 222 scenario after a category/set_weight correction:
+    # the weight is now supplied and the categories sum to 100, but the
+    # unknown_weight ExtractionWarning is stale (SET_WEIGHT never touches
+    # GradeModel.warnings) and still present. It must not re-block.
+    model = GradeModel(
+        grading_method=GradingMethod.WEIGHTED,
+        categories=[
+            GradeCategory(name="Homework", weight=35, evidence=evidence(1, "Homework: 35%")),
+            GradeCategory(name="Midterm Exam", weight=30, count=2, evidence=evidence(1, "2 midterms")),
+            GradeCategory(name="Final Exam", weight=35, evidence=evidence(1, "Final Exam: 35%")),
+        ],
+        warnings=[
+            ExtractionWarning(
+                type=ExtractionWarningType.UNKNOWN_WEIGHT,
+                description="The total weight for the Midterm Exam category is not stated.",
+                related_field="Midterm Exam",
+            )
+        ],
+    )
+    result = reconcile_grade_model(
+        model, content_from_pages([page(1, "x")]), confirmed_category_value_claims={"midterm exam"}
+    )
+    assert any(f.code == "unknown_weight" for f in result.findings)
+    weight_finding = next(f for f in result.findings if f.code == "category_weight_validation")
+    assert weight_finding.severity == ValidationSeverity.VALID
+    assert result.status == ReconciliationStatus.ACCEPTED
 
 
 def test_missing_grade_scale_warning_alone_does_not_force_review():

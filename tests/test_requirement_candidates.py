@@ -61,14 +61,27 @@ def test_ethan_exposes_all_five_candidate_sets_with_stable_order_and_ids():
         "Two Courses",
         "Engineering Leadership (6 Credit Hours)",
     ]
-    # AI set is (5, 6): CS 5331 is feasible because its OR-clause prereq
+    # AI set is (9, 2): CS 5331 is feasible because its OR-clause prereq
     # (CS 4340 or OREM 3340 or STAT 4340) is met within the same plan by
     # whichever course resolves Statistical Methods -- see
-    # test_horizon_or_cycle_failure_is_not_misrepresented_as_feasible.
+    # test_horizon_or_cycle_failure_is_not_misrepresented_as_feasible. The
+    # AI/Two Courses/Engineering Leadership counts each moved up from a
+    # prior baseline of (5, 6), (11, 5), (1, 7): StructuredPrerequisite.
+    # restrictions is informational per its own model contract
+    # (models.py:261-269, "not enforced by the scheduler") and no longer
+    # excludes a candidate (e.g. CS 5312's "Prerequisites: Junior
+    # standing"). CS 5325 (AI, UNSCHEDULABLE) and CS 5328 (AI,
+    # DOUBLE_COUNTING_CONFLICT) still correctly exclude for unrelated
+    # reasons; the CHEM 1113/1114/1303/1304 candidate (Two Courses) still
+    # correctly excludes via PREREQUISITE_NEEDS_REVIEW -- CHEM 1303 mixes a
+    # real course code with an unverifiable alternative path ("...or a
+    # passing grade on the Chemistry Placement Exam"), which may hide a
+    # real unresolved prerequisite (see needs_review's contract,
+    # models.py:270-280) and is unaffected by the restrictions fix.
     assert [
         (len(item.feasible_candidates), len(item.excluded_candidates))
         for item in first.candidate_sets
-    ] == [(5, 6), (4, 2), (3, 0), (11, 5), (1, 7)]
+    ] == [(9, 2), (6, 0), (3, 0), (13, 3), (6, 2)]
     assert first.candidate_sets == second.candidate_sets
     first_ids = [
         candidate.candidate_id for group in first.candidate_sets
@@ -119,10 +132,23 @@ def test_real_multi_course_paths_are_atomic_and_expose_burden_and_completion():
 def test_real_exclusions_are_typed_and_unresolved_references_remain_visible():
     _, _, result = _ethan_result()
     by_name = {item.requirement_name: item for item in result.candidate_sets}
-    ai = by_name["Advanced/Domain Specific Use/Design of AI"]
-    restricted = next(candidate for candidate in ai.excluded_candidates if candidate.course_codes == ["CS 5312"])
-    assert restricted.exclusion_reasons == [CandidateExclusionReason.RESTRICTION_REQUIRES_REVIEW]
-    assert restricted.completion_term_index is None
+    # CS 5312 ("Prerequisites: Junior standing", StructuredPrerequisite.
+    # restrictions) is feasible now -- that field is informational per its
+    # own model contract (models.py:261-269, "not enforced by the
+    # scheduler") and no longer excludes. The still-genuinely-excluded
+    # example moves to "Two Courses": CHEM 1303's prerequisite text mixes a
+    # real course code (CHEM 1302) with an unverifiable alternative path
+    # ("...or a passing grade on the Chemistry Placement Exam"), the exact
+    # shape StructuredPrerequisite.needs_review's contract describes
+    # (models.py:270-280) -- it may hide a real unresolved course
+    # prerequisite, so it correctly stays excluded.
+    two_courses = by_name["Two Courses"]
+    needs_review = next(
+        candidate for candidate in two_courses.excluded_candidates
+        if set(candidate.course_codes) == {"CHEM 1113", "CHEM 1114", "CHEM 1303", "CHEM 1304"}
+    )
+    assert needs_review.exclusion_reasons == [CandidateExclusionReason.PREREQUISITE_NEEDS_REVIEW]
+    assert needs_review.completion_term_index is None
 
     leadership = by_name["Engineering Leadership (6 Credit Hours)"]
     unresolved = [

@@ -1112,3 +1112,51 @@ def test_grading_schema_requires_a_home_institution(client, db, monkeypatch):
     response = client.get(GRADING_SCHEMA, headers=HEADERS)
 
     assert response.status_code == 409
+
+
+# ── 13. cross-listing map for the add-time duplicate check ─────────────────
+# GET /me/catalog/cross-listings backs CourseSearchAdd's cross-listing-aware
+# duplicate check. Deliberately backed by LocalCatalogRepository (the
+# in-process JSON catalog, which carries a real cross_listings field) rather
+# than the course_catalog table db.add_catalog() seeds -- that Supabase table
+# has no cross_listings column at all, which is exactly why this route reads
+# from a different source than /me/catalog/search does.
+
+CROSS_LISTINGS = "/api/v2/student/me/catalog/cross-listings"
+
+
+def test_cross_listings_returns_the_real_catalog_pair_for_tamu(client, db, monkeypatch):
+    patch_session(monkeypatch, db, STUDENT_A)  # STUDENT_A's home institution is TAMU
+
+    response = client.get(CROSS_LISTINGS, headers=HEADERS)
+
+    assert response.status_code == 200
+    mapping = response.json()["cross_listings"]
+    assert mapping["CSCE 222"] == ["ECEN 222"]
+    assert mapping["ECEN 222"] == ["CSCE 222"]
+    # A code with no cross-listing carries no entry at all, not an empty list.
+    assert "CSCE 121" not in mapping
+
+
+def test_cross_listings_is_scoped_per_institution(client, db, monkeypatch):
+    smu_student = "smu-student-0002"
+    db.add_student(smu_student, SMU)
+    monkeypatch.setattr(api, "build_client_for_token", lambda token: FakeSupabase(db, smu_student))
+
+    response = client.get(CROSS_LISTINGS, headers=HEADERS)
+
+    assert response.status_code == 200
+    # SMU's own catalog, not TAMU's -- the TAMU-only CSCE/ECEN pair must not
+    # leak into an SMU student's response.
+    assert "CSCE 222" not in response.json()["cross_listings"]
+
+
+def test_cross_listings_requires_a_home_institution(client, db, monkeypatch):
+    db.tables["students"].append({"id": "orphan-cross-listings", "name": "Orphan"})
+    monkeypatch.setattr(
+        api, "build_client_for_token", lambda token: FakeSupabase(db, "orphan-cross-listings")
+    )
+
+    response = client.get(CROSS_LISTINGS, headers=HEADERS)
+
+    assert response.status_code == 409

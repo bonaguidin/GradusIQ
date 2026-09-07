@@ -125,7 +125,7 @@ function json(response, status, body) {
   response.end(JSON.stringify(body))
 }
 
-test('Grade Calculator: empty state, upload, review, confirm, grade entry, calculate, target solve', { timeout: 45_000 }, async (t) => {
+test('Grade Calculator: empty state, upload, review, confirm, grade entry, save & calculate', { timeout: 45_000 }, async (t) => {
   // term id 'term-2' deliberately matches authenticatedDashboardPreview.tsx's
   // ?currentTerm=inprogress fixture (CS 221 / MATH 251, both in_progress),
   // so the eligible-course dropdown genuinely merges two sources under one
@@ -204,16 +204,6 @@ test('Grade Calculator: empty state, upload, review, confirm, grade entry, calcu
             current_letter_grade: null,
             projected_letter_grade: null,
             applied_rules: [],
-            warnings: [],
-          })
-        }
-        if (path === `/api/v2/student/me/syllabus-grade-profiles/${PROFILE_ID}/solve-target` && request.method === 'POST') {
-          const body = JSON.parse(await readBody(request))
-          const required = body.target_grade === 90 ? 90.12 : 78.35
-          return json(response, 200, {
-            target_component: 'Final Exam', target_grade: body.target_grade, target_label: null,
-            required_score: required, feasible: true, already_achieved: false,
-            applied_rules: [{ rule_type: 'replacement', source: 'Final Exam', target: 'Mid-term Exam', changed_calculation: true, description: 'Final replaces Midterm when higher.' }],
             warnings: [],
           })
         }
@@ -313,7 +303,7 @@ test('Grade Calculator: empty state, upload, review, confirm, grade entry, calcu
   assert.equal(await general.getByText('overlapping cutoffs').count(), 0)
 
   await page.getByRole('button', { name: '← Back to your calculators' }).click()
-  await page.locator('.grade-profile-row-button', { hasText: 'PHYS 207' }).click()
+  await page.locator('.grade-card', { hasText: 'PHYS 207' }).click()
   await page.getByRole('heading', { name: 'Needs your review' }).waitFor()
   // reopening re-fetched the same findings and dismissal did not persist
   await page.locator('.grade-inline-findings--general').getByText('overlapping cutoffs').waitFor()
@@ -355,17 +345,16 @@ test('Grade Calculator: empty state, upload, review, confirm, grade entry, calcu
   await page.fill('#actual-category\\:Mid-term\\ Exam', '78')
   await page.fill('#actual-category\\:Lecture\\ Quizzes', '92')
   await page.fill('#actual-category\\:Recitation\\ Quizzes', '88')
-  await page.getByRole('button', { name: 'Calculate' }).click()
 
+  // --- one button now persists the actuals AND returns the calculation:
+  //     the per-category averages the student typed are what gets persisted
+  //     as category_scores[].actual_score (no per-assessment breakdown), and
+  //     the result card renders from the /calculate response ---
+  await page.getByRole('button', { name: 'Save & calculate' }).click()
   await page.getByText('81.4%').waitFor()
   await page.getByText('Based on 50% of the course completed').waitFor()
-
-  // --- Save grades: the per-category averages the student typed are what
-  //     gets persisted as category_scores[].actual_score (no per-assessment
-  //     breakdown required) ---
-  await page.getByRole('button', { name: 'Save grades' }).click()
   await page.waitForFunction(() => !document.querySelector('button[aria-busy="true"]'))
-  assert.ok(capturedGradeStateBody, 'Save grades sent a grade-state PUT')
+  assert.ok(capturedGradeStateBody, 'Save & calculate sent a grade-state PUT')
   assert.deepEqual(
     [...capturedGradeStateBody.category_scores].sort((a, b) => a.category_name.localeCompare(b.category_name)),
     [
@@ -376,11 +365,10 @@ test('Grade Calculator: empty state, upload, review, confirm, grade entry, calcu
   )
   assert.deepEqual(capturedGradeStateBody.assessment_scores, [])
 
-  // --- target solver ---
-  await page.selectOption('#target-component', 'Final Exam')
-  await page.fill('#target-numeric', '90')
-  await page.getByRole('button', { name: 'Solve' }).click()
-  await page.getByText('90.12').waitFor()
+  // --- the Target Grade card is gone entirely ---
+  assert.equal(await page.locator('#target-component').count(), 0)
+  assert.equal(await page.locator('#target-numeric').count(), 0)
+  assert.equal(await page.getByRole('button', { name: 'Solve' }).count(), 0)
 
   // --- responsive: no horizontal overflow ---
   for (const width of [390, 834, 1280]) {
@@ -479,7 +467,7 @@ test('Grade Calculator: remove a calculator from the list (confirm-gated soft de
   await page.getByRole('button', { name: 'Academic' }).click()
   await page.getByRole('button', { name: 'Grade Calculator', exact: true }).click()
 
-  const row = page.locator('.grade-profile-row', { hasText: 'ECEN 248' })
+  const row = page.locator('.grade-card-wrap', { hasText: 'ECEN 248' })
   await row.waitFor()
   const removeButton = row.getByRole('button', { name: /Remove grade calculator for ECEN 248/ })
 
@@ -497,7 +485,7 @@ test('Grade Calculator: remove a calculator from the list (confirm-gated soft de
   })
   await removeButton.click()
 
-  await page.locator('.grade-profile-row', { hasText: 'ECEN 248' }).waitFor({ state: 'detached' })
+  await page.locator('.grade-card-wrap', { hasText: 'ECEN 248' }).waitFor({ state: 'detached' })
   assert.equal(deleteCount, 1, 'accepting the confirm calls DELETE exactly once')
   await page.getByText('See what you need to reach your target grade').waitFor()
 })
@@ -561,7 +549,7 @@ async function mountCutoffPanel(t, cacheKey, handle) {
   await page.goto(`http://127.0.0.1:${address.port}/authenticated-dashboard-preview.html?mode=complete`)
   await page.getByRole('button', { name: 'Academic' }).click()
   await page.getByRole('button', { name: 'Grade Calculator', exact: true }).click()
-  await page.locator('.grade-profile-row-button', { hasText: 'PHYS 207' }).click()
+  await page.locator('.grade-card', { hasText: 'PHYS 207' }).click()
   return page
 }
 
@@ -708,7 +696,7 @@ test('Grade Calculator: an answered cutoff shows resolved and does not re-ask on
 
   // navigate away and back — still resolved, still no banner
   await page.getByRole('button', { name: '← Back to your calculators' }).click()
-  await page.locator('.grade-profile-row-button', { hasText: 'PHYS 207' }).click()
+  await page.locator('.grade-card', { hasText: 'PHYS 207' }).click()
   await page.locator('.grade-cutoff-resolved[data-cutoff-pair="B,C"]').waitFor()
   assert.equal(await page.locator('.grade-cutoff-banner[data-cutoff-pair="B,C"]').count(), 0)
 })
@@ -739,6 +727,64 @@ test('Grade Calculator: non-blocking informational findings are filtered from th
   // unknown_assessment_count is filtered out entirely
   assert.equal(await page.locator('[data-finding-code="unknown_assessment_count"]').count(), 0)
   assert.equal(await page.getByText("doesn't say exactly how many assessments are in this category").count(), 0)
+})
+
+test('Grade Calculator: missing_grade_scale shows in the review list; no letter-target UI remains in the ready calculator', { timeout: 45_000 }, async (t) => {
+  const NO_SCALE_MODEL = { ...EXTRACTED_MODEL, grade_thresholds: [], rules: [], warnings: [] }
+  const REVIEW_RECON = {
+    status: 'needs_student_review',
+    findings: [
+      // the Target Grade card that used to explain this is gone, so the
+      // finding is no longer filtered -- it flows into the review list
+      { code: 'missing_grade_scale', severity: 'warning', message: "This syllabus doesn't specify a letter-grade scale.", field: null },
+      { code: 'grading_method_unknown', severity: 'warning', message: 'grading_method could not be determined from the syllabus', field: 'grading_method' },
+    ],
+    evidence_coverage: { total_claims: 4, supported_claims: 4, coverage_ratio: 1, unsupported_claims: [] },
+  }
+
+  // phase drives which detail payload the GET returns:
+  //   'review'         -> not ready, review list on screen
+  //   'ready-noscale'  -> ready, confirmed model has no grade_thresholds
+  //   'ready-withscale'-> ready, confirmed model has grade_thresholds
+  let phase = 'review'
+  const readyDetail = (thresholds) => detail({
+    review_state: 'confirmed',
+    calculator_ready: true,
+    extracted_grade_model: { ...NO_SCALE_MODEL, grade_thresholds: thresholds },
+    confirmed_grade_model: { ...NO_SCALE_MODEL, grade_thresholds: thresholds },
+    reconciliation: RECONCILIATION_ACCEPTED,
+    confirmed_reconciliation: RECONCILIATION_ACCEPTED,
+  })
+
+  const page = await mountCutoffPanel(t, 'grade-calculator-missing-scale-in-review', async (path, method, request, response) => {
+    if (path === `/api/v2/student/me/syllabus-grade-profiles/${PROFILE_ID}` && method === 'GET') {
+      if (phase === 'review') json(response, 200, detail({ extracted_grade_model: NO_SCALE_MODEL, reconciliation: REVIEW_RECON }))
+      else if (phase === 'ready-noscale') json(response, 200, readyDetail([]))
+      else json(response, 200, readyDetail(CUTOFF_MODEL.grade_thresholds))
+      return true
+    }
+    return false
+  })
+
+  // --- the finding now appears in the review list (no relocation target) ---
+  await page.getByRole('heading', { name: 'Needs your review' }).waitFor()
+  assert.ok((await page.locator('[data-finding-code="grading_method_unknown"]').count()) >= 1)
+  assert.ok((await page.locator('[data-finding-code="missing_grade_scale"]').count()) >= 1)
+  await page.getByText("doesn't specify a letter-grade scale").waitFor()
+  // the old target-card note never existed here and still doesn't
+  assert.equal(await page.locator('.grade-no-scale-note').count(), 0)
+
+  // --- ready calculator: no Target Grade card, with OR without a grade scale ---
+  for (const p of ['ready-noscale', 'ready-withscale']) {
+    phase = p
+    await page.getByRole('button', { name: '← Back to your calculators' }).click()
+    await page.locator('.grade-card', { hasText: 'PHYS 207' }).click()
+    await page.getByRole('heading', { name: 'Enter your grades' }).waitFor()
+    assert.equal(await page.locator('#target-letter').count(), 0, `${p}: no target-letter select`)
+    assert.equal(await page.locator('#target-component').count(), 0, `${p}: no target-component select`)
+    assert.equal(await page.locator('.grade-no-scale-note').count(), 0, `${p}: no no-scale note`)
+    assert.equal(await page.getByRole('button', { name: 'Solve' }).count(), 0, `${p}: no Solve button`)
+  }
 })
 
 // --- per-threshold value-claim clarifying questions ------------------------------
@@ -838,7 +884,7 @@ test('Grade Calculator: an affirmed threshold value shows confirmed and does not
   assert.equal(await page.locator('.grade-cutoff-row[data-threshold-letter="B"] .grade-cutoff-row-affirm').count(), 0)
 
   await page.getByRole('button', { name: '← Back to your calculators' }).click()
-  await page.locator('.grade-profile-row-button', { hasText: 'PHYS 207' }).click()
+  await page.locator('.grade-card', { hasText: 'PHYS 207' }).click()
   await page.locator('.grade-cutoff-resolved[data-threshold-letter="B"]').waitFor()
   assert.equal(await page.locator('.grade-cutoff-row[data-threshold-letter="B"] .grade-cutoff-row-affirm').count(), 0)
 })
@@ -1101,4 +1147,906 @@ test('Grade Calculator: in-progress edits in other rows survive a sibling row af
   assert.deepEqual(correctionBody.corrections, [
     { target_type: 'threshold', operation: 'confirm_threshold_value', threshold_letter: 'C' },
   ])
+})
+
+// --- category-weight editor (CategoryWeightEditor) -------------------------------
+
+// Mirrors a real incomplete extraction: Homework and Final are known (35%
+// each), midterm exam's count is known (2) but its total weight was never
+// stated -- weight: null, the exact category a student needs to fill in.
+// 35 + 35 = 70, matching category_weight_validation's real message shape.
+const WEIGHT_GAP_MODEL = {
+  ...EXTRACTED_MODEL,
+  categories: [
+    { name: 'Homework assignment', weight: 35, count: null, evidence: { page: 3, text: 'Homework assignment (35%)', confidence: 1.0 } },
+    { name: 'midterm exam', weight: null, count: 2, evidence: { page: 2, text: '2 midterms', confidence: 1.0 } },
+    { name: 'final exam', weight: 35, count: 1, evidence: { page: 3, text: 'final exam (35%)', confidence: 1.0 } },
+  ],
+  assessments: [],
+  grade_thresholds: [],
+  rules: [],
+  warnings: [],
+}
+
+const RECON_WEIGHT_GAP = {
+  status: 'needs_student_review',
+  findings: [
+    { code: 'category_weight_validation', severity: 'warning', message: 'category weights sum to 70.0, not 100 (possibly incomplete extraction)', field: 'categories' },
+    { code: 'unknown_weight', severity: 'warning', message: 'The total weight for the midterm exam category is not explicitly stated; each midterm is 15% but the category total is not given.', field: 'midterm exam' },
+  ],
+  evidence_coverage: { total_claims: 3, supported_claims: 3, coverage_ratio: 1, unsupported_claims: [] },
+}
+
+test('Grade Calculator: category weight editor renders every category (including one with no weight yet), shows blocking non-dismissible notes, and a live running total that closes as you type', { timeout: 45_000 }, async (t) => {
+  const page = await mountCutoffPanel(t, 'grade-calculator-weight-editor-render', async (path, method, request, response) => {
+    if (path === `/api/v2/student/me/syllabus-grade-profiles/${PROFILE_ID}` && method === 'GET') {
+      json(response, 200, detail({ extracted_grade_model: WEIGHT_GAP_MODEL, reconciliation: RECON_WEIGHT_GAP }))
+      return true
+    }
+    return false
+  })
+
+  const table = page.locator('[data-testid="category-weight-table"]')
+  await table.waitFor()
+
+  // every category renders, including the one with weight: null -- the read-
+  // only breakdown would have hidden it entirely
+  assert.equal(await table.locator('[data-category-name]').count(), 3)
+  assert.equal(await page.getByLabel('Homework assignment weight').inputValue(), '35')
+  assert.equal(await page.getByLabel('midterm exam weight').inputValue(), '')
+  assert.equal(await page.getByLabel('midterm exam count').inputValue(), '2')
+  assert.equal(await page.getByLabel('final exam weight').inputValue(), '35')
+
+  // category_weight_validation is blocking here (severity: warning) -- shown
+  // as a non-dismissible note anchored to the editor, not in the dismissible
+  // general findings list it used to render in
+  const totalNote = table.locator('[data-finding-code="category_weight_validation"]')
+  await totalNote.getByText('category weights in this syllabus may not add up to 100%').waitFor()
+  assert.equal(await totalNote.getByRole('button', { name: 'Dismiss this finding' }).count(), 0)
+  assert.equal(await page.locator('.grade-inline-findings--general [data-finding-code="category_weight_validation"]').count(), 0)
+  assert.equal(await page.locator('.grade-inline-findings--general').getByText('may not add up to 100%').count(), 0)
+
+  // unknown_weight is per-category, also blocking and non-dismissible, and
+  // likewise gone from the general dismissible list
+  const row = table.locator('[data-category-name="midterm exam"]')
+  const rowNote = row.locator('[data-finding-code="unknown_weight"]')
+  await rowNote.getByText("couldn't determine this category's weight").waitFor()
+  assert.equal(await rowNote.getByRole('button', { name: 'Dismiss this finding' }).count(), 0)
+  assert.equal(await page.locator('.grade-inline-findings--general [data-finding-code="unknown_weight"]').count(), 0)
+
+  // live running total reflects the declared categories before any edit
+  await table.getByText('Total: 70%').waitFor()
+  await table.getByText('30% short of 100%').waitFor()
+
+  // typing the missing weight updates the total live, before Save is clicked
+  await page.getByLabel('midterm exam weight').fill('30')
+  await table.getByText('Total: 100%').waitFor()
+  assert.equal(await table.getByText(/short of 100%|over 100%/).count(), 0)
+})
+
+test('Grade Calculator: category weight editor save emits category/set_weight and category/set_count for touched fields only', { timeout: 45_000 }, async (t) => {
+  let correctionBody = null
+  const page = await mountCutoffPanel(t, 'grade-calculator-weight-editor-save', async (path, method, request, response) => {
+    if (path === `/api/v2/student/me/syllabus-grade-profiles/${PROFILE_ID}` && method === 'GET') {
+      json(response, 200, detail({ extracted_grade_model: WEIGHT_GAP_MODEL, reconciliation: RECON_WEIGHT_GAP }))
+      return true
+    }
+    if (path === `/api/v2/student/me/syllabus-grade-profiles/${PROFILE_ID}/corrections` && method === 'POST') {
+      correctionBody = JSON.parse(await readBody(request))
+      const FIXED_MODEL = {
+        ...WEIGHT_GAP_MODEL,
+        categories: WEIGHT_GAP_MODEL.categories.map((c) => (c.name === 'midterm exam' ? { ...c, weight: 30 } : c)),
+      }
+      json(response, 200, detail({
+        extracted_grade_model: WEIGHT_GAP_MODEL,
+        confirmed_grade_model: FIXED_MODEL,
+        reconciliation: RECON_WEIGHT_GAP,
+        confirmed_reconciliation: {
+          status: 'accepted',
+          findings: [{ code: 'category_weight_validation', severity: 'valid', message: 'category weights sum to 100.0', field: 'categories' }],
+          evidence_coverage: RECON_WEIGHT_GAP.evidence_coverage,
+        },
+        calculator_ready: true,
+        corrections: correctionBody.corrections,
+      }))
+      return true
+    }
+    return false
+  })
+
+  const table = page.locator('[data-testid="category-weight-table"]')
+  await table.waitFor()
+
+  // touch a count on one row and a weight on another; leave the third alone
+  await page.getByLabel('Homework assignment count').fill('12')
+  await page.getByLabel('midterm exam weight').fill('30')
+  await page.getByRole('button', { name: 'Save weights' }).click()
+  await page.waitForFunction(() => !document.querySelector('button[aria-busy="true"]'))
+
+  // only the two touched fields become corrections -- nothing invented for
+  // the untouched "final exam" row, and only existing operations are used
+  assert.deepEqual(correctionBody.corrections, [
+    { target_type: 'category', operation: 'set_count', category_name: 'Homework assignment', value: 12 },
+    { target_type: 'category', operation: 'set_weight', category_name: 'midterm exam', value: 30 },
+  ])
+
+  // the fix unblocks the calculator
+  await page.getByRole('heading', { name: 'Enter your grades' }).waitFor()
+})
+
+test('Grade Calculator: a category_weight_validation instance that is already valid shows no blocking note', { timeout: 45_000 }, async (t) => {
+  const CLEAN_MODEL = {
+    ...WEIGHT_GAP_MODEL,
+    categories: WEIGHT_GAP_MODEL.categories.map((c) => (c.name === 'midterm exam' ? { ...c, weight: 30 } : c)),
+  }
+  const RECON_CLEAN = {
+    status: 'needs_student_review',
+    findings: [
+      { code: 'category_weight_validation', severity: 'valid', message: 'category weights sum to 100.0', field: 'categories' },
+      { code: 'grading_method_unknown', severity: 'warning', message: 'grading_method could not be determined from the syllabus', field: 'grading_method' },
+    ],
+    evidence_coverage: { total_claims: 3, supported_claims: 3, coverage_ratio: 1, unsupported_claims: [] },
+  }
+  const page = await mountCutoffPanel(t, 'grade-calculator-weight-editor-valid', async (path, method, request, response) => {
+    if (path === `/api/v2/student/me/syllabus-grade-profiles/${PROFILE_ID}` && method === 'GET') {
+      json(response, 200, detail({ extracted_grade_model: CLEAN_MODEL, reconciliation: RECON_CLEAN }))
+      return true
+    }
+    return false
+  })
+
+  const table = page.locator('[data-testid="category-weight-table"]')
+  await table.waitFor()
+  // category_weight_validation's own instance is VALID (weights already sum
+  // to 100) -- the code is not treated as unconditionally blocking, so no
+  // note renders here even though the code is on the relocated list
+  assert.equal(await table.locator('[data-finding-code="category_weight_validation"]').count(), 0)
+  await table.getByText('Total: 100%').waitFor()
+  assert.equal(await table.getByText(/short of 100%|over 100%/).count(), 0)
+  // a genuinely blocking, unrelated finding still shows in the general list
+  assert.ok((await page.locator('[data-finding-code="grading_method_unknown"]').count()) >= 1)
+})
+
+// --- category weight claim-evidence (confirm_category_value) --------------------
+
+// claim_evidence_consistency_unverifiable / claim_evidence_value_mismatch on a
+// category weight cannot exist at extraction time -- _check_category_weight_
+// consistency skips a category outright while weight is null (matches
+// WEIGHT_GAP_MODEL's 'midterm exam' row). They only appear in the SERVER
+// RESPONSE to a set_weight correction, once the category actually has a
+// weight to check against its (possibly stale) evidence text.
+
+test('Grade Calculator: a category claim-evidence finding does not exist on initial load, only appears in the correction response, and affirming it emits confirm_category_value', { timeout: 45_000 }, async (t) => {
+  let corrections = []
+  const RECON_UNVERIFIABLE = {
+    status: 'needs_student_review',
+    findings: [
+      { code: 'category_weight_validation', severity: 'valid', message: 'category weights sum to 100.0', field: 'categories' },
+      { code: 'unknown_weight', severity: 'warning', message: 'The total weight for the midterm exam category is not explicitly stated; each midterm is 15% but the category total is not given.', field: 'midterm exam' },
+      { code: 'claim_evidence_consistency_unverifiable', severity: 'warning', message: "could not deterministically verify category:midterm exam.weight against its cited evidence text ('2 midterms')", field: 'category:midterm exam.weight' },
+    ],
+    evidence_coverage: { total_claims: 3, supported_claims: 3, coverage_ratio: 1, unsupported_claims: [] },
+  }
+  const RECON_CONFIRMED = {
+    status: 'accepted',
+    findings: [
+      { code: 'category_weight_validation', severity: 'valid', message: 'category weights sum to 100.0', field: 'categories' },
+      { code: 'unknown_weight', severity: 'warning', message: 'The total weight for the midterm exam category is not explicitly stated; each midterm is 15% but the category total is not given.', field: 'midterm exam' },
+    ],
+    evidence_coverage: { total_claims: 3, supported_claims: 3, coverage_ratio: 1, unsupported_claims: [] },
+  }
+  const WEIGHT_SET_MODEL = {
+    ...WEIGHT_GAP_MODEL,
+    categories: WEIGHT_GAP_MODEL.categories.map((c) => (c.name === 'midterm exam' ? { ...c, weight: 30 } : c)),
+  }
+
+  const page = await mountCutoffPanel(t, 'grade-calculator-category-claim-evidence-affirm', async (path, method, request, response) => {
+    if (path === `/api/v2/student/me/syllabus-grade-profiles/${PROFILE_ID}` && method === 'GET') {
+      json(response, 200, detail({ extracted_grade_model: WEIGHT_GAP_MODEL, reconciliation: RECON_WEIGHT_GAP }))
+      return true
+    }
+    if (path === `/api/v2/student/me/syllabus-grade-profiles/${PROFILE_ID}/corrections` && method === 'POST') {
+      corrections = JSON.parse(await readBody(request)).corrections
+      const justAffirmed = corrections.some((c) => c.operation === 'confirm_category_value')
+      // calculator_ready stays false throughout (an unrelated finding --
+      // grading_method_unknown -- keeps the model genuinely incomplete) so
+      // the editor stays mounted after affirming and its own "answered"
+      // display (✓ ... confirmed as correct) can be observed directly,
+      // independent of the separate "everything is now accepted" transition
+      // already covered by the cutoff-table equivalent test.
+      const findingsAfterAffirm = [
+        ...RECON_CONFIRMED.findings,
+        { code: 'grading_method_unknown', severity: 'warning', message: 'grading_method could not be determined from the syllabus', field: 'grading_method' },
+      ]
+      json(response, 200, detail({
+        extracted_grade_model: WEIGHT_GAP_MODEL,
+        confirmed_grade_model: WEIGHT_SET_MODEL,
+        calculator_ready: false,
+        reconciliation: RECON_WEIGHT_GAP,
+        confirmed_reconciliation: justAffirmed ? { ...RECON_CONFIRMED, status: 'needs_student_review', findings: findingsAfterAffirm } : RECON_UNVERIFIABLE,
+        corrections,
+        clarifying_answers: justAffirmed ? { 'claim_evidence:category:midterm exam': { answer: 'confirm_value', category_name: 'midterm exam' } } : {},
+      }))
+      return true
+    }
+    return false
+  })
+
+  const table = page.locator('[data-testid="category-weight-table"]')
+  await table.waitFor()
+  const row = table.locator('[data-category-name="midterm exam"]')
+
+  // --- initial load: the claim-evidence finding does not exist yet (the
+  //     category's weight is still null), so there is no affirm banner ---
+  assert.equal(await row.getByRole('button', { name: "Yes, that's correct" }).count(), 0)
+  assert.equal(await table.locator('[data-finding-code="claim_evidence_consistency_unverifiable"]').count(), 0)
+
+  // --- set the weight and save -> the response is the ONLY place this
+  //     finding can appear ---
+  await page.getByLabel('midterm exam weight').fill('30')
+  await page.getByRole('button', { name: 'Save weights' }).click()
+  await page.waitForFunction(() => !document.querySelector('button[aria-busy="true"]'))
+
+  assert.deepEqual(corrections, [
+    { target_type: 'category', operation: 'set_weight', category_name: 'midterm exam', value: 30 },
+  ])
+
+  // the affirm banner now renders reactively against the POST-CORRECTION
+  // findings (detail.confirmed_reconciliation), not any initial-load snapshot
+  await row.getByText("We couldn't confirm midterm exam's weight against your syllabus.").waitFor()
+  const affirmButton = row.getByRole('button', { name: "Yes, that's correct" })
+  await affirmButton.waitFor()
+
+  // unknown_weight is still present in this response's findings (the
+  // backend never clears it), but its text ("we couldn't determine this
+  // category's weight") is now factually wrong -- the weight IS 30 -- so it
+  // must not render here once weight is no longer null
+  assert.equal(await row.locator('[data-finding-code="unknown_weight"]').count(), 0)
+  assert.equal(await row.getByText("couldn't determine this category's weight").count(), 0)
+
+  // --- affirming emits category/confirm_category_value, cumulative with
+  //     the prior set_weight correction ---
+  await affirmButton.click()
+  await page.waitForFunction(() => !document.querySelector('button[aria-busy="true"]'))
+
+  assert.deepEqual(corrections, [
+    { target_type: 'category', operation: 'set_weight', category_name: 'midterm exam', value: 30 },
+    { target_type: 'category', operation: 'confirm_category_value', category_name: 'midterm exam' },
+  ])
+  await row.getByText('✓ midterm exam weight confirmed as correct.').waitFor()
+  assert.equal(await row.getByRole('button', { name: "Yes, that's correct" }).count(), 0)
+})
+
+test('Grade Calculator: a category weight mismatch renders as blocking with no affirm button', { timeout: 45_000 }, async (t) => {
+  const RECON_MISMATCH = {
+    status: 'needs_student_review',
+    findings: [
+      { code: 'category_weight_validation', severity: 'valid', message: 'category weights sum to 100.0', field: 'categories' },
+      { code: 'claim_evidence_value_mismatch', severity: 'error', message: "category:midterm exam.weight claims 30.0, but its cited evidence text ('Midterm Exam (25%)') states 25.0", field: 'category:midterm exam.weight' },
+    ],
+    evidence_coverage: { total_claims: 3, supported_claims: 3, coverage_ratio: 1, unsupported_claims: [] },
+  }
+  const WEIGHT_SET_MODEL = {
+    ...WEIGHT_GAP_MODEL,
+    categories: WEIGHT_GAP_MODEL.categories.map((c) =>
+      c.name === 'midterm exam' ? { ...c, weight: 30, evidence: { page: 1, text: 'Midterm Exam (25%)', confidence: 1.0 } } : c,
+    ),
+  }
+  let corrections = []
+
+  const page = await mountCutoffPanel(t, 'grade-calculator-category-claim-evidence-mismatch', async (path, method, request, response) => {
+    if (path === `/api/v2/student/me/syllabus-grade-profiles/${PROFILE_ID}` && method === 'GET') {
+      json(response, 200, detail({ extracted_grade_model: WEIGHT_GAP_MODEL, reconciliation: RECON_WEIGHT_GAP }))
+      return true
+    }
+    if (path === `/api/v2/student/me/syllabus-grade-profiles/${PROFILE_ID}/corrections` && method === 'POST') {
+      corrections = JSON.parse(await readBody(request)).corrections
+      json(response, 200, detail({
+        extracted_grade_model: WEIGHT_GAP_MODEL,
+        confirmed_grade_model: WEIGHT_SET_MODEL,
+        calculator_ready: false,
+        reconciliation: RECON_WEIGHT_GAP,
+        confirmed_reconciliation: RECON_MISMATCH,
+        corrections,
+      }))
+      return true
+    }
+    return false
+  })
+
+  const table = page.locator('[data-testid="category-weight-table"]')
+  await table.waitFor()
+  await page.getByLabel('midterm exam weight').fill('30')
+  await page.getByRole('button', { name: 'Save weights' }).click()
+  await page.waitForFunction(() => !document.querySelector('button[aria-busy="true"]'))
+
+  const row = table.locator('[data-category-name="midterm exam"]')
+  const mismatchFinding = row.locator('[data-finding-code="claim_evidence_value_mismatch"]')
+  await mismatchFinding.getByText(/You entered 30%, but the syllabus text \("Midterm Exam \(25%\)"\) says 25%/).waitFor()
+
+  // blocking, non-dismissible, and -- unlike the unverifiable case -- never
+  // gets an affirm button anywhere on this row: the backend deliberately
+  // does not suppress claim_evidence_value_mismatch for a category
+  assert.equal(await mismatchFinding.getByRole('button', { name: 'Dismiss this finding' }).count(), 0)
+  assert.equal(await row.getByRole('button', { name: "Yes, that's correct" }).count(), 0)
+  assert.equal(await row.getByRole('button', { name: /confirm/i }).count(), 0)
+})
+
+test('Grade Calculator: an unknown_weight finding that matches no category renders unattached instead of disappearing', { timeout: 45_000 }, async (t) => {
+  // related_field is untyped free text (extraction.py:132) -- it can name
+  // an assessment or rule instead of a category, or just not match
+  // anything. "Final Project" matches none of WEIGHT_GAP_MODEL's three
+  // categories (Homework assignment / midterm exam / final exam).
+  const RECON_UNMATCHED = {
+    status: 'needs_student_review',
+    findings: [
+      { code: 'category_weight_validation', severity: 'warning', message: 'category weights sum to 70.0, not 100 (possibly incomplete extraction)', field: 'categories' },
+      { code: 'unknown_weight', severity: 'warning', message: 'The total weight for the Final Project is not explicitly stated.', field: 'Final Project' },
+    ],
+    evidence_coverage: { total_claims: 3, supported_claims: 3, coverage_ratio: 1, unsupported_claims: [] },
+  }
+  const page = await mountCutoffPanel(t, 'grade-calculator-unknown-weight-unmatched', async (path, method, request, response) => {
+    if (path === `/api/v2/student/me/syllabus-grade-profiles/${PROFILE_ID}` && method === 'GET') {
+      json(response, 200, detail({ extracted_grade_model: WEIGHT_GAP_MODEL, reconciliation: RECON_UNMATCHED }))
+      return true
+    }
+    return false
+  })
+
+  const table = page.locator('[data-testid="category-weight-table"]')
+  await table.waitFor()
+
+  // renders unattached in the editor's general area -- not dropped, and
+  // not attached to any of the three (non-matching) category rows
+  await table.getByText('The syllabus doesn\'t state a weight for "Final Project", but CampusIQ couldn\'t match that to one of the categories below.').waitFor()
+  for (const name of ['Homework assignment', 'midterm exam', 'final exam']) {
+    assert.equal(
+      await table.locator(`[data-category-name="${name}"]`).locator('[data-finding-code="unknown_weight"]').count(),
+      0,
+      `unmatched finding must not attach to the ${name} row`,
+    )
+  }
+
+  // informational only: no affirm button, no dismiss button anywhere for it
+  const unmatchedNote = table.locator('[data-finding-code="unknown_weight"]', { hasText: 'Final Project' })
+  await unmatchedNote.waitFor()
+  assert.equal(await unmatchedNote.getByRole('button').count(), 0)
+})
+
+// --- live projection: merged save+calculate button, and reactive What-if ---------
+
+const PROJECTION_READY_DETAIL = () => detail({
+  review_state: 'confirmed',
+  calculator_ready: true,
+  extracted_grade_model: CUTOFF_MODEL,
+  confirmed_grade_model: CUTOFF_MODEL,
+  reconciliation: RECONCILIATION_ACCEPTED,
+  confirmed_reconciliation: RECONCILIATION_ACCEPTED,
+  grade_state_revision: 4,
+})
+
+function calcResponse(overrides = {}) {
+  return {
+    grading_method: 'weighted',
+    components: [],
+    completed_weight: null,
+    earned_course_percentage: null,
+    current_grade: null,
+    projected_grade: null,
+    current_letter_grade: null,
+    projected_letter_grade: null,
+    applied_rules: [],
+    warnings: [],
+    ...overrides,
+  }
+}
+
+test('Grade Calculator: "Save & calculate" persists the actuals then calculates, in one action', { timeout: 45_000 }, async (t) => {
+  const calls = []
+  let gradeStateBody = null
+
+  const page = await mountCutoffPanel(t, 'grade-calculator-save-and-calculate', async (path, method, request, response) => {
+    if (path === `/api/v2/student/me/syllabus-grade-profiles/${PROFILE_ID}` && method === 'GET') {
+      json(response, 200, PROJECTION_READY_DETAIL())
+      return true
+    }
+    if (path === `/api/v2/student/me/syllabus-grade-profiles/${PROFILE_ID}/grade-state` && method === 'PUT') {
+      calls.push('grade-state')
+      gradeStateBody = JSON.parse(await readBody(request))
+      json(response, 200, { revision: 5, category_scores: gradeStateBody.category_scores, assessment_scores: gradeStateBody.assessment_scores })
+      return true
+    }
+    if (path === `/api/v2/student/me/syllabus-grade-profiles/${PROFILE_ID}/calculate` && method === 'POST') {
+      calls.push('calculate')
+      await readBody(request)
+      json(response, 200, calcResponse({ completed_weight: 35, current_grade: 85 }))
+      return true
+    }
+    return false
+  })
+
+  await page.getByRole('heading', { name: 'Enter your grades' }).waitFor()
+  await page.fill('#actual-category\\:Mid-term\\ Exam', '85')
+  await page.getByRole('button', { name: 'Save & calculate' }).click()
+
+  // the result card renders from the /calculate response
+  await page.getByText('Based on 35% of the course completed').waitFor()
+  await page.locator('.overview-stat-value', { hasText: '85%' }).waitFor()
+  await page.waitForFunction(() => !document.querySelector('button[aria-busy="true"]'))
+
+  // the typed actual was persisted (PUT /grade-state) with the optimistic
+  // revision, then the calculation ran (POST /calculate) -- that order, each once
+  assert.ok(gradeStateBody, 'a grade-state PUT was sent')
+  assert.deepEqual(gradeStateBody.category_scores, [{ category_name: 'Mid-term Exam', actual_score: 85 }])
+  assert.deepEqual(gradeStateBody.assessment_scores, [])
+  assert.equal(gradeStateBody.expected_revision, 4)
+  assert.deepEqual(calls, ['grade-state', 'calculate'])
+})
+
+test('Grade Calculator: entering a What-if score recalculates with no button press and no save', { timeout: 45_000 }, async (t) => {
+  const calls = []
+  let calcBody = null
+
+  const page = await mountCutoffPanel(t, 'grade-calculator-reactive-whatif', async (path, method, request, response) => {
+    if (path === `/api/v2/student/me/syllabus-grade-profiles/${PROFILE_ID}` && method === 'GET') {
+      json(response, 200, PROJECTION_READY_DETAIL())
+      return true
+    }
+    if (path === `/api/v2/student/me/syllabus-grade-profiles/${PROFILE_ID}/grade-state` && method === 'PUT') {
+      calls.push('grade-state')
+      json(response, 200, { revision: 5, category_scores: [], assessment_scores: [] })
+      return true
+    }
+    if (path === `/api/v2/student/me/syllabus-grade-profiles/${PROFILE_ID}/calculate` && method === 'POST') {
+      calls.push('calculate')
+      calcBody = JSON.parse(await readBody(request))
+      json(response, 200, calcResponse({ projected_grade: 91.2 }))
+      return true
+    }
+    return false
+  })
+
+  await page.getByRole('heading', { name: 'Enter your grades' }).waitFor()
+
+  // type a hypothetical score -- no button is clicked anywhere after this
+  await page.fill('#hypo-category\\:Mid-term\\ Exam', '95')
+
+  // the projected grade updates on its own
+  await page.locator('.overview-stat-value', { hasText: '91.2%' }).waitFor()
+
+  // and it got there via /calculate only -- the debounced projection never
+  // writes grade-state
+  await page.waitForTimeout(700)
+  assert.deepEqual(calls, ['calculate'])
+
+  // a What-if-only row is submitted as a projected score, never an actual
+  assert.deepEqual(calcBody.category_scores, [{ category_name: 'Mid-term Exam', projected_score: 95 }])
+  assert.deepEqual(calcBody.assessment_scores, [])
+})
+
+test('Grade Calculator: a What-if takes precedence over that row\'s actual in the /calculate body', { timeout: 45_000 }, async (t) => {
+  let calcBody = null
+
+  const page = await mountCutoffPanel(t, 'grade-calculator-whatif-precedence', async (path, method, request, response) => {
+    if (path === `/api/v2/student/me/syllabus-grade-profiles/${PROFILE_ID}` && method === 'GET') {
+      json(response, 200, PROJECTION_READY_DETAIL())
+      return true
+    }
+    if (path === `/api/v2/student/me/syllabus-grade-profiles/${PROFILE_ID}/calculate` && method === 'POST') {
+      calcBody = JSON.parse(await readBody(request))
+      json(response, 200, calcResponse({ projected_grade: 62.5 }))
+      return true
+    }
+    return false
+  })
+
+  await page.getByRole('heading', { name: 'Enter your grades' }).waitFor()
+
+  // Mid-term: a real score AND a hypothetical -- the hypothetical wins.
+  await page.fill('#actual-category\\:Mid-term\\ Exam', '20')
+  await page.fill('#hypo-category\\:Mid-term\\ Exam', '70')
+  // Final: actual only.
+  await page.fill('#actual-category\\:Final\\ Exam', '100')
+  // Lecture Quizzes: What-if only.
+  await page.fill('#hypo-category\\:Lecture\\ Quizzes', '88')
+
+  await page.locator('.overview-stat-value', { hasText: '62.5%' }).waitFor()
+  await page.waitForTimeout(700)
+
+  const sorted = [...calcBody.category_scores].sort((a, b) => a.category_name.localeCompare(b.category_name))
+  assert.deepEqual(sorted, [
+    { category_name: 'Final Exam', actual_score: 100 },        // actual only -> actual_score, no projected_score
+    { category_name: 'Lecture Quizzes', projected_score: 88 }, // What-if only -> projected_score (unchanged)
+    { category_name: 'Mid-term Exam', projected_score: 70 },   // actual 20 + What-if 70 -> projected_score 70, no actual_score
+  ])
+  assert.deepEqual(calcBody.assessment_scores, [])
+  // never both keys on one row -- the backend validator (exactly_one_score) forbids it
+  for (const row of calcBody.category_scores) {
+    assert.equal(
+      ('actual_score' in row ? 1 : 0) + ('projected_score' in row ? 1 : 0),
+      1,
+      `${row.category_name} must carry exactly one of actual_score / projected_score`,
+    )
+  }
+})
+
+test('Grade Calculator: "Save & calculate" persists actuals only even when a What-if overrides a row', { timeout: 45_000 }, async (t) => {
+  const calls = []
+  let gradeStateBody = null
+  let calcBody = null
+
+  const page = await mountCutoffPanel(t, 'grade-calculator-whatif-save-actuals-only', async (path, method, request, response) => {
+    if (path === `/api/v2/student/me/syllabus-grade-profiles/${PROFILE_ID}` && method === 'GET') {
+      json(response, 200, PROJECTION_READY_DETAIL())
+      return true
+    }
+    if (path === `/api/v2/student/me/syllabus-grade-profiles/${PROFILE_ID}/grade-state` && method === 'PUT') {
+      calls.push('grade-state')
+      gradeStateBody = JSON.parse(await readBody(request))
+      json(response, 200, { revision: 5, category_scores: gradeStateBody.category_scores, assessment_scores: gradeStateBody.assessment_scores })
+      return true
+    }
+    if (path === `/api/v2/student/me/syllabus-grade-profiles/${PROFILE_ID}/calculate` && method === 'POST') {
+      calls.push('calculate')
+      calcBody = JSON.parse(await readBody(request))
+      json(response, 200, calcResponse({ completed_weight: 50, current_grade: 100, projected_grade: 62.5 }))
+      return true
+    }
+    return false
+  })
+
+  await page.getByRole('heading', { name: 'Enter your grades' }).waitFor()
+  await page.fill('#actual-category\\:Mid-term\\ Exam', '20')
+  await page.fill('#hypo-category\\:Mid-term\\ Exam', '70')
+  await page.fill('#actual-category\\:Final\\ Exam', '100')
+
+  // cancels the pending debounce, so /calculate here is the button's
+  await page.getByRole('button', { name: 'Save & calculate' }).click()
+  await page.getByText('Based on 50% of the course completed').waitFor()
+  await page.waitForFunction(() => !document.querySelector('button[aria-busy="true"]'))
+
+  assert.deepEqual(calls, ['grade-state', 'calculate'])
+
+  // the persisted state keeps the real score for the overridden row and
+  // carries no projected_score anywhere -- hypotheticals are never saved
+  const savedSorted = [...gradeStateBody.category_scores].sort((a, b) => a.category_name.localeCompare(b.category_name))
+  assert.deepEqual(savedSorted, [
+    { category_name: 'Final Exam', actual_score: 100 },
+    { category_name: 'Mid-term Exam', actual_score: 20 },
+  ])
+  assert.deepEqual(gradeStateBody.assessment_scores, [])
+  for (const row of gradeStateBody.category_scores) {
+    assert.ok(!('projected_score' in row), `${row.category_name} must not be persisted with a projected_score`)
+  }
+
+  // ...but the calculation that follows still applies the What-if
+  const midterm = calcBody.category_scores.find((r) => r.category_name === 'Mid-term Exam')
+  assert.deepEqual(midterm, { category_name: 'Mid-term Exam', projected_score: 70 })
+})
+
+test('Grade Calculator: clearing a What-if reverts that row to sending its actual', { timeout: 45_000 }, async (t) => {
+  let calcBody = null
+
+  const page = await mountCutoffPanel(t, 'grade-calculator-whatif-cleared', async (path, method, request, response) => {
+    if (path === `/api/v2/student/me/syllabus-grade-profiles/${PROFILE_ID}` && method === 'GET') {
+      json(response, 200, PROJECTION_READY_DETAIL())
+      return true
+    }
+    if (path === `/api/v2/student/me/syllabus-grade-profiles/${PROFILE_ID}/calculate` && method === 'POST') {
+      calcBody = JSON.parse(await readBody(request))
+      const midterm = calcBody.category_scores.find((r) => r.category_name === 'Mid-term Exam') ?? {}
+      // echo the row back through the card so each recalculation is observable
+      json(response, 200, calcResponse({
+        projected_grade: midterm.projected_score ?? null,
+        current_grade: midterm.actual_score ?? null,
+        completed_weight: midterm.actual_score != null ? 35 : null,
+      }))
+      return true
+    }
+    return false
+  })
+
+  await page.getByRole('heading', { name: 'Enter your grades' }).waitFor()
+  await page.fill('#actual-category\\:Mid-term\\ Exam', '20')
+  await page.fill('#hypo-category\\:Mid-term\\ Exam', '70')
+
+  // while the What-if is set, the row goes out as a projected score
+  await page.locator('.overview-stat-value', { hasText: '70%' }).waitFor()
+  assert.deepEqual(calcBody.category_scores, [{ category_name: 'Mid-term Exam', projected_score: 70 }])
+
+  // clear it -- the row falls back to its actual
+  await page.fill('#hypo-category\\:Mid-term\\ Exam', '')
+  await page.getByText('Based on 35% of the course completed').waitFor()
+  await page.locator('.overview-stat-value', { hasText: '20%' }).waitFor()
+  await page.waitForTimeout(700)
+  assert.deepEqual(calcBody.category_scores, [{ category_name: 'Mid-term Exam', actual_score: 20 }])
+})
+
+test('Grade Calculator: the current-grade card flags when a What-if has displaced a real score', { timeout: 45_000 }, async (t) => {
+  const page = await mountCutoffPanel(t, 'grade-calculator-displaced-actual-note', async (path, method, request, response) => {
+    if (path === `/api/v2/student/me/syllabus-grade-profiles/${PROFILE_ID}` && method === 'GET') {
+      json(response, 200, PROJECTION_READY_DETAIL())
+      return true
+    }
+    if (path === `/api/v2/student/me/syllabus-grade-profiles/${PROFILE_ID}/calculate` && method === 'POST') {
+      await readBody(request)
+      json(response, 200, calcResponse({ completed_weight: 50, current_grade: 88, projected_grade: 79 }))
+      return true
+    }
+    return false
+  })
+
+  const note = page.getByText('projected from a What-if score instead of counted')
+
+  await page.getByRole('heading', { name: 'Enter your grades' }).waitFor()
+
+  // a What-if on an EMPTY row: it never counted, so nothing is displaced
+  await page.fill('#hypo-category\\:Lecture\\ Quizzes', '95')
+  await page.getByText('Based on 50% of the course completed').waitFor()
+  await page.waitForTimeout(700)
+  assert.equal(await note.count(), 0, 'no note when the What-if only sits on an empty row')
+
+  // now put a What-if over a row that also has a real score -> note appears
+  await page.fill('#actual-category\\:Mid-term\\ Exam', '80')
+  await page.fill('#hypo-category\\:Mid-term\\ Exam', '40')
+  await note.waitFor()
+
+  // clear that What-if -> the row is counted again, note disappears
+  await page.fill('#hypo-category\\:Mid-term\\ Exam', '')
+  await page.waitForTimeout(700)
+  assert.equal(await note.count(), 0, 'note clears once the displacing What-if is removed')
+})
+
+test('Grade Calculator: clicking "Save & calculate" cancels a pending live projection (one result, from the button)', { timeout: 45_000 }, async (t) => {
+  const calls = []
+  let calcCount = 0
+  let gradeStateCount = 0
+
+  const page = await mountCutoffPanel(t, 'grade-calculator-projection-race', async (path, method, request, response) => {
+    if (path === `/api/v2/student/me/syllabus-grade-profiles/${PROFILE_ID}` && method === 'GET') {
+      json(response, 200, PROJECTION_READY_DETAIL())
+      return true
+    }
+    if (path === `/api/v2/student/me/syllabus-grade-profiles/${PROFILE_ID}/grade-state` && method === 'PUT') {
+      gradeStateCount += 1
+      calls.push('grade-state')
+      await readBody(request)
+      json(response, 200, { revision: 5, category_scores: [{ category_name: 'Mid-term Exam', actual_score: 88 }], assessment_scores: [] })
+      return true
+    }
+    if (path === `/api/v2/student/me/syllabus-grade-profiles/${PROFILE_ID}/calculate` && method === 'POST') {
+      calcCount += 1
+      calls.push('calculate')
+      await readBody(request)
+      // a slow response: a raced debounce call would still be in flight here
+      // and would bump the count if it hadn't been cancelled
+      await new Promise((r) => setTimeout(r, 150))
+      json(response, 200, calcResponse({ completed_weight: 35, current_grade: 88.8 }))
+      return true
+    }
+    return false
+  })
+
+  await page.getByRole('heading', { name: 'Enter your grades' }).waitFor()
+
+  // start the 500ms projection debounce, then immediately commit via the
+  // button -- well inside the debounce window
+  await page.fill('#actual-category\\:Mid-term\\ Exam', '88')
+  await page.getByRole('button', { name: 'Save & calculate' }).click()
+
+  await page.getByText('Based on 35% of the course completed').waitFor()
+  await page.locator('.overview-stat-value', { hasText: '88.8%' }).waitFor()
+  await page.waitForFunction(() => !document.querySelector('button[aria-busy="true"]'))
+
+  // give the cancelled debounce well past its 500ms window to prove it never fires
+  await page.waitForTimeout(900)
+
+  assert.equal(gradeStateCount, 1)
+  assert.equal(calcCount, 1, 'exactly one /calculate ran -- the button cancelled the pending projection')
+  // the one calculation was the button's: preceded by its save
+  assert.deepEqual(calls, ['grade-state', 'calculate'])
+})
+
+// --- course cards: ring segments, states, and the aria-label breakdown ----------
+
+test('Grade Calculator: the list renders a segmented ring card per calculator', { timeout: 30_000 }, async (t) => {
+  const planning = planningRoutes({ terms: [] })
+  const listRows = [
+    {
+      id: 'p-ready', institution: 'tamu', course_code: 'PHYS 207', term: 'Fall 2026', section: '529',
+      review_state: 'confirmed', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+      calculator_ready: true, current_grade: 85, current_letter_grade: 'B',
+      components: [
+        { name: 'Midterm', source_type: 'category', weight_percent: 30, effective_score: 90, status: 'completed' },
+        { name: 'Final', source_type: 'category', weight_percent: 40, effective_score: null, status: null },
+        { name: 'Project', source_type: 'category', weight_percent: 30, effective_score: 0, status: 'completed' },
+      ],
+    },
+    {
+      id: 'p-setup', institution: 'tamu', course_code: 'ECEN 248', term: 'Fall 2026', section: '501',
+      review_state: 'needs_review', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+      calculator_ready: false, current_grade: null, current_letter_grade: null, components: [],
+    },
+    {
+      id: 'p-nogap', institution: 'tamu', course_code: 'MATH 251', term: 'Fall 2026', section: '200',
+      review_state: 'confirmed', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+      calculator_ready: true, current_grade: 63.5, current_letter_grade: null,
+      components: [{ name: 'Exam', source_type: 'category', weight_percent: 100, effective_score: 63.5, status: 'completed' }],
+    },
+    {
+      // categories sum to 70 -> a shortfall segment for the missing 30
+      id: 'p-short', institution: 'tamu', course_code: 'CHEM 101', term: 'Fall 2026', section: '300',
+      review_state: 'confirmed', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+      calculator_ready: true, current_grade: 78, current_letter_grade: 'C',
+      components: [
+        { name: 'Labs', source_type: 'category', weight_percent: 30, effective_score: 82, status: 'completed' },
+        { name: 'Exams', source_type: 'category', weight_percent: 40, effective_score: null, status: null },
+      ],
+    },
+    {
+      // points-based: all assessments, no categories -> one full-circle arc
+      id: 'p-points', institution: 'tamu', course_code: 'ENGR 102', term: 'Fall 2026', section: '400',
+      review_state: 'confirmed', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+      calculator_ready: true, current_grade: 91, current_letter_grade: 'A',
+      components: [
+        { name: 'Project 1', source_type: 'assessment', weight_percent: 50, effective_score: 88, status: 'completed' },
+        { name: 'Project 2', source_type: 'assessment', weight_percent: 50, effective_score: 94, status: 'completed' },
+      ],
+    },
+    // A pair identical except for course_title, to check the title renders
+    // and does not change the card's height.
+    {
+      id: 'p-title', institution: 'tamu', course_code: 'PHYS 218', term: 'Fall 2026', section: '500',
+      review_state: 'confirmed', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+      calculator_ready: true, current_grade: 80, current_letter_grade: 'B',
+      course_title: 'Mechanics for Engineering and Science Majors',
+      components: [{ name: 'Exams', source_type: 'category', weight_percent: 100, effective_score: 80, status: 'completed' }],
+    },
+    {
+      id: 'p-notitle', institution: 'tamu', course_code: 'PHYS 219', term: 'Fall 2026', section: '500',
+      review_state: 'confirmed', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+      calculator_ready: true, current_grade: 80, current_letter_grade: 'B',
+      course_title: null,
+      components: [{ name: 'Exams', source_type: 'category', weight_percent: 100, effective_score: 80, status: 'completed' }],
+    },
+  ]
+
+  const apiPlugin = {
+    name: 'grade-calculator-cards',
+    configureServer(server) {
+      server.middlewares.use((request, response, next) => {
+        const path = request.url?.split('?')[0]
+        if (planning.handle(path, request.method, request, response)) return undefined
+        if (path === '/api/v2/student/me/requirement-satisfaction') return json(response, 404, { detail: 'Not found.' })
+        if (path?.startsWith('/api/v2/student/me/analysis-cache/')) return json(response, 404, { detail: 'Not found.' })
+        if (path === '/api/v2/student/me/syllabus-grade-profiles' && request.method === 'GET') {
+          return json(response, 200, { syllabus_grade_profiles: listRows })
+        }
+        next()
+      })
+    },
+  }
+  const server = await createServer({
+    root: new URL('..', import.meta.url).pathname,
+    cacheDir: new URL('../node_modules/.vite-grade-calculator-cards', import.meta.url).pathname,
+    logLevel: 'silent',
+    plugins: [apiPlugin],
+    server: { host: '127.0.0.1' },
+  })
+  await server.listen()
+  t.after(async () => server.close())
+  const address = server.httpServer?.address()
+  assert.ok(address && typeof address === 'object')
+  const browser = await chromium.launch()
+  t.after(async () => browser.close())
+  const page = await browser.newPage()
+  await page.goto(`http://127.0.0.1:${address.port}/authenticated-dashboard-preview.html?mode=complete`)
+  await page.getByRole('button', { name: 'Academic' }).click()
+  await page.getByRole('button', { name: 'Grade Calculator', exact: true }).click()
+
+  // --- ready card: one ring, three category segments, fill only where graded ---
+  const ready = page.locator('.grade-card', { hasText: 'PHYS 207' })
+  await ready.waitFor()
+  assert.equal(await ready.getAttribute('data-kind'), 'ring')
+  assert.equal(await ready.getAttribute('data-grade'), 'b')
+  assert.equal(await ready.locator('.grade-card-track').count(), 3, 'a track per category')
+  // Midterm 90% is the only graded, non-zero fill; Final is ungraded, Project is a scored 0
+  assert.equal(await ready.locator('.grade-card-fill').count(), 1)
+  await ready.locator('.grade-card-center-primary', { hasText: 'B' }).waitFor()
+  await ready.locator('.grade-card-center-secondary', { hasText: '85%' }).waitFor()
+
+  // --- aria-label carries the full breakdown, so nothing is hover-only ---
+  const label = await ready.locator('svg.grade-card-ring').getAttribute('aria-label')
+  assert.match(label, /PHYS 207, Fall 2026\./)
+  assert.match(label, /Current grade B, 85%\./)
+  assert.match(label, /Midterm: weight 30%, score 90%\./)
+  assert.match(label, /Final: weight 40%, not yet graded\./)
+  assert.match(label, /Project: weight 30%, score 0%\./)
+
+  // --- segments are not individually focusable (decorative to AT) ---
+  assert.equal(await ready.locator('svg.grade-card-ring [tabindex]').count(), 0)
+  assert.equal(await ready.locator('svg.grade-card-ring path[role]').count(), 0)
+
+  // --- setup card: no ring, dashed, and still a tap target that opens ---
+  const setup = page.locator('.grade-card', { hasText: 'ECEN 248' })
+  assert.equal(await setup.getAttribute('data-kind'), 'setup')
+  assert.equal(await setup.locator('svg.grade-card-ring').count(), 0)
+  assert.equal(await setup.locator('.grade-card-track').count(), 0)
+
+  // --- letter-null card: percentage alone, neutral (no data-grade), no dash ---
+  const noLetter = page.locator('.grade-card', { hasText: 'MATH 251' })
+  assert.equal(await noLetter.getAttribute('data-grade'), null)
+  await noLetter.locator('.grade-card-center-primary', { hasText: '63.5%' }).waitFor()
+  assert.equal(await noLetter.locator('.grade-card-center-primary', { hasText: 'B' }).count(), 0)
+
+  // --- sub-100 weights: a distinct shortfall segment, and the aria-label says so ---
+  const short = page.locator('.grade-card', { hasText: 'CHEM 101' })
+  assert.equal(await short.locator('.grade-card-track').count(), 3, '2 categories + 1 shortfall track')
+  assert.equal(await short.locator('.grade-card-track--shortfall').count(), 1)
+  // the shortfall segment is never a hover target
+  assert.equal(await short.locator('.grade-card-seg[data-shortfall] .grade-card-hit').count(), 0)
+  const shortLabel = await short.locator('svg.grade-card-ring').getAttribute('aria-label')
+  assert.match(shortLabel, /Labs: weight 30%, score 82%\./)
+  assert.match(shortLabel, /Exams: weight 40%, not yet graded\./)
+  assert.match(shortLabel, /30% of the course weight is not accounted for by any component/)
+
+  // --- points-based: one full-circle arc, no segments, letter + percentage centre ---
+  const points = page.locator('.grade-card', { hasText: 'ENGR 102' })
+  assert.equal(await points.getAttribute('data-kind'), 'categoryless')
+  assert.equal(await points.getAttribute('data-grade'), 'a')
+  assert.equal(await points.locator('.grade-card-track').count(), 1, 'one full-circle track')
+  assert.equal(await points.locator('.grade-card-fill').count(), 1)
+  assert.equal(await points.locator('.grade-card-hit').count(), 0, 'no hover reveal on a categoryless card')
+  await points.locator('.grade-card-center-primary', { hasText: 'A' }).waitFor()
+  await points.locator('.grade-card-center-secondary', { hasText: '91%' }).waitFor()
+  const pointsLabel = await points.locator('svg.grade-card-ring').getAttribute('aria-label')
+  assert.match(pointsLabel, /Graded by individual assessments, not weighted categories\./)
+
+  // --- course title: rendered under the code when present; identical card
+  //     height when absent (reserved line, no placeholder, no shift) ---
+  const titled = page.locator('.grade-card', { hasText: 'PHYS 218' })
+  const untitled = page.locator('.grade-card', { hasText: 'PHYS 219' })
+  await titled.locator('.grade-card-title-name', { hasText: 'Mechanics for Engineering and Science Majors' }).waitFor()
+  assert.equal((await untitled.locator('.grade-card-title-name').textContent()).trim(), '', 'no title -> empty, no placeholder text')
+  const [ht, hu] = await Promise.all([
+    titled.evaluate((el) => el.getBoundingClientRect().height),
+    untitled.evaluate((el) => el.getBoundingClientRect().height),
+  ])
+  assert.ok(Math.abs(ht - hu) < 0.5, `card height is identical with (${ht}) and without (${hu}) a title`)
+
+  // --- grade colour ramp: a continuous green -> red hue sweep, one step per
+  //     grade, no blue break, A vs B still a clear hue apart ---
+  const hues = await page.evaluate(() => {
+    const root = getComputedStyle(document.documentElement)
+    const parse = (name) => {
+      const m = root.getPropertyValue(name).trim().replace('#', '')
+      return [0, 2, 4].map((i) => parseInt(m.slice(i, i + 2), 16))
+    }
+    const hueOf = ([r, g, b]) => {
+      const rr = r / 255, gg = g / 255, bb = b / 255
+      const max = Math.max(rr, gg, bb), min = Math.min(rr, gg, bb), d = max - min
+      if (d === 0) return 0
+      let h
+      if (max === rr) h = ((gg - bb) / d) % 6
+      else if (max === gg) h = (bb - rr) / d + 2
+      else h = (rr - gg) / d + 4
+      h *= 60
+      return h < 0 ? h + 360 : h
+    }
+    const names = ['--grade-a', '--grade-b', '--grade-c', '--grade-d', '--grade-f']
+    return names.map((n) => ({ rgb: parse(n), hue: hueOf(parse(n)) }))
+  })
+  const H = hues.map((x) => x.hue)
+  // green (~130) monotonically down to red (~0)
+  assert.ok(H[0] > 110 && H[0] < 160, `A is green (hue ${Math.round(H[0])})`)
+  assert.ok(H[4] >= 0 && H[4] < 15, `F is deep red (hue ${Math.round(H[4])})`)
+  for (let i = 1; i < H.length; i += 1) {
+    assert.ok(H[i] < H[i - 1], `hue steps down from grade ${i - 1} (${Math.round(H[i - 1])}) to ${i} (${Math.round(H[i])})`)
+  }
+  assert.ok(H[0] - H[1] > 30, `A and B are a clear hue apart (${Math.round(H[0])} vs ${Math.round(H[1])})`)
+  assert.ok(hues.every((x) => x.rgb[2] <= 90), 'no blue break anywhere on the ramp')
+
+  // --- Remove + Upload another are preserved ---
+  await page.getByRole('button', { name: /Remove grade calculator for PHYS 207/ }).waitFor()
+  await page.getByRole('button', { name: 'Upload another syllabus' }).waitFor()
 })

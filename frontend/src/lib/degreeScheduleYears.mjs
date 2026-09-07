@@ -1,4 +1,4 @@
-import { termStatus } from './termPlanning.mjs'
+import { termStatus, existingCourseStatusIndex, findCrossListedMatch } from './termPlanning.mjs'
 import { formatCredits } from './degreeSchedulePresentation.mjs'
 
 /**
@@ -70,8 +70,98 @@ function sumCredits(courses) {
   return courses.reduce((total, course) => total + (Number(course.credit_hours) || 0), 0)
 }
 
+/** The three decision states Phase 3 relocates onto term cards. Everything
+ * else (AUTO_SELECTED, ADVISER_REVIEW, DATA_UNRESOLVED) is deliberately not
+ * surfaced anywhere in the planner UI -- see planning-docs Phase 3. */
+export const TERM_CARD_DECISION_STATES = ['LOCKED', 'CHOICE_REQUIRED', 'EXCLUDED']
+
 /**
- * Builds the year-tabbed, two-column data this view renders, merging three
+ * Resolves the decisions the backend serialized (schedule.decisions +
+ * schedule.candidate_sets) into per-term buckets, keyed by the
+ * `resolved_term_key` the server already computed.
+ *
+ *  - Only LOCKED / CHOICE_REQUIRED / EXCLUDED are carried; the rest return
+ *    nothing.
+ *  - A decision with no `resolved_term_key` is dropped entirely (this is the
+ *    documented behaviour for an EXCLUDED candidate that never joined a
+ *    feasible combination, and a fail-safe for the others).
+ *  - `candidates` holds the feasible candidates for LOCKED/CHOICE_REQUIRED
+ *    and the excluded candidate(s) for EXCLUDED, purely for course-code
+ *    display; the action handlers key off requirementGroupId + candidate_id.
+ */
+export function bucketDecisionsByTerm(decisions, candidateSets) {
+  const byTermKey = new Map()
+  if (!Array.isArray(decisions) || decisions.length === 0) return byTermKey
+
+  const candidateById = new Map()
+  for (const set of Array.isArray(candidateSets) ? candidateSets : []) {
+    for (const candidate of [...(set.feasible_candidates ?? []), ...(set.excluded_candidates ?? [])]) {
+      candidateById.set(candidate.candidate_id, candidate)
+    }
+  }
+
+  for (const decision of decisions) {
+    if (!TERM_CARD_DECISION_STATES.includes(decision.state)) continue
+    const termKey = decision.resolved_term_key
+    if (!termKey) continue
+
+    const ids = decision.state === 'EXCLUDED'
+      ? decision.excluded_candidate_ids ?? []
+      : decision.feasible_candidate_ids ?? []
+    const candidates = ids.map((id) => candidateById.get(id)).filter(Boolean)
+
+    const entry = {
+      requirementGroupId: decision.requirement_group_id,
+      requirementName: decision.requirement_name,
+      state: decision.state,
+      selectedCandidateId: decision.selected_candidate_id ?? null,
+      candidates,
+      termKey,
+    }
+    const bucket = byTermKey.get(termKey) ?? []
+    bucket.push(entry)
+    byTermKey.set(termKey, bucket)
+  }
+  return byTermKey
+}
+
+/**
+ * Ids of planned_courses rows that are display-duplicates of coursework the
+ * student already has under a cross-listed alias -- either a course_records
+ * row (in_progress/completed) or an earlier planned row for the same real
+ * course under its other departmental code. The add-time check
+ * (CourseSearchAdd's findCrossListedMatch call) blocks new duplicates like
+ * this from being created; this is the retroactive display-only filter for
+ * rows that predate that check (or otherwise slipped through). The
+ * underlying planned_courses row is never written to here -- this only
+ * decides what's rendered, matching the existingCourseStatusIndex /
+ * findCrossListedMatch pair already used for the add-time check, not a new
+ * lookup.
+ *
+ * Student-wide (every term, not just one), same scope as the add-time check.
+ * Rows are walked in input order; the first row for a given course "wins"
+ * and later cross-listed duplicates of it are hidden -- order isn't
+ * otherwise meaningful here, it's just a deterministic tie-break.
+ */
+function hiddenPlannedIds(planned, courseRecords, crossListingMap) {
+  const hidden = new Set()
+  const recordIndex = existingCourseStatusIndex(courseRecords, [])
+  const keptIndex = new Map()
+  for (const row of planned) {
+    const code = String(row.course_code ?? '').toUpperCase()
+    const alreadyHasRecord = findCrossListedMatch(code, crossListingMap, recordIndex)
+    const alreadyKeptPlanned = findCrossListedMatch(code, crossListingMap, keptIndex)
+    if (alreadyHasRecord || alreadyKeptPlanned) {
+      hidden.add(row.id)
+      continue
+    }
+    keptIndex.set(code, 'planned')
+  }
+  return hidden
+}
+
+/**
+ * Builds the year-tabbed, two-column data this view renders, merging four
  * sources that otherwise never meet:
  *  - realTerms (GET /terms): calendar terms, used for status + real dates
  *  - courseRecords (GET /course-records, passed down from the dashboard's
@@ -81,14 +171,31 @@ function sumCredits(courses) {
  *    nothing is confirmed until enrollment) and, per product decision, as
  *    the "Suggested courses" section, since it is the only real
  *    recommendation data currently exposed by any endpoint.
+ *  - plannedCourses (GET /planned-courses): courses the student added to a
+ *    future term themselves. Rendered only in the 'future' branch, in their
+ *    own `planned` array with the "Added" treatment. A planned code also
+ *    present in the scheduler's plan for that term is shown once, here --
+ *    the suggestion is dropped (see below), matching the plannedCodes
+ *    (case-insensitive) convention.
+ *
+ * plannedCourses defaults to [] so callers that predate it (and tests) keep
+ * working unchanged. decisions/candidateSets likewise default to [] -- when
+ * present, LOCKED/CHOICE_REQUIRED/EXCLUDED decisions are bucketed onto the
+ * term card the backend resolved for each (semester.decisions); a decision
+ * whose resolved term falls beyond every scheduled/enrolled year adds that
+ * year to the grid, the same way a scheduler-only term already does.
  */
-export function buildDegreeScheduleYears({ realTerms, scheduleTerms, courseRecords, gradingSchema, today }) {
+export function buildDegreeScheduleYears({ realTerms, scheduleTerms, courseRecords, gradingSchema, today, plannedCourses, decisions, candidateSets, crossListings }) {
   const terms = Array.isArray(realTerms) ? realTerms : []
   const schedule = Array.isArray(scheduleTerms) ? scheduleTerms : []
   const records = Array.isArray(courseRecords) ? courseRecords : []
+  const planned = Array.isArray(plannedCourses) ? plannedCourses : []
+  const crossListingMap = crossListings && typeof crossListings === 'object' ? crossListings : {}
+  const hiddenIds = hiddenPlannedIds(planned, records, crossListingMap)
 
   const termsByKey = new Map(terms.map((term) => [term.key, term]))
   const scheduleByKey = new Map(schedule.map((term) => [term.term_key, term]))
+  const decisionsByTermKey = bucketDecisionsByTerm(decisions, candidateSets)
 
   const yearKeys = new Set()
   for (const term of terms) {
@@ -96,7 +203,7 @@ export function buildDegreeScheduleYears({ realTerms, scheduleTerms, courseRecor
     const yearKey = academicYearKey(term.year, term.season)
     if (yearKey !== null) yearKeys.add(yearKey)
   }
-  for (const termKey of scheduleByKey.keys()) {
+  for (const termKey of [...scheduleByKey.keys(), ...decisionsByTermKey.keys()]) {
     const match = /^(\d{4})-(Fall|Spring)$/.exec(termKey)
     if (!match) continue
     yearKeys.add(academicYearKey(Number(match[1]), match[2]))
@@ -135,20 +242,73 @@ export function buildDegreeScheduleYears({ realTerms, scheduleTerms, courseRecor
             gradeBadge: state === 'past' ? formatGradeBadge(record.letter_grade, gradingSchema) : null,
           })),
           suggestedCourses: [],
+          planned: [],
+          // A past/in-progress term is satisfied coursework -- the requirement
+          // pipeline never emits a decision for it (scope_schedule_input's
+          // SATISFIED early-return), and resolved_term_key is always a future
+          // term anyway. Hard-empty here so a decision can never surface on
+          // one of these columns regardless of upstream data.
+          decisions: [],
         }
       }
 
       const scheduled = scheduleByKey.get(termKey) ?? null
+
+      // A planned row always carries a real term_id (ensure_term_row makes one
+      // on add); a term with no materialized id therefore has none, by
+      // construction -- same guard the past/in_progress branch applies to
+      // course_records.
+      const plannedRowsForTerm = realTerm?.id == null
+        ? []
+        : planned.filter((row) => row.term_id === realTerm.id)
+
+      // Display-only: a row cross-listed with something the student already
+      // has (course_records or an earlier planned row -- see hiddenPlannedIds
+      // above) is excluded from what renders, but it still counts as
+      // genuinely planned for the suggested-course reconciliation just below,
+      // so that reconciliation is computed off plannedRowsForTerm (pre-hide),
+      // not plannedForTerm.
+      const plannedForTerm = plannedRowsForTerm
+        .filter((row) => !hiddenIds.has(row.id))
+        .map((row) => ({
+          id: row.id,
+          course_code: row.course_code,
+          title: row.title ?? null,
+          credit_hours: row.credit_hours,
+        }))
+
+      // Reconcile against the scheduler's plan: a course the student already
+      // added is shown once, under the added treatment -- drop the matching
+      // suggestion. Case-insensitive, matching plannedCodes (termPlanning.mjs).
+      // Cross-listing-aware: a planned CSCE 222 must also drop a suggested
+      // ECEN 222 (the same course under its other departmental code), not
+      // just an exact-code match -- otherwise the suggestion sits unfiltered
+      // next to its own cross-listed twin. Done by pre-expanding the set with
+      // each planned code's cross-listed partners, so the .has() check below
+      // stays a single, unchanged lookup.
+      const plannedCodeSet = new Set()
+      for (const row of plannedRowsForTerm) {
+        const code = String(row.course_code ?? '').toUpperCase()
+        plannedCodeSet.add(code)
+        for (const partner of crossListingMap[code] ?? []) {
+          plannedCodeSet.add(String(partner).toUpperCase())
+        }
+      }
+
       return {
         season,
         termKey,
         state,
         totalCreditsLabel: 'Not scheduled',
         courses: [],
-        suggestedCourses: (scheduled?.courses ?? []).map((course) => ({
-          course_code: course.course_code,
-          credit_hours: course.credit_hours,
-        })),
+        suggestedCourses: (scheduled?.courses ?? [])
+          .filter((course) => !plannedCodeSet.has(String(course.course_code ?? '').toUpperCase()))
+          .map((course) => ({
+            course_code: course.course_code,
+            credit_hours: course.credit_hours,
+          })),
+        planned: plannedForTerm,
+        decisions: decisionsByTermKey.get(termKey) ?? [],
       }
     }),
   }))

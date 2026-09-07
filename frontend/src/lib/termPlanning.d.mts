@@ -93,6 +93,7 @@ export declare const COURSE_RECORDS_URL: string;
 export declare const PENDING_FINAL_GRADES_URL: string;
 export declare const ACTIVATION_WINDOW_DAYS: number;
 export declare const GRADING_SCHEMA_URL: string;
+export declare const CROSS_LISTINGS_URL: string;
 
 export declare function currentGradeOptions(schema: GradingSchema | null | undefined): string[];
 export declare function finalGradeOptions(schema: GradingSchema | null | undefined): string[];
@@ -106,7 +107,10 @@ export declare function plannedRemoveUrl(id: string): string;
 export declare function plannedListUrl(termId: string | null | undefined): string;
 export declare function catalogSearchUrl(query: string): string;
 export declare function sortTerms(terms: PlanningTerm[]): PlanningTerm[];
-export declare function pickDefaultTermKey(payload: Partial<TermsPayload> | null | undefined): string | null;
+export declare function pickDefaultTermKey(
+  payload: Partial<TermsPayload> | null | undefined,
+  today?: Date,
+): string | null;
 export declare function termStatus(term: PlanningTerm | null | undefined, today: Date): TermStatus;
 export declare function parseDate(value: string | null | undefined): Date | null;
 export declare function formatTermDates(term: PlanningTerm | null | undefined): string | null;
@@ -130,3 +134,22 @@ export declare function normalizeGradingSchemaPayload(
   status: number,
   body: unknown,
 ): NormalizedGradingSchema;
+
+/** code -> its cross-listed partner codes, both sides uppercased. */
+export type CrossListingMap = Record<string, string[]>;
+export interface NormalizedCrossListings { ok: boolean; crossListings: CrossListingMap }
+export declare function normalizeCrossListingsPayload(
+  status: number,
+  body: unknown,
+): NormalizedCrossListings;
+
+export type ExistingCourseStatus = 'in_progress' | 'completed' | 'planned';
+export declare function existingCourseStatusIndex<R extends { course_code: string; status?: string }>(
+  courseRecords: R[],
+  plannedCourses: Array<{ course_code: string }>,
+): Map<string, ExistingCourseStatus>;
+export declare function findCrossListedMatch(
+  code: string,
+  crossListings: CrossListingMap,
+  existingIndex: Map<string, ExistingCourseStatus>,
+): { code: string; status: ExistingCourseStatus } | null;

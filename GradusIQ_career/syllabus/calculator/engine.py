@@ -22,6 +22,21 @@ its own `.weight`) -- otherwise the syllabus's own category weight is the
 only safe percentage to use, and the assessment is informational only in
 Phase 6.
 
+The single exception is a category the model PROVES decomposable (see
+weighting._decomposition_children: every child weighted, child weights sum
+to the parent's, stated count matches, no name collisions) FOR WHICH the
+student supplied a score on at least one child assessment this request.
+Only then does the calculator emit one ASSESSMENT component per child at
+the child's own weight and drop the parent category component -- the
+children's weights already sum to the parent's, so the course total and
+_compute_breakdown's flat sum are unchanged. The decision is per
+calculation, from grade_state alone: the same model scored by
+CategoryScoreInput keeps its single parent component, exactly as before
+(no migration). If both a category score and a child score name the same
+category, the child scores win and a warning records that the category
+score was ignored. A child of a category that is not decomposable (or not
+decomposed this request) still cannot be scored directly.
+
 WHY THE SAME MATH WORKS FOR WEIGHTED AND POINTS
 --------------------------------------------------
 Both engines reduce every component to (name, weight_percent, score 0-100).
@@ -126,9 +141,48 @@ def _build_weighted_components(
     warnings: list[str] = []
     effective = get_effective_course_weights(grade_model)
 
+    category_inputs = _validate_and_index_category_inputs(grade_state, grade_model)
+    assessment_inputs = _validate_and_index_assessment_inputs(grade_state, grade_model)
+
+    # Decomposition is decided per calculation, from what the student actually
+    # supplied -- not baked into the model. A structurally decomposable
+    # category (weighting._decomposition_children) only decomposes for THIS
+    # request when the student supplied a score for at least one of its child
+    # assessments. Otherwise it stays a single CATEGORY component, scored by a
+    # CategoryScoreInput exactly as before -- so a course scored by category
+    # keeps working untouched, with no migration.
+    structural_children_by_key: dict[str, tuple] = {}
+    for category in effective.decomposable_categories:
+        key = _normalize_name(category.name)
+        structural_children_by_key[key] = tuple(
+            a
+            for a in effective.decomposed_assessments
+            if a.category is not None and _normalize_name(a.category) == key
+        )
+
+    decomposed_keys: set[str] = set()
+    for key, children in structural_children_by_key.items():
+        child_keys = {_normalize_name(c.name) for c in children}
+        if assessment_inputs.keys() & child_keys:
+            decomposed_keys.add(key)
+            if key in category_inputs:
+                # Precedence: children win, the category score is ignored.
+                warnings.append(
+                    f"category '{category_inputs[key].category_name}' has both a category score and "
+                    "individual assessment scores; the assessment scores are used and the category "
+                    "score is ignored"
+                )
+
+    decomposed_children = tuple(
+        child for key in decomposed_keys for child in structural_children_by_key[key]
+    )
+    decomposed_names = {_normalize_name(a.name) for a in decomposed_children}
+
     for category in effective.categories_without_weight:
         warnings.append(f"category '{category.name}' has no known weight and is excluded from the calculation")
     for assessment in effective.category_scoped_weighted_assessments:
+        if _normalize_name(assessment.name) in decomposed_names:
+            continue  # this child is emitted as its own component this request
         warnings.append(
             f"assessment '{assessment.name}' has both a category ('{assessment.category}') and its own weight; "
             "Phase 6 does not know whether the category weight already includes it, so it is excluded -- enter "
@@ -136,15 +190,19 @@ def _build_weighted_components(
         )
 
     standalone_names = {_normalize_name(a.name) for a in effective.standalone_weighted_assessments}
+    directly_scoreable_assessment_names = standalone_names | decomposed_names
     non_standalone_names = {
-        _normalize_name(a.name) for a in grade_model.assessments if _normalize_name(a.name) not in standalone_names
+        _normalize_name(a.name)
+        for a in grade_model.assessments
+        if _normalize_name(a.name) not in directly_scoreable_assessment_names
     }
 
     category_by_key = {_normalize_name(c.name): c for c in effective.weighted_categories}
     assessment_by_key = {_normalize_name(a.name): a for a in effective.standalone_weighted_assessments}
-
-    category_inputs = _validate_and_index_category_inputs(grade_state, grade_model)
-    assessment_inputs = _validate_and_index_assessment_inputs(grade_state, grade_model)
+    for child in decomposed_children:
+        # A decomposed category's children score exactly like standalone
+        # weighted assessments: own weight, percentage input only.
+        assessment_by_key[_normalize_name(child.name)] = child
 
     for key, input_ in assessment_inputs.items():
         if key in non_standalone_names:
@@ -160,6 +218,8 @@ def _build_weighted_components(
 
     components: list[CalculationComponent] = []
     for key, category in category_by_key.items():
+        if key in decomposed_keys:
+            continue  # emitted below as one component per child assessment
         input_ = category_inputs.get(key)
         score = input_.score if input_ is not None else None
         status = input_.status if input_ is not None else None

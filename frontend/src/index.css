@@ -2463,7 +2463,24 @@ a {
 .degree-schedule-course-row span {
   color: var(--muted);
   font-size: var(--text-sm);
+}
+
+/* nowrap belongs only on the credits value / term-total label -- NOT the
+   code(+title) wrapper span in a scheduled row. That span is first-child
+   and holds a course title that must be free to wrap; keeping it nowrap
+   pushed the sibling credits span past the card's clipped edge
+   (.degree-schedule-semester { overflow: hidden }). */
+.degree-schedule-term-header span,
+.degree-schedule-course-row span:last-child {
   white-space: nowrap;
+}
+
+/* The code(+title) wrapper span is a flex item; flex items default to
+   min-width: auto and refuse to shrink below their content, so a long
+   title overflows the column instead of wrapping. */
+.degree-schedule-course-row span:first-child {
+  min-width: 0;
+  overflow-wrap: break-word;
 }
 
 .degree-schedule-courses,
@@ -2590,8 +2607,7 @@ a {
 }
 
 .degree-schedule-decision-heading,
-.degree-schedule-candidate-header,
-.degree-schedule-candidate-courses > li {
+.degree-schedule-candidate-header {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -2605,8 +2621,7 @@ a {
 }
 
 .degree-schedule-decision-heading span,
-.degree-schedule-candidate-header span,
-.degree-schedule-candidate-courses > li > span {
+.degree-schedule-candidate-header span {
   color: var(--muted);
   font-size: var(--text-sm);
   font-variant-numeric: tabular-nums;
@@ -2686,7 +2701,17 @@ a {
   background: var(--surface);
 }
 
+/* A per-course line inside a decision option is now the exact
+   .degree-schedule-course-row the Fall / planned lists use -- an <li>
+   wrapping the flex row (code+title span / credits span) with the
+   "Planned course" badge stacked below it. The <li> is a plain block (it
+   was a flex row only to hold the older bare code-div + credits-span
+   shape); the shared .degree-schedule-course-row rules then style it
+   identically to a .degree-schedule-semester-course row, including the
+   title <small> on its own line. Only the per-course line matches -- the
+   option-level container keeps its bordered "this is a decision" framing. */
 .degree-schedule-candidate-courses > li {
+  display: block;
   padding: var(--sp-3);
   border-top: 1px solid var(--line);
 }
@@ -2695,17 +2720,65 @@ a {
   border-top: 0;
 }
 
-.degree-schedule-candidate-courses > li > div {
-  display: grid;
-  min-width: 0;
-  gap: var(--sp-1);
-}
-
-.degree-schedule-candidate-courses > li > div > span {
+.degree-schedule-candidate-courses > li .degree-schedule-course-row small {
+  display: block;
   color: var(--muted);
   font-size: var(--text-sm);
-  overflow-wrap: anywhere;
-  text-wrap: pretty;
+}
+
+/* A LOCKED, not-changing decision card renders its course rows directly
+   inside the outer card -- no bordered "Option N" box (there's only ever
+   one candidate there, so the grouping box distinguished nothing). Undo the
+   surface-tint background .degree-schedule-candidate-courses normally gets
+   from sitting inside a .degree-schedule-candidate-path box. Also applies
+   to .degree-schedule-locked-decision -- the LOCKED non-changing card's
+   boxless wrapper (see below) -- since it renders the same course list
+   without the .degree-schedule-decision-card ancestor. */
+.degree-schedule-decision-card > .degree-schedule-candidate-courses,
+.degree-schedule-locked-decision > .degree-schedule-candidate-courses {
+  background: none;
+}
+
+/* Restores the gap the removed .degree-schedule-candidate-list ol used to
+   supply between the card's heading and its course rows. Decision-card-only:
+   .degree-schedule-locked-decision's non-changing view has no heading at all
+   (it moved to the term header's "Required courses" note), so its
+   .degree-schedule-candidate-courses is the card's first child -- the card's
+   own top padding already supplies the gap, and adding this margin on top of
+   that stacked an extra, heading-less gap above the first row (visibly larger
+   than the Fall/planned list's first-row spacing). */
+.degree-schedule-decision-card > .degree-schedule-candidate-courses {
+  margin-top: var(--sp-3);
+}
+
+/* LOCKED, non-changing decision card: full visual parity with the Fall/
+   planned plain rows it sits beside -- no border, no background (it
+   deliberately does NOT use .degree-schedule-decision-card), no heading at
+   all (that requirement-name signal moved to the term header's "Required
+   courses" note -- see .degree-schedule-semester-header span below), just
+   the .degree-schedule-term-decision padding it's paired with in JSX. */
+
+/* Plain text-style "Change choice" / "Clear choice" actions for the
+   non-changing LOCKED card -- no border/background convention existed
+   elsewhere in the codebase for this (checked: .btn-ghost still renders a
+   border and hover tint), so this is a new, minimal link-style button. */
+.degree-schedule-text-action {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.degree-schedule-text-action:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.degree-schedule-text-action:disabled {
+  color: var(--muted);
+  cursor: default;
 }
 
 /* Degree Schedule: year tabs (reuses .academic-tabs/.academic-tab, the
@@ -2820,6 +2893,36 @@ a {
   text-transform: uppercase;
 }
 
+/* Student-added (planned_courses) rows in a future term. Third tint in this
+   family, deliberately achromatic: --gold means "in progress" and --ready
+   green means "completed" -- both encode a fact about real coursework. A
+   planned addition is speculative, not a fact, so it takes --pending, the
+   theme's designated no-semantic-hue neutral (see :root). */
+.degree-schedule-badge--added {
+  color: var(--pending);
+  background: var(--pending-tint);
+  text-transform: uppercase;
+}
+
+/* "Planned course" marker on every course line inside a decision option --
+   now a sibling of the .degree-schedule-course-row div, stacked below it,
+   the same place the Fall list carries its grade / in-progress badges.
+   Those courses are prospective -- they enter the plan only if the student
+   picks that option -- so this parallels .degree-schedule-badge--added on a
+   confirmed planned row, but in the institution accent (--accent /
+   --accent-tint) instead of --added's achromatic --pending, so a decision
+   option's courses read as a distinct fourth state. --accent is
+   institution-themed (TAMU maroon, SMU blue, ...): accent-coloured text on
+   the 7%-opacity --accent-tint is effectively brand-on-white and stays
+   legible for every institution. The two-class selector keeps it ahead of
+   the base .degree-schedule-badge font-size and any inherited row colour. */
+.degree-schedule-candidate-courses .degree-schedule-badge--decision {
+  color: var(--accent);
+  background: var(--accent-tint);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+}
+
 .degree-schedule-suggested {
   padding: var(--sp-3) var(--sp-4);
   border-top: 1px solid var(--line);
@@ -2836,6 +2939,117 @@ a {
 
 .degree-schedule-suggested .degree-schedule-semester-course {
   padding: var(--sp-2) 0;
+}
+
+/* "If you have room" -- scheduler-placed courses shown as optional headroom.
+   No badge (that family is reserved for acted-on rows: --added / grade /
+   in-progress); it recedes instead, muted body text one step below the
+   planned and decision rows it now sits beneath. */
+.degree-schedule-suggested--elective .degree-schedule-semester-course,
+.degree-schedule-suggested--elective .degree-schedule-semester-course strong {
+  color: var(--muted);
+}
+
+/* Phase 3: LOCKED / CHOICE_REQUIRED / EXCLUDED decisions relocated onto the
+   term column they resolve to. Sits above the planned/suggested/add stack;
+   reuses the decision-card + candidate-path look from the retired standalone
+   section, tightened for the narrower column. */
+.degree-schedule-term-decisions {
+  list-style: none;
+  margin: 0;
+  display: grid;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border-top: 1px solid var(--line);
+}
+
+.degree-schedule-term-decision {
+  padding: var(--sp-3);
+}
+
+/* LOCKED's non-changing view is now a plain row list -- no heading, no
+   badges, no multi-option content -- so it no longer needs the top
+   breathing room .degree-schedule-term-decisions/.degree-schedule-term-decision
+   give CHOICE_REQUIRED/EXCLUDED (which still render a heading + status
+   line, or multiple Option-N boxes, and benefit from it). Narrow,
+   additive overrides scoped to .degree-schedule-locked-decision --
+   the shared rules above are untouched, so CHOICE_REQUIRED/EXCLUDED get
+   the same padding as before. Goal: LOCKED's first course row lands at
+   the same vertical position as the Fall/planned list's first row. */
+/* Also drop the ul's own border-top for this case -- it's a second
+   hairline stacked directly under .degree-schedule-semester-header's
+   border-bottom, adding 1px that padding-top: 0 alone doesn't remove.
+   CHOICE_REQUIRED/EXCLUDED keep it (untouched, same :has() scoping). */
+.degree-schedule-term-decisions:has(> .degree-schedule-locked-decision:first-child) {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.degree-schedule-locked-decision.degree-schedule-term-decision {
+  padding-top: 0;
+}
+
+.degree-schedule-decision-card h6 {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  text-wrap: balance;
+}
+
+.degree-schedule-term-decision .degree-schedule-decision-heading > div {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+}
+
+.degree-schedule-term-decision-codes {
+  margin: var(--sp-2) 0 0;
+  font-family: var(--font-data);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+/* The per-term "Edit courses" popup (EditCoursesDialog). New but deliberately
+   conventional: the fixed inset-0 scrim + centered --surface panel that
+   .rv-confirming and .tour-overlay both already use. z-index 90 clears the
+   sticky commit bar (40) and sits below GuidedTour's 100. Not a shared
+   primitive -- scoped to this one control. */
+.degree-schedule-edit-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-4);
+  background: var(--overlay-backdrop);
+}
+
+.degree-schedule-edit-dialog {
+  width: min(32rem, 100%);
+  max-height: 85vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--sp-5);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--accent);
+  border-radius: var(--radius);
+  box-shadow: 0 18px 48px var(--shadow-ink);
+  outline: none;
+}
+
+.degree-schedule-edit-title {
+  margin: 0 0 var(--sp-3);
+  font-size: var(--text-md);
+}
+
+.degree-schedule-edit-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--sp-4);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--line);
 }
 
 .career-optimization {
@@ -3102,8 +3316,7 @@ a {
     gap: var(--sp-2);
   }
 
-  .degree-schedule-decision-heading,
-  .degree-schedule-candidate-courses > li {
+  .degree-schedule-decision-heading {
     align-items: flex-start;
     flex-direction: column;
   }
@@ -6215,6 +6428,14 @@ a {
   font-size: 0.875rem;
 }
 
+/* The cross-listing-alias note ("Already in progress as CSCE 222.") --
+   inherits the muted/small treatment above (it is itself a <small>), plus
+   italics so it reads as an explanation of why Add is disabled, not as a
+   second description line under the title. */
+.term-search-result-note {
+  font-style: italic;
+}
+
 @media (max-width: 640px) {
   .term-planner-header {
     align-items: flex-start;
@@ -6525,29 +6746,215 @@ label.profile-form-check { display: flex; flex-direction: row; align-items: cent
 /* ── Grade Calculator (syllabus What-If Calculator) ─────────────────────── */
 
 .grade-calculator-panel { display: flex; flex-direction: column; gap: var(--sp-4); }
-.grade-profile-row-button {
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  gap: var(--sp-3);
-  align-items: center;
-  width: 100%;
+
+/* ── Course cards: a square card per calculator, ring segmented by category
+   weight and filled by score, one colour per card keyed to the letter grade.
+   The whole card is a single tap target that opens the course; the Remove
+   button is the only nested control. Segment hover is desktop-only progressive
+   enhancement, gated on `pointer: fine`. gradeCardRing.mjs builds the geometry
+   and aria-label; this is presentation only. ─────────────────────────────── */
+
+/* Letter-grade colours -- a continuous green-through-red ramp, one hue step per
+   grade, no blue break. Hues: A~133deg green, B~76deg yellow-green/olive,
+   C~41deg amber, D~15deg red-orange, F~4deg deep red -- larger steps in the
+   green-yellow arc where hue reads less evenly. All held near the same low
+   lightness (relative luminance ~0.11-0.24) so the ramp keeps >=3:1 contrast
+   on both the light card surface and a dark one, and A vs B stay a clear
+   green/olive apart side by side. The ONLY colour on a card; an unrecognised
+   or absent letter leaves --grade-color unset and the fill falls back to
+   --muted (neutral). Not institution-themed. */
+:root {
+  --grade-a: #2F7D3E; /* green */
+  --grade-b: #6E8B1F; /* yellow-green / olive */
+  --grade-c: #B07D12; /* amber */
+  --grade-d: #C0522A; /* red-orange */
+  --grade-f: #AE3A31; /* deep red */
+}
+
+.grade-card-grid {
+  list-style: none;
+  margin: 0;
   padding: 0;
-  border: 0;
-  background: none;
+  display: grid;
+  /* 3 up at desktop -> 2 -> 1, so each ring is large enough to read its
+     segments rather than 5-6 cramped cards. */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-4);
+}
+.grade-card-grid > li { display: flex; }
+@media (max-width: 900px) {
+  .grade-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.grade-card-wrap { position: relative; flex: 1 1 auto; display: flex; }
+
+.grade-card {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--sp-3);
+  width: 100%;
+  padding: var(--sp-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface-elevated);
   font: inherit;
   color: inherit;
   text-align: left;
   cursor: pointer;
 }
-/* Row + per-row Remove affordance: the clickable row keeps its full 3-column
-   layout, the Remove button tucks to the far right. */
-.grade-profile-row {
+.grade-card:hover { border-color: var(--accent-ghost-border); }
+.grade-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.grade-card[data-kind='setup'] {
+  border-style: dashed;
+  background: var(--surface);
+}
+
+/* Square ring area. The centre text is overlaid, not part of the SVG, so it
+   can restyle on hover without touching path geometry. */
+.grade-card-face {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: var(--sp-3);
+  justify-content: center;
+  aspect-ratio: 1 / 1;
+  width: 100%;
 }
-.grade-profile-row .grade-profile-row-button { flex: 1 1 auto; }
-.grade-profile-remove { flex: 0 0 auto; }
+/* Slightly inset so the ring clears the absolutely-positioned Remove button
+   in the card's top-right corner. */
+.grade-card-ring { width: 90%; height: 90%; display: block; overflow: visible; }
+
+/* Butt caps on the segmented ring: a round cap adds half the stroke width
+   past each arc end (~3deg at this radius) and swallows the inter-segment
+   gaps. The categoryless single-arc card has no gaps to protect and keeps
+   round caps (below). */
+.grade-card-track {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 8;
+  stroke-linecap: butt;
+}
+.grade-card-fill {
+  fill: none;
+  stroke: var(--grade-color, var(--muted));
+  stroke-width: 8;
+  stroke-linecap: butt;
+}
+.grade-card[data-kind='categoryless'] .grade-card-track,
+.grade-card[data-kind='categoryless'] .grade-card-fill {
+  stroke-linecap: round;
+}
+/* Course weight the syllabus never assigned to a category. Dashed + butt-capped
+   so it reads as "structure missing", clearly not the flat --line track of a
+   category that simply has no score yet, and it can never carry a fill. */
+.grade-card-track--shortfall {
+  stroke: var(--muted);
+  stroke-width: 6;
+  stroke-linecap: butt;
+  stroke-dasharray: 1.5 2.5;
+  opacity: 0.65;
+}
+.grade-card[data-grade='a'] { --grade-color: var(--grade-a); }
+.grade-card[data-grade='b'] { --grade-color: var(--grade-b); }
+.grade-card[data-grade='c'] { --grade-color: var(--grade-c); }
+.grade-card[data-grade='d'] { --grade-color: var(--grade-d); }
+.grade-card[data-grade='f'] { --grade-color: var(--grade-f); }
+
+/* Invisible fat stroke that catches the hover; only rendered on fine pointers
+   (GradeCard.tsx omits it otherwise), never a click target. */
+.grade-card-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 15;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+.grade-card-seg { transition: opacity 120ms ease; }
+.grade-card-seg[data-dim] { opacity: 0.22; }
+
+.grade-card-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  pointer-events: none;
+}
+.grade-card-center-primary {
+  font: 600 var(--text-xl) / 1 var(--font-data);
+  color: var(--grade-color, var(--ink));
+}
+/* a bare letter grade gets the big treatment; a percentage / dash stays
+   smaller so it fits inside the ring without crowding */
+.grade-card[data-grade] .grade-card-center-primary { font-size: var(--text-2xl); }
+.grade-card-center-secondary {
+  font: 500 var(--text-sm) / 1.2 var(--font-ui);
+  color: var(--muted);
+  text-align: center;
+  max-width: 90%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* setup + categoryless faces: no ring, just a centred mark */
+.grade-card-face--setup,
+.grade-card-face--flat { flex-direction: column; gap: var(--sp-2); }
+.grade-card-setup-mark {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--accent-ghost-border);
+  border-radius: 50%;
+  font: 400 var(--text-xl) / 1 var(--font-ui);
+  color: var(--muted);
+}
+.grade-card-setup-text { font-size: var(--text-sm); color: var(--muted); }
+
+.grade-card-title {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.grade-card-title strong {
+  font: 600 var(--text-base) / 1.2 var(--font-data);
+  color: var(--accent-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.grade-card-title small { font-size: var(--text-xs); color: var(--muted); }
+/* Course title under the code. Always in the DOM (empty when there is no
+   title) with its line-box height reserved, so the card is identical in
+   height whether or not a title is present. One line, ellipsis on overflow. */
+.grade-card-title-name {
+  display: block;
+  line-height: 1.35;
+  height: 1.35em; /* fixed one-line box: empty and filled are the exact same height */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Always visible, not hover-gated: discoverable without a pointer and stable
+   for tests. Sits over the card's top-right padding, clear of the ring. */
+.grade-card-remove {
+  position: absolute;
+  top: var(--sp-2);
+  right: var(--sp-2);
+  background: var(--surface-elevated);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .grade-card-seg { transition: none; }
+}
+
 .grade-review-card { display: flex; flex-direction: column; gap: var(--sp-4); }
 
 /* Unified letter-grade cutoff table (CutoffTable): one editable row per
@@ -6598,6 +7005,25 @@ label.profile-form-check { display: flex; flex-direction: row; align-items: cent
 .grade-rule-title { margin: 0 0 var(--sp-2); font-weight: 600; }
 .grade-rule-explanation { color: var(--muted); font-size: var(--text-sm); }
 .grade-breakdown-row { display: flex; flex-direction: column; }
+
+/* Editable category-weight table (CategoryWeightEditor): same grid/row/
+   status-column language as .grade-cutoff-* above, one column wider
+   (category name is not a fixed-width letter). */
+.grade-weight-table { display: flex; flex-direction: column; gap: var(--sp-3); }
+.grade-weight-table-rows { display: flex; flex-direction: column; gap: var(--sp-2); }
+.grade-weight-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 5rem) minmax(0, 5rem) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--sp-2);
+}
+.grade-weight-row > span { min-width: 0; overflow-wrap: anywhere; }
+.grade-weight-row--head { color: var(--muted); font-size: var(--text-sm); }
+.grade-weight-row-name { font-weight: 600; }
+.grade-weight-row .form-input { width: 100%; min-width: 0; }
+.grade-weight-row-status { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); font-size: var(--text-sm); }
+.grade-weight-total { margin: 0; }
+.grade-weight-total-gap { color: var(--muted); font-weight: 400; }
 
 /* Professor's rules -- persistent reference panel next to the calculator
    (ProfessorsRules in GradeCalculatorPanel.tsx). Informational only: no
@@ -6704,9 +7130,8 @@ label.profile-form-check { display: flex; flex-direction: row; align-items: cent
 .grade-inline-finding-dismiss:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 .grade-evidence-note { color: var(--muted); font-size: var(--text-xs); }
-.grade-target-result { padding: var(--sp-3); border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
 
 @media (max-width: 640px) {
   .grade-entry-row { grid-template-columns: minmax(0, 1fr); gap: var(--sp-1); }
-  .grade-profile-row-button { grid-template-columns: minmax(0, 1fr); }
+  .grade-card-grid { grid-template-columns: minmax(0, 1fr); }
 }

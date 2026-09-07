@@ -3,9 +3,11 @@ import {
   PLANNED_COURSES_URL,
   PENDING_FINAL_GRADES_URL,
   GRADING_SCHEMA_URL,
+  CROSS_LISTINGS_URL,
   catalogSearchUrl,
   courseRecordUrl,
   finalizeCourseUrl,
+  normalizeCrossListingsPayload,
   normalizeGradingSchemaPayload,
   normalizePendingFinalGradesPayload,
   normalizePlannedPayload,
@@ -16,6 +18,7 @@ import {
 } from '../lib/termPlanning.mjs';
 import type {
   AddedCourseResult,
+  NormalizedCrossListings,
   NormalizedGradingSchema,
   NormalizedPendingFinalGrades,
   NormalizedPlanned,
@@ -90,6 +93,12 @@ export interface AddPlannedCourseInput {
   title?: string | null;
   credit_hours?: number | null;
   catalog_course_id?: string | null;
+  /**
+   * Set only by the year-view add action. Forces a planned_courses row even
+   * inside the 30-day activation window -- see PlannedCourseRequest.force_planned.
+   * The response is always `kind: 'planned'` when this is true.
+   */
+  force_planned?: boolean;
 }
 
 /**
@@ -171,6 +180,27 @@ export async function fetchGradingSchema(identity: AnalysisIdentity): Promise<No
     headers: auth(identity.accessToken ?? ''),
   });
   return normalizeGradingSchemaPayload(status, body);
+}
+
+/**
+ * code -> its cross-listed partner codes, for the caller's home institution.
+ * Fetched once and cached by the caller (same "load once" shape as
+ * fetchGradingSchema), not re-fetched per search keystroke.
+ *
+ * Demo identities get an empty map: the demo fixtures (data/students/*.json)
+ * were not built against real cross-listing data, so there is nothing
+ * correct to return -- matching fetchPendingFinalGrades's same reasoning for
+ * an empty demo stub rather than a fabricated one.
+ */
+export async function fetchCrossListings(identity: AnalysisIdentity): Promise<NormalizedCrossListings> {
+  if (identity.slug) {
+    return normalizeCrossListingsPayload(200, { cross_listings: {} });
+  }
+  const { status, body } = await send(CROSS_LISTINGS_URL, {
+    method: 'GET',
+    headers: auth(identity.accessToken ?? ''),
+  });
+  return normalizeCrossListingsPayload(status, body);
 }
 
 export async function fetchPendingFinalGrades(

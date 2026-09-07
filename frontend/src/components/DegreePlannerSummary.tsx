@@ -1,5 +1,5 @@
 import type { DegreeScheduleResponse } from '../api/degreeSchedule.mjs';
-import { adviserReviewCount, nextPlannedTerm } from '../lib/degreeSchedulePresentation.mjs';
+import { nextPlannedTerm } from '../lib/degreeSchedulePresentation.mjs';
 
 export function DegreePlannerSummary({
   institution,
@@ -13,7 +13,6 @@ export function DegreePlannerSummary({
   schedule: DegreeScheduleResponse | null;
 }) {
   const nextTerm = nextPlannedTerm(schedule);
-  const adviserCount = adviserReviewCount(schedule);
   const scheduled = schedule && 'status' in schedule && schedule.status === 'SCHEDULED';
 
   return (
@@ -34,10 +33,6 @@ export function DegreePlannerSummary({
         <div>
           <dt>Next planned term</dt>
           <dd>{nextTerm ? `${nextTerm.displayName} · ${nextTerm.totalLabel}` : 'Not available yet'}</dd>
-        </div>
-        <div>
-          <dt>Needs attention</dt>
-          <dd>{adviserCount === null ? 'Checking…' : `${adviserCount} requirement${adviserCount === 1 ? '' : 's'} need adviser review`}</dd>
         </div>
       </dl>
     </section>

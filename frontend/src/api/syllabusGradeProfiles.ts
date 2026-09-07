@@ -116,9 +116,14 @@ export interface SyllabusCutoffOverlapResolution {
 // apply_student_corrections merges these). Keys in use:
 //   `cutoff_overlap:<winner>,<loser>`   -> { answer, boundary, winner, loser }
 //   `claim_evidence:threshold:<letter>` -> { answer, letter }
+//   `claim_evidence:category:<name>`   -> { answer, category_name }
+// The category key is a separate namespace from the threshold one, not a
+// variant of it -- mirrors reconcile_grade_model's separate
+// confirmed_category_value_claims parameter (see corrections.py's
+// CONFIRM_CATEGORY_VALUE).
 export type SyllabusClarifyingAnswers = Record<
   string,
-  { answer: string; boundary?: number; winner?: string; loser?: string; letter?: string }
+  { answer: string; boundary?: number; winner?: string; loser?: string; letter?: string; category_name?: string }
 >;
 
 export interface SyllabusCategoryScore {
@@ -141,6 +146,20 @@ export interface SyllabusGradeState {
   assessment_scores: SyllabusAssessmentScore[];
 }
 
+// Trimmed per-component slice the list endpoint serializes for a course
+// card's ring: one segment per component, sized by weight_percent, filled by
+// effective_score. status null + effective_score null = ungraded (empty
+// segment); effective_score 0 with a status = a real scored zero. The fuller
+// SyllabusCalculationComponent (original_score, contribution, points) is only
+// on the /calculate response, not here.
+export interface SyllabusListCardComponent {
+  name: string;
+  source_type: 'category' | 'assessment';
+  weight_percent: number | null;
+  effective_score: number | null;
+  status: 'completed' | 'projected' | null;
+}
+
 export interface SyllabusProfileSummary {
   id: string;
   institution: string | null;
@@ -152,6 +171,12 @@ export interface SyllabusProfileSummary {
   updated_at: string;
   calculator_ready?: boolean;
   current_grade?: number | null;
+  current_letter_grade?: string | null;
+  components?: SyllabusListCardComponent[];
+  // Dug out of the confirmed/extracted grade model's course block by the list
+  // endpoint; null when the syllabus never named a title (or the model is
+  // malformed). See _course_title_from_revision.
+  course_title?: string | null;
 }
 
 export interface SyllabusProfileDetail {
@@ -167,6 +192,11 @@ export interface SyllabusProfileDetail {
   corrections: SyllabusCorrection[];
   clarifying_answers: SyllabusClarifyingAnswers;
   cutoff_overlap_resolution: SyllabusCutoffOverlapResolution;
+  // Names of confirmed_grade_model categories the backend proves decomposable
+  // (weighting._decomposition_children): their assessments can be scored
+  // individually. Empty when there is no confirmed model. Source of truth is
+  // the backend -- never re-derive the gate client-side.
+  decomposable_categories: string[];
   grade_state: SyllabusGradeState | null;
   grade_state_revision: number | null;
   possible_duplicate_profiles?: SyllabusProfileSummary[];
@@ -371,6 +401,10 @@ export async function calculateSyllabusGrade(
   );
 }
 
+// NOTE: currently unused. The Target Grade card that called this was removed
+// from GradeCalculatorPanel in favour of the live projection flow; the
+// `.../solve-target` endpoint and its engine path are still in place and this
+// wrapper is kept ready for a future caller.
 export async function solveSyllabusTarget(
   accessToken: string,
   profileId: string,

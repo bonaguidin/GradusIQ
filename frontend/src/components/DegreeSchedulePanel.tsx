@@ -4,6 +4,7 @@ import {
   fetchDegreeSchedule,
   isSkippedDegreeSchedule,
   updateDegreeScheduleChoices,
+  updateDegreeScheduleExclusions,
   type DegreeScheduleResponse,
   type RequirementCandidate,
 } from '../api/degreeSchedule.mjs';
@@ -15,7 +16,6 @@ import {
 import { CareerOptimizationPanel } from './CareerOptimizationPanel';
 import { DegreeScheduleTerms } from './DegreeScheduleTerms';
 import { DegreeScheduleYears } from './DegreeScheduleYears';
-import { DegreeScheduleDecisionSection } from './DegreeScheduleDecisionSection';
 import {
   choiceConflictMessage,
   removeRequirementSelection,
@@ -55,7 +55,7 @@ export function DegreeSchedulePanel({
   const { state, trigger, replaceResult } = useAnalysisRun(load);
   const [choiceMutation, setChoiceMutation] = useState<{
     requirementGroupId: string;
-    action: 'choose' | 'change' | 'clear';
+    action: 'choose' | 'change' | 'clear' | 'restore';
     candidateId?: string;
   } | null>(null);
   const [choiceMessage, setChoiceMessage] = useState<string | null>(null);
@@ -131,6 +131,31 @@ export function DegreeSchedulePanel({
     );
   }, [schedule, saveChoices]);
 
+  const restoreExcluded = useCallback((requirementGroupId: string) => {
+    if (!schedule || !accessToken || mutationInFlight.current) return;
+    mutationInFlight.current = true;
+    setChoiceMutation({ requirementGroupId, action: 'restore' });
+    setChoiceMessage(null);
+    void (async () => {
+      try {
+        await updateDegreeScheduleExclusions(accessToken, {
+          scheduleVersion: schedule.schedule_version,
+          excludedGroupIds: schedule.exclusion_state.excluded_group_ids.filter(
+            (id) => id !== requirementGroupId,
+          ),
+        });
+        await refreshSchedule();
+      } catch (error) {
+        const code = error instanceof DegreeScheduleChoiceError ? error.code : 'UNKNOWN_ERROR';
+        try { await refreshSchedule(); } catch { /* retain the current rendered schedule */ }
+        setChoiceMessage(choiceConflictMessage(code));
+      } finally {
+        mutationInFlight.current = false;
+        setChoiceMutation(null);
+      }
+    })();
+  }, [schedule, accessToken, refreshSchedule]);
+
   return (
     <Fragment>
       <section className="card degree-schedule-panel" aria-labelledby="degree-schedule-title">
@@ -181,8 +206,33 @@ export function DegreeSchedulePanel({
       {schedule?.status === 'SCHEDULED' && (
         <>
           <p className="degree-schedule-partial-note">
-            Your academic schedule is shown below. Requirements that still need adviser input are listed separately.
+            Your academic schedule is shown below. Choices you still need to make sit on the term they'd fall in.
           </p>
+
+          {choiceMessage && (
+            <div className="degree-schedule-choice-message" role="status" aria-live="polite">{choiceMessage}</div>
+          )}
+
+          {/* A saved course choice that no longer matches current requirements
+              is a plan-level problem, not a single term's -- it stays a
+              top-level alert above the year grid rather than moving onto a
+              term card (a stale selection can also point at a group with no
+              current feasible option, which would resolve to no term at all). */}
+          {schedule.selection_state?.status === 'RESELECTION_REQUIRED' && (
+            <div className="degree-schedule-reselection" role="alert">
+              <strong>Your saved course choice needs attention</strong>
+              <p>Your degree requirements changed since this choice was saved. Choose a current option on its term card, or clear the saved choice.</p>
+              <div className="degree-schedule-choice-actions">
+                {schedule.selection_state.selections.map((selection) => (
+                  <button type="button" className="btn btn-ghost btn-sm" disabled={choiceMutation !== null}
+                    aria-busy={choiceMutation?.requirementGroupId === selection.requirement_group_id}
+                    onClick={() => clearChoice(selection.requirement_group_id)} key={selection.requirement_group_id}>
+                    {choiceMutation?.requirementGroupId === selection.requirement_group_id ? 'Clearing…' : 'Clear saved choice'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Demo identities get the simpler term list: DegreeScheduleYears
               calls session-scoped /me/terms + /me/grading-schema routes
@@ -195,11 +245,18 @@ export function DegreeSchedulePanel({
               <DegreeScheduleTerms terms={schedule.terms} ariaLabel="Academic degree schedule" />
             )
           ) : (
-            <DegreeScheduleYears accessToken={accessToken ?? ''} scheduleTerms={schedule.terms} courses={courses} />
+            <DegreeScheduleYears
+              accessToken={accessToken ?? ''}
+              scheduleTerms={schedule.terms}
+              courses={courses}
+              decisions={schedule.decisions}
+              candidateSets={schedule.candidate_sets}
+              mutation={choiceMutation}
+              onChoose={chooseCandidate}
+              onClear={clearChoice}
+              onRestore={restoreExcluded}
+            />
           )}
-
-          <DegreeScheduleDecisionSection schedule={schedule} mutation={choiceMutation}
-            message={choiceMessage} interactive={!identity.slug} onChoose={chooseCandidate} onClear={clearChoice} />
         </>
       )}
       </section>

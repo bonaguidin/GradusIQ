@@ -34,10 +34,14 @@ from GradusIQ_career.course_discovery.requirement_candidates import (
     RequirementDecision,
     RequirementDecisionState,
 )
+from GradusIQ_career.course_discovery.catalog import LocalCatalogRepository
+from GradusIQ_career.course_discovery.models import CatalogInstitution
+from GradusIQ_career.course_discovery.requirement_satisfaction import evaluate_requirement_tree
 from GradusIQ_career.course_discovery.requirement_selection import RequirementSelectionResult
 from GradusIQ_career.course_discovery.requirement_selection import LockedSelectionFailureCode
+from GradusIQ_career.course_discovery.requirement_selection import structured_candidate_codes
 from GradusIQ_career.degree_schedule_choice_service import ChoiceWriteOutcome
-from GradusIQ_career.course_discovery.scheduler import ScheduleResult
+from GradusIQ_career.course_discovery.scheduler import ScheduledCourse, ScheduleResult, TermPlan
 from GradusIQ_career.degree_schedule_semantics import DegreeScheduleSemanticSnapshot
 from GradusIQ_career.planning import term_view as term_view_module
 from test_api_v2_me_routes import _canonical_profile
@@ -477,9 +481,25 @@ def test_stale_persisted_choice_falls_back_and_can_be_cleared(
     _freeze_today(monkeypatch, date(2026, 8, 19))
     service = FakeScheduleChoiceServiceClient(tables, student_id, program_id)
     monkeypatch.setattr(api, "build_service_client", lambda: service)
+    if mutation == "choice_no_longer_required":
+        # No group in this fixture auto-resolves to a sole feasible
+        # candidate on its own data (StructuredPrerequisite.restrictions no
+        # longer excludes a candidate purely for informational text -- see
+        # test_ethan_brooks_returns_full_schedule_result). A student-
+        # excluded group's decision is EXCLUDED, which is also
+        # != CHOICE_REQUIRED -- the same "this decision no longer needs the
+        # student's stale choice" shape _validate_locks gates on.
+        seed = client.get(URL, headers={"Authorization": "Bearer good-token"}).json()
+        excluded_group_id = next(
+            item for item in seed["decisions"] if item["state"] == "CHOICE_REQUIRED"
+        )["requirement_group_id"]
+        tables["degree_requirement_exclusions"] = [{
+            "student_id": student_id, "program_id": program_id,
+            "requirement_group_id": excluded_group_id,
+        }]
     unlocked = client.get(URL, headers={"Authorization": "Bearer good-token"}).json()
     if mutation == "choice_no_longer_required":
-        decision = next(item for item in unlocked["decisions"] if item["state"] == "AUTO_SELECTED")
+        decision = next(item for item in unlocked["decisions"] if item["state"] == "EXCLUDED")
     else:
         decision = next(item for item in unlocked["decisions"] if item["state"] == "CHOICE_REQUIRED")
     candidate_set = next(
@@ -797,8 +817,30 @@ def test_put_schedule_choices_is_model_free(client, monkeypatch):
 
 
 def test_put_choice_no_longer_required_and_structural_errors(client, monkeypatch):
-    _, service, schedule, _ = _choice_test_context(client, monkeypatch)
-    auto_decision = next(item for item in schedule["decisions"] if item["state"] == "AUTO_SELECTED")
+    # No group in this Ethan Brooks fixture auto-resolves to a sole
+    # feasible candidate on its own data any more (StructuredPrerequisite.
+    # restrictions no longer excludes a candidate purely for informational
+    # text -- see test_ethan_brooks_returns_full_schedule_result), so this
+    # test can't reuse _choice_test_context's baseline to find an
+    # AUTO_SELECTED decision. A student-excluded group's decision is
+    # EXCLUDED instead, which is also != CHOICE_REQUIRED -- the same
+    # "stale lock on a decision that no longer needs the student's choice"
+    # shape _validate_locks gates on.
+    tables, student_id, program_id = _schedule_tables()
+    _patch_client(monkeypatch, tables)
+    _freeze_today(monkeypatch, date(2026, 8, 19))
+    service = FakeScheduleChoiceServiceClient(tables, student_id, program_id)
+    monkeypatch.setattr(api, "build_service_client", lambda: service)
+    seed = client.get(URL, headers={"Authorization": "Bearer good-token"}).json()
+    excluded_group_id = next(
+        item for item in seed["decisions"] if item["state"] == "CHOICE_REQUIRED"
+    )["requirement_group_id"]
+    tables["degree_requirement_exclusions"] = [{
+        "student_id": student_id, "program_id": program_id,
+        "requirement_group_id": excluded_group_id,
+    }]
+    schedule = client.get(URL, headers={"Authorization": "Bearer good-token"}).json()
+    auto_decision = next(item for item in schedule["decisions"] if item["state"] == "EXCLUDED")
     candidate_set = next(
         item for item in schedule["candidate_sets"]
         if item["requirement_group_id"] == auto_decision["requirement_group_id"]
@@ -877,11 +919,25 @@ def test_ethan_brooks_returns_full_schedule_result(client, monkeypatch):
 
     decisions = {item["requirement_name"]: item for item in body["decisions"]}
     candidate_sets = {item["requirement_name"]: item for item in body["candidate_sets"]}
+    # Engineering Leadership no longer collapses to a single auto-picked
+    # candidate. CS 5312's "Prerequisites: Junior standing" -- and every
+    # other candidate's non-course prerequisite text in this set -- is
+    # StructuredPrerequisite.restrictions, which is informational by its own
+    # model contract ("classification... campus notes, and similar...
+    # not enforced by the scheduler", models.py:261-269) and must not
+    # exclude a candidate. With that no longer gating, 6 combinations of
+    # {CEE 2302, CEE 3302, CS 3377, OREM 3308} are genuinely feasible, so
+    # the student has a real choice instead of one silently auto-selected
+    # because its siblings carried an unenforced restriction note.
     leadership_decision = decisions["Engineering Leadership (6 Credit Hours)"]
-    assert leadership_decision["state"] == "AUTO_SELECTED"
-    assert leadership_decision["selected_candidate_id"] == leadership_decision["feasible_candidate_ids"][0]
-    assert len(candidate_sets["Engineering Leadership (6 Credit Hours)"]["feasible_candidates"]) == 1
-    assert len(candidate_sets["Engineering Leadership (6 Credit Hours)"]["excluded_candidates"]) == 7
+    assert leadership_decision["state"] == "CHOICE_REQUIRED"
+    assert leadership_decision["selected_candidate_id"] is None
+    assert len(candidate_sets["Engineering Leadership (6 Credit Hours)"]["feasible_candidates"]) == 6
+    assert len(candidate_sets["Engineering Leadership (6 Credit Hours)"]["excluded_candidates"]) == 2
+    assert all(
+        candidate["exclusion_reasons"] == ["UNRESOLVED_COURSE"]
+        for candidate in candidate_sets["Engineering Leadership (6 Credit Hours)"]["excluded_candidates"]
+    )
 
     statistics_decision = decisions["Statistical Methods"]
     assert statistics_decision["state"] == "CHOICE_REQUIRED"
@@ -899,36 +955,53 @@ def test_ethan_brooks_returns_full_schedule_result(client, monkeypatch):
     two_courses_decision = decisions["Two Courses"]
     assert two_courses_decision["state"] == "CHOICE_REQUIRED"
     assert two_courses_decision["selected_candidate_id"] is None
-    assert len(candidate_sets["Two Courses"]["feasible_candidates"]) == 11
-    assert len(candidate_sets["Two Courses"]["excluded_candidates"]) == 5
+    assert len(candidate_sets["Two Courses"]["feasible_candidates"]) == 13
+    assert len(candidate_sets["Two Courses"]["excluded_candidates"]) == 3
     assert any(
         len(candidate["course_codes"]) == 4
         for candidate in candidate_sets["Two Courses"]["feasible_candidates"]
     )
-    leadership_candidate = candidate_sets["Engineering Leadership (6 Credit Hours)"]["feasible_candidates"][0]
+    # CHEM 1303's "C- or higher in CHEM 1302 ... or a passing grade on the
+    # Chemistry Placement Exam" mixes a real course code with an
+    # unverifiable alternative path -- exactly the CS-1341-style shape
+    # StructuredPrerequisite.needs_review's own contract describes
+    # (models.py:270-280). It genuinely may hide an unresolved course
+    # dependency, so it stays excluded even under the narrowed gate.
+    needs_review_candidate = next(
+        candidate for candidate in candidate_sets["Two Courses"]["excluded_candidates"]
+        if set(candidate["course_codes"]) == {"CHEM 1113", "CHEM 1114", "CHEM 1303", "CHEM 1304"}
+    )
+    assert needs_review_candidate["exclusion_reasons"] == ["PREREQUISITE_NEEDS_REVIEW"]
+    leadership_candidate = next(
+        candidate for candidate in candidate_sets["Engineering Leadership (6 Credit Hours)"]["feasible_candidates"]
+        if set(candidate["course_codes"]) == {"CEE 2302", "CS 3377"}
+    )
     assert leadership_candidate["candidate_courses"] == [
         {"course_code": "CEE 2302", "title": "Authentic Leadership", "credits": 3.0},
         {"course_code": "CS 3377", "title": "Ethical Issues in Computing", "credits": 3.0},
     ]
     assert leadership_candidate["additional_credits"] == 6.0
 
+    # Engineering Leadership now joins the unscheduled list too: with no
+    # structured group AUTO_SELECTED, nothing beyond the base no-choice
+    # courses is merged into the deterministic schedule.
     assert {u["name"] for u in body["unscheduled"]} == {
         "Advanced/Domain Specific Use/Design of AI",
         "Experiential Learning (1-3 Credit Hours)",
         "Statistical Methods",
         "Two Courses",
+        "Engineering Leadership (6 Credit Hours)",
         "Technical Electives (9 Credit Hours)",
         "Advanced Major Electives (3-5 Credit Hours)",
     }
-    assert len(body["unscheduled"]) == 6
+    assert len(body["unscheduled"]) == 7
 
     scheduled_codes = {course["course_code"] for term in body["terms"] for course in term["courses"]}
     schedule_fixture = json.loads(SCHEDULE_FIXTURE_PATH.read_text())
     expected_codes = {row["course_code"] for row in schedule_fixture["courses"]}
-    selected_codes = {"CEE 2302", "CS 3377"}
-    assert scheduled_codes == expected_codes | selected_codes
-    assert len(scheduled_codes) == 15
-    assert {"CEE 2302", "CS 3377"} <= scheduled_codes
+    assert scheduled_codes == expected_codes
+    assert len(scheduled_codes) == 13
+    assert not ({"CEE 2302", "CS 3377"} & scheduled_codes)
     assert not ({"CS 4340", "STAT 4340", "OREM 3340"} & scheduled_codes)
 
     # Structured selection consumes the existing slack without extending
@@ -970,13 +1043,20 @@ def test_ethan_technical_elective_pool_is_read_only_and_catalog_grounded(client,
     assert all(int(item["course_code"].split()[1]) >= 3000 for item in body["candidates"])
     assert all(item["credit_max"] > 0 for item in body["candidates"])
     assert len(body["limitations"]) == 3
+    # technical_elective_candidates.py's own restriction/needs_review gate
+    # (unrelated to select_structured_requirements' gate fixed above) is
+    # unchanged, so those counts hold. excluded_already_used and
+    # candidate_count shift by one: Engineering Leadership no longer
+    # AUTO_SELECTs {CEE 2302, CS 3377}, so CS 3377 (CS 3000+) is no longer
+    # claimed by another requirement and is a genuine technical-elective
+    # candidate again.
     assert body["stats"] == {
         "catalog_courses_considered": 3249,
         "cs_3000_plus_courses": 87,
-        "excluded_already_used": 8,
+        "excluded_already_used": 7,
         "excluded_zero_credit": 1,
         "excluded_restriction_or_review": 46,
-        "candidate_count": 32,
+        "candidate_count": 33,
     }
     # SMU matches exactly one freeform group -- the new multi-group support
     # for TAMU must not surface a phantom "also satisfies" entry for SMU.
@@ -984,10 +1064,13 @@ def test_ethan_technical_elective_pool_is_read_only_and_catalog_grounded(client,
 
     after = client.get(URL, headers={"Authorization": "Bearer good-token"}).json()
     assert after == before
-    assert sum(len(term["courses"]) for term in after["terms"]) == 15
-    assert sum(term["total_credit_hours"] for term in after["terms"]) == 39
+    # CEE 2302/CS 3377 are no longer merged into the deterministic schedule
+    # (Engineering Leadership is CHOICE_REQUIRED, not AUTO_SELECTED) --
+    # 15 courses/39 credits drops to the 13 base no-choice courses/33 credits.
+    assert sum(len(term["courses"]) for term in after["terms"]) == 13
+    assert sum(term["total_credit_hours"] for term in after["terms"]) == 33
     assert len(after["terms"]) == 4
-    assert len(after["unscheduled"]) == 6
+    assert len(after["unscheduled"]) == 7
 
 
 def test_technical_elective_endpoint_is_model_free(client, monkeypatch):
@@ -1000,7 +1083,10 @@ def test_technical_elective_endpoint_is_model_free(client, monkeypatch):
     )
     response = client.get(TECHNICAL_ELECTIVES_URL, headers={"Authorization": "Bearer good-token"})
     assert response.status_code == 200
-    assert response.json()["stats"]["candidate_count"] == 32
+    # 33, not 32: see test_ethan_technical_elective_pool_is_read_only_and_
+    # catalog_grounded -- Engineering Leadership no longer AUTO_SELECTs
+    # CS 3377, so it's free to appear as a technical-elective candidate too.
+    assert response.json()["stats"]["candidate_count"] == 33
 
 
 def test_missing_technical_elective_requirement_skips_safely(client, monkeypatch):
@@ -1158,6 +1244,262 @@ def test_schedule_payload_serializes_tamu_choice_and_zero_feasible_evidence():
     json.dumps(payload)
 
 
+def test_schedule_payload_enriches_candidate_courses_under_a_deeply_nested_tamu_leaf():
+    """Regression for the audit finding: on TAMU Computer Engineering the
+    course-bearing requirement groups sit three levels deep (compound_all
+    year -> compound_all season -> enumerated_all leaf). _build_academic_
+    schedule_state seeds its display-enrichment catalog off
+    structured_candidate_codes(); when that walk stopped at roots + direct
+    children it returned nothing for such a program, so every decision
+    option's courses (CSCE 221 / ECEN 214 / ECEN 303 / MATH 308) rendered
+    with title=None and credits=None even though the local catalog has full
+    data for all of them. This drives the real requirements tree shape and
+    the real LocalCatalogRepository through the same relevant_codes ->
+    catalog_by_code -> _degree_schedule_payload chain api.py uses.
+    """
+    def _group(rule_id, group_type, *, parent=None, n=None):
+        return {
+            "id": rule_id, "coursedog_rule_id": rule_id, "parent_group_id": parent,
+            "name": rule_id, "group_type": group_type, "n_required": n,
+            "credit_hours_required": None, "notes_html": None,
+            "requires_manual_definition": False,
+        }
+
+    def _option(option_id, group_id, index, logic="and"):
+        return {"id": option_id, "requirement_group_id": group_id, "option_index": index, "logic": logic}
+
+    def _course(option_id, code):
+        return {
+            "requirement_group_option_id": option_id,
+            "coursedog_group_id": None, "unresolved_course_ref": None, "course_code": code,
+        }
+
+    leaf = "Second Year — Spring — Required Courses"
+    raw_groups = [
+        _group("Second Year", "compound_all"),
+        _group("Second Year — Spring", "compound_all", parent="Second Year"),
+        _group(leaf, "enumerated_all", parent="Second Year — Spring"),
+    ]
+    options = [
+        _option("o-0", leaf, 0), _option("o-1", leaf, 1), _option("o-2", leaf, 2, "or"),
+        _option("o-3", leaf, 3),
+    ]
+    option_courses = [
+        _course("o-0", "CSCE 221"), _course("o-1", "ECEN 214"),
+        _course("o-2", "ECEN 303"), _course("o-2", "STAT 211"), _course("o-3", "MATH 308"),
+    ]
+    targets = ["CSCE 221", "ECEN 214", "ECEN 303", "MATH 308"]
+    raw_catalog_by_code = {c: [c] for c in ("CSCE 221", "ECEN 214", "ECEN 303", "STAT 211", "MATH 308")}
+
+    evaluated = evaluate_requirement_tree(
+        raw_groups, options, option_courses, [], {}, raw_catalog_by_code
+    )
+
+    # Exactly api.py:_build_academic_schedule_state -> relevant_codes -> catalog_by_code.
+    repo = LocalCatalogRepository()
+    candidate_codes = structured_candidate_codes(
+        evaluated, raw_groups, options, option_courses, {}, raw_catalog_by_code
+    )
+    assert set(targets).issubset(candidate_codes)
+    catalog_by_code = {
+        code: record
+        for code in sorted(candidate_codes)
+        if (record := repo.get(CatalogInstitution.TAMU, code)) is not None
+    }
+
+    def _cand(candidate_id, codes):
+        return RequirementCandidate(
+            candidate_id=candidate_id, requirement_group_id=leaf, requirement_name=leaf,
+            course_codes=codes,
+            existing_contribution=0, additional_course_count=len(codes), additional_credits=14,
+            academic_feasibility=AcademicFeasibility.FEASIBLE, completion_term_index=0,
+        )
+
+    # The `or` option (ECEN 303 / STAT 211) is what makes this a real choice.
+    candidate_sets = [
+        RequirementCandidateSet(
+            requirement_group_id=leaf, requirement_name=leaf,
+            feasible_candidates=[
+                _cand("cand-a", targets),
+                _cand("cand-b", ["CSCE 221", "ECEN 214", "STAT 211", "MATH 308"]),
+            ],
+        ),
+    ]
+    decisions = [RequirementDecision(
+        requirement_group_id=leaf, requirement_name=leaf,
+        state=RequirementDecisionState.CHOICE_REQUIRED,
+        feasible_candidate_ids=["cand-a", "cand-b"],
+    )]
+    state = SimpleNamespace(
+        student_id="s", program_id="p", starting_year=2026, starting_season="Fall", max_terms=4,
+        academic_schedule=ScheduleResult(student_id="s", program_id="p"),
+        academic_selection=RequirementSelectionResult(
+            candidate_sets=candidate_sets, decisions=decisions,
+        ),
+        catalog_by_code=catalog_by_code,
+        raw=SimpleNamespace(
+            groups=[], options=[], option_courses=[], course_records=[],
+            catalog_credit_by_code={c: float(catalog_by_code[c].credit_min) for c in targets},
+        ),
+        prerequisites={code: StructuredPrerequisite() for code in targets},
+        semantic_snapshot=DegreeScheduleSemanticSnapshot(
+            planner_contract_version="1",
+            local_catalog_fingerprint="sha256:" + "a" * 64,
+            reconstruction_date=date(2026, 8, 19),
+        ),
+        active_selections=(),
+    )
+
+    payload = api._degree_schedule_payload(state)
+    enriched = payload["candidate_sets"][0]["feasible_candidates"][0]["candidate_courses"]
+    assert enriched == [
+        {"course_code": "CSCE 221", "title": "Data Structures and Algorithms", "credits": 4.0},
+        {"course_code": "ECEN 214", "title": "Electrical Circuit Theory", "credits": 4.0},
+        {"course_code": "ECEN 303", "title": "Random Signals and Systems", "credits": 3.0},
+        {"course_code": "MATH 308", "title": "Differential Equations", "credits": 3.0},
+    ]
+    # No entry silently degraded to the "code not in catalog" shape.
+    assert all(item["title"] is not None and item["credits"] for item in enriched)
+    json.dumps(payload)
+
+
+def test_schedule_payload_resolves_decision_term_keys_per_state():
+    """Phase 3: each decision carries the term card it should render on.
+
+    LOCKED -> the term its course actually landed in; CHOICE_REQUIRED ->
+    min(completion_term_index) over feasible candidates, mapped through the
+    scheduler's own Fall<->Spring cadence; EXCLUDED -> the excluded
+    candidate's completion_term_index (None when it never joined a feasible
+    combination); AUTO_SELECTED / ADVISER_REVIEW / DATA_UNRESOLVED -> None.
+    """
+
+    def feasible(candidate_id, requirement_id, code, term_index):
+        return RequirementCandidate(
+            candidate_id=candidate_id, requirement_group_id=requirement_id,
+            requirement_name=requirement_id, course_codes=[code],
+            existing_contribution=0, additional_course_count=1, additional_credits=3,
+            academic_feasibility=AcademicFeasibility.FEASIBLE,
+            completion_term_index=term_index,
+        )
+
+    def excluded(candidate_id, requirement_id, code, reason):
+        return RequirementCandidate(
+            candidate_id=candidate_id, requirement_group_id=requirement_id,
+            requirement_name=requirement_id, course_codes=[code],
+            existing_contribution=0, additional_course_count=1, additional_credits=3,
+            academic_feasibility=AcademicFeasibility.EXCLUDED,
+            completion_term_index=None, exclusion_reasons=[reason],
+        )
+
+    candidate_sets = [
+        RequirementCandidateSet(
+            requirement_group_id="locked", requirement_name="American History",
+            feasible_candidates=[
+                feasible("hist-1301", "locked", "HIST 1301", 0),
+                feasible("hist-1302", "locked", "HIST 1302", 1),
+            ],
+        ),
+        RequirementCandidateSet(
+            requirement_group_id="choice", requirement_name="Statistical Methods",
+            feasible_candidates=[
+                feasible("stat-early", "choice", "STAT 3011", 1),
+                feasible("stat-late", "choice", "STAT 4011", 3),
+            ],
+        ),
+        RequirementCandidateSet(
+            requirement_group_id="excluded", requirement_name="Technical Elective",
+            feasible_candidates=[feasible("tech-1", "excluded", "CSCE 4901", 2)],
+        ),
+        RequirementCandidateSet(
+            requirement_group_id="excluded-noterm", requirement_name="Mystery Elective",
+            excluded_candidates=[excluded(
+                "myst-1", "excluded-noterm", "MYST 1000",
+                CandidateExclusionReason.UNSCHEDULABLE,
+            )],
+        ),
+        RequirementCandidateSet(
+            requirement_group_id="review", requirement_name="Restricted Elective",
+            excluded_candidates=[excluded(
+                "rev-1", "review", "REV 1000",
+                CandidateExclusionReason.RESTRICTION_REQUIRES_REVIEW,
+            )],
+        ),
+    ]
+    decisions = [
+        RequirementDecision(
+            requirement_group_id="locked", requirement_name="American History",
+            state=RequirementDecisionState.LOCKED,
+            feasible_candidate_ids=["hist-1301", "hist-1302"],
+            selected_candidate_id="hist-1301",
+        ),
+        RequirementDecision(
+            requirement_group_id="choice", requirement_name="Statistical Methods",
+            state=RequirementDecisionState.CHOICE_REQUIRED,
+            feasible_candidate_ids=["stat-early", "stat-late"],
+        ),
+        RequirementDecision(
+            requirement_group_id="excluded", requirement_name="Technical Elective",
+            state=RequirementDecisionState.EXCLUDED,
+            excluded_candidate_ids=["tech-1"],
+        ),
+        RequirementDecision(
+            requirement_group_id="excluded-noterm", requirement_name="Mystery Elective",
+            state=RequirementDecisionState.EXCLUDED,
+            excluded_candidate_ids=["myst-1"],
+        ),
+        RequirementDecision(
+            requirement_group_id="review", requirement_name="Restricted Elective",
+            state=RequirementDecisionState.ADVISER_REVIEW,
+            excluded_candidate_ids=["rev-1"],
+        ),
+    ]
+    schedule = ScheduleResult(
+        student_id="s", program_id="p",
+        terms=[
+            TermPlan(
+                term_key="2026-Fall", total_credit_hours=3,
+                courses=[ScheduledCourse(
+                    course_code="HIST 1301", credit_hours=3, requirement_group_id="locked",
+                )],
+            ),
+            TermPlan(term_key="2027-Spring", total_credit_hours=0, courses=[]),
+        ],
+    )
+    state = SimpleNamespace(
+        student_id="s", program_id="p", starting_year=2026, starting_season="Fall",
+        max_terms=8, academic_schedule=schedule,
+        academic_selection=RequirementSelectionResult(
+            candidate_sets=candidate_sets, decisions=decisions,
+        ),
+        catalog_by_code={}, raw=SimpleNamespace(
+            groups=[], options=[], option_courses=[], course_records=[],
+            catalog_credit_by_code={},
+        ),
+        prerequisites={},
+        semantic_snapshot=DegreeScheduleSemanticSnapshot(
+            planner_contract_version="1",
+            local_catalog_fingerprint="sha256:" + "a" * 64,
+            reconstruction_date=date(2026, 8, 19),
+        ),
+        active_selections=(),
+    )
+
+    payload = api._degree_schedule_payload(state)
+    resolved = {item["requirement_group_id"]: item["resolved_term_key"] for item in payload["decisions"]}
+
+    # LOCKED joins to the term HIST 1301 actually landed in.
+    assert resolved["locked"] == "2026-Fall"
+    # CHOICE_REQUIRED -> min index 1 from start (2026-Fall) -> one long term on.
+    assert resolved["choice"] == "2027-Spring"
+    # EXCLUDED -> the excluded candidate's index 2 -> two long terms on.
+    assert resolved["excluded"] == "2027-Fall"
+    # EXCLUDED with no resolvable index stays None (frontend drops it).
+    assert resolved["excluded-noterm"] is None
+    # ADVISER_REVIEW / DATA_UNRESOLVED carry no term signal.
+    assert resolved["review"] is None
+    json.dumps(payload)
+
+
 def _trusted_need():
     return CareerSkillNeed(
         skill="Software design", category="skills",
@@ -1212,9 +1554,13 @@ def test_career_optimize_returns_typed_preview_and_cache_hit(client, monkeypatch
     assert body["fingerprint"] and body["ranking_prompt_version"] == "1"
     assert len(body["academic_schedule"]["terms"]) == 4
     assert len(body["optimized_schedule"]["terms"]) == 4
-    assert len(body["academic_schedule"]["unscheduled"]) == 6
+    # Engineering Leadership joins the unscheduled/ranked set too: it no
+    # longer AUTO_SELECTs a sole feasible candidate (see
+    # test_ethan_brooks_returns_full_schedule_result), so it now also needs
+    # a ranking call like the other 4 structured groups.
+    assert len(body["academic_schedule"]["unscheduled"]) == 7
     assert len(body["optimized_schedule"]["unscheduled"]) == 2
-    assert len(body["requirement_rankings"]) == len(calls) == 4
+    assert len(body["requirement_rankings"]) == len(calls) == 5
     initial_calls = len(calls)
 
     second = client.post(
@@ -1263,7 +1609,13 @@ def test_career_optimize_honors_persisted_lock_over_provider_preference(
     assert set(locked["course_codes"]) <= optimized_codes
     assert not set(provider_preferred["course_codes"]) <= optimized_codes
     assert locked["requirement_group_id"] not in calls
-    assert len(body["requirement_rankings"]) == len(calls) == 3
+    # 4, not 3: Statistical Methods is locked (excluded from ranking) and
+    # Engineering Leadership now also needs a ranking call -- it no longer
+    # AUTO_SELECTs a sole feasible candidate (see
+    # test_ethan_brooks_returns_full_schedule_result) -- so the remaining
+    # 4 of 5 structured groups (AI, Experiential Learning, Two Courses,
+    # Engineering Leadership) are ranked, not 3.
+    assert len(body["requirement_rankings"]) == len(calls) == 4
 
     forced = client.post(
         OPTIMIZE_URL, json={"force_refresh": True},
@@ -1424,10 +1776,14 @@ def test_career_optimize_force_refresh_and_full_failure_preserve_ethan_baseline(
     assert body["optimized_schedule"] == body["academic_schedule"]
     schedule = body["academic_schedule"]
     courses = [course for term in schedule["terms"] for course in term["courses"]]
-    assert len(courses) == 15
-    assert sum(course["credit_hours"] for course in courses) == 39
+    # 13 courses/33 credits/7 unscheduled, not 15/39/6: no structured group
+    # is AUTO_SELECTED any more (see test_ethan_brooks_returns_full_schedule_
+    # result), so only the base no-choice courses populate the baseline
+    # academic schedule and Engineering Leadership joins unscheduled too.
+    assert len(courses) == 13
+    assert sum(course["credit_hours"] for course in courses) == 33
     assert len(schedule["terms"]) == 4
-    assert len(schedule["unscheduled"]) == 6
+    assert len(schedule["unscheduled"]) == 7
 
 
 @pytest.mark.parametrize("roles,body,summary_fragment", [
@@ -1483,6 +1839,97 @@ def test_no_expected_graduation_returns_200_skipped(client, monkeypatch):
     assert body["feature"] == "SCHEDULE"
     assert body["status"] == "skipped"
     assert body["missing_fields"][0]["path"] == "students.expected_graduation"
+
+
+class _MissingRelationError(Exception):
+    """Shaped like a PostgREST schema-cache miss for a table that isn't there."""
+
+    def __init__(self):
+        super().__init__(
+            "{'message': \"Could not find the table "
+            "'public.degree_requirement_exclusions' in the schema cache\", "
+            "'code': 'PGRST205'}"
+        )
+        self.code = "PGRST205"
+        self.message = (
+            "Could not find the table 'public.degree_requirement_exclusions' "
+            "in the schema cache"
+        )
+
+
+class _ExclusionsTableMissingClient(FakeClient):
+    """FakeClient that raises on any query against degree_requirement_exclusions,
+    reproducing the state of a database the exclusions migration hasn't reached."""
+
+    def table(self, name):
+        if name == "degree_requirement_exclusions":
+            class _Raising:
+                def select(self, *a, **k):
+                    return self
+
+                def eq(self, *a, **k):
+                    return self
+
+                def execute(self):
+                    raise _MissingRelationError()
+
+            return _Raising()
+        return super().table(name)
+
+
+def test_load_requirement_exclusion_group_ids_degrades_when_table_missing():
+    from GradusIQ_career.planning.requirement_exclusions import (
+        load_requirement_exclusion_group_ids,
+    )
+
+    client = _ExclusionsTableMissingClient({})
+    assert load_requirement_exclusion_group_ids(client, "stu", "prog") == ()
+
+
+def test_load_requirement_exclusion_group_ids_reraises_unrelated_error():
+    from GradusIQ_career.planning.requirement_exclusions import (
+        load_requirement_exclusion_group_ids,
+    )
+
+    class _AuthError(Exception):
+        pass
+
+    class _AuthFailingClient(FakeClient):
+        def table(self, name):
+            class _Raising:
+                def select(self, *a, **k):
+                    return self
+
+                def eq(self, *a, **k):
+                    return self
+
+                def execute(self):
+                    raise _AuthError("JWT expired")
+
+            return _Raising()
+
+    with pytest.raises(_AuthError):
+        load_requirement_exclusion_group_ids(_AuthFailingClient({}), "stu", "prog")
+
+
+# Defense-in-depth: the exclusions migration can be written, tested, and
+# shipped in code while its schema dependency stays unapplied (this exact
+# failure mode took every schedule route to a 502 on 2026-09-02). A missing
+# degree_requirement_exclusions relation must degrade to "no exclusions", not
+# propagate an uncaught error out of _reconstruct_academic_schedule.
+def test_missing_exclusions_table_still_returns_200_schedule(client, monkeypatch):
+    tables, student_id, _program_id = _schedule_tables()
+    fake = _ExclusionsTableMissingClient(tables)
+    monkeypatch.setattr(api, "build_client_for_token", lambda token: fake)
+    _freeze_today(monkeypatch, date(2026, 8, 19))
+
+    response = client.get(URL, headers={"Authorization": "Bearer good-token"})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "SCHEDULED"
+    assert body["student_id"] == student_id
+    # active_exclusions treated as empty -> nothing set aside in the payload
+    assert body["exclusion_state"]["excluded_group_ids"] == []
 
 
 # 4. Over-constrained: an expected_graduation in the immediate past relative

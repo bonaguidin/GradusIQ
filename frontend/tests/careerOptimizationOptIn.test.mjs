@@ -22,7 +22,9 @@ test('loading is localized while the parent academic schedule stays rendered', a
   assert.match(panel, /state\.phase === 'loading'/)
   assert.match(panel, /Finding career-aligned choices/)
   assert.match(panel, /disabled=\{!accessToken \|\| state\.phase === 'loading'\}/)
-  assert.match(schedule, /<DegreeScheduleYears accessToken=\{accessToken \?\? ''\} scheduleTerms=\{schedule\.terms\}/)
+  assert.match(schedule, /<DegreeScheduleYears\b/)
+  assert.match(schedule, /accessToken=\{accessToken \?\? ''\}/)
+  assert.match(schedule, /scheduleTerms=\{schedule\.terms\}/)
   assert.match(schedule, /<CareerOptimizationPanel/)
 })
 

@@ -89,6 +89,7 @@ export function planningRoutes({
   terms = DEFAULT_TERMS,
   catalog = DEFAULT_CATALOG,
   gradingSchema = DEFAULT_GRADING_SCHEMA,
+  crossListings = {},
   upcomingTermKey = '2026-Fall',
   state = { planned: [] },
 } = {}) {
@@ -171,6 +172,11 @@ export function planningRoutes({
 
       if (path === '/api/v2/student/me/grading-schema' && method === 'GET') {
         respond(response, gradingSchema)
+        return true
+      }
+
+      if (path === '/api/v2/student/me/catalog/cross-listings' && method === 'GET') {
+        respond(response, { cross_listings: crossListings })
         return true
       }
 

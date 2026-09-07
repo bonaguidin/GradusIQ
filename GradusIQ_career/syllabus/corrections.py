@@ -56,6 +56,7 @@ class CorrectionOperation(str, Enum):
     SET_MAXIMUM = "set_maximum"
     RESOLVE_CUTOFF_OVERLAP = "resolve_cutoff_overlap"
     CONFIRM_THRESHOLD_VALUE = "confirm_threshold_value"
+    CONFIRM_CATEGORY_VALUE = "confirm_category_value"
     SET_SOURCE = "set_source"
     SET_TARGET = "set_target"
     SET_CONDITION = "set_condition"
@@ -153,6 +154,21 @@ def _find_by_name(items: list, name: str | None, *, kind: str):
 def _apply_category_correction(model: GradeModel, correction: GradeModelCorrection) -> GradeModel:
     index, category = _find_by_name(model.categories, correction.category_name, kind="category")
     op = correction.operation
+    if op == CorrectionOperation.CONFIRM_CATEGORY_VALUE:
+        # "Yes, that value is what the syllabus says": the student affirms an
+        # extracted category weight reconciliation could not deterministically
+        # verify against its cited evidence text. A NO-OP on the GradeModel --
+        # same shape as CONFIRM_THRESHOLD_VALUE (corrections.py's threshold
+        # equivalent): the category and its verbatim evidence are left
+        # exactly as extracted. _find_by_name above already validated the
+        # category exists, so there is nothing further to check here -- the
+        # affirmation's only effect is downstream, where reconcile_grade_
+        # model suppresses claim_evidence_consistency_unverifiable for this
+        # category via its confirmed_category_value_claims argument. Unlike
+        # CONFIRM_THRESHOLD_VALUE, this does NOT also suppress a
+        # claim_evidence_value_mismatch -- see
+        # reconciliation._check_category_weight_consistency for why.
+        return model
     if op == CorrectionOperation.RENAME:
         updated = _replace_validated(category, name=_require_str(correction.value, field="rename"))
     elif op == CorrectionOperation.SET_WEIGHT:

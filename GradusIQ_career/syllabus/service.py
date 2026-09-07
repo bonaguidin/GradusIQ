@@ -175,20 +175,28 @@ def apply_student_corrections(
 
     candidate = apply_grade_model_corrections(extracted_model, corrections)
 
-    # RESOLVE_CUTOFF_OVERLAP and CONFIRM_THRESHOLD_VALUE are both no-ops on
-    # the model; their effect is here -- on re-reconciliation the confirmed
-    # cutoff pairs suppress the overlapping_grade_thresholds ERROR (only for
-    # pairs reconcile_grade_model itself re-derives as cleanly resolvable),
-    # and the confirmed value-claim letters suppress that threshold's
+    # RESOLVE_CUTOFF_OVERLAP, CONFIRM_THRESHOLD_VALUE, and CONFIRM_CATEGORY_
+    # VALUE are all no-ops on the model; their effect is here -- on
+    # re-reconciliation the confirmed cutoff pairs suppress the
+    # overlapping_grade_thresholds ERROR (only for pairs reconcile_grade_
+    # model itself re-derives as cleanly resolvable), the confirmed
+    # threshold value-claim letters suppress that threshold's
     # claim_evidence_consistency_unverifiable / claim_evidence_value_mismatch
-    # finding. Each is logged as a keyed clarifying answer.
+    # finding, and the confirmed category value-claim names suppress
+    # claim_evidence_consistency_unverifiable for a category weight --
+    # narrower than the threshold case, since a category affirmation never
+    # suppresses a claim_evidence_value_mismatch (see reconciliation.
+    # _check_category_weight_consistency). Each is logged as a keyed
+    # clarifying answer.
     resolved_cutoffs = _confirmed_cutoff_resolutions(extracted_model, corrections)
     confirmed_value_claim_letters = _confirmed_value_claim_letters(corrections)
+    confirmed_category_value_claim_names = _confirmed_category_value_claim_names(corrections)
     candidate_reconciliation = reconcile_grade_model(
         candidate,
         content,
         confirmed_cutoff_pairs={frozenset((r.winner, r.loser)) for r in resolved_cutoffs},
         confirmed_value_claims=confirmed_value_claim_letters,
+        confirmed_category_value_claims=confirmed_category_value_claim_names,
     )
 
     clarifying_answers = dict(revision.get("clarifying_answers") or {})
@@ -203,6 +211,11 @@ def apply_student_corrections(
         clarifying_answers[f"claim_evidence:threshold:{letter}"] = {
             "answer": "confirm_value",
             "letter": letter,
+        }
+    for name in sorted(confirmed_category_value_claim_names):
+        clarifying_answers[f"claim_evidence:category:{name}"] = {
+            "answer": "confirm_value",
+            "category_name": name,
         }
 
     updated_revision = store.update_revision_confirmation(
@@ -251,6 +264,27 @@ def _confirmed_value_claim_letters(corrections) -> set[str]:
         if c.target_type == CorrectionTargetType.THRESHOLD
         and c.operation == CorrectionOperation.CONFIRM_THRESHOLD_VALUE
         and c.threshold_letter is not None
+    }
+
+
+def _confirmed_category_value_claim_names(corrections) -> set[str]:
+    """Normalized category names the CONFIRM_CATEGORY_VALUE corrections in
+    this batch affirm -- the category equivalent of
+    _confirmed_value_claim_letters. Normalization matches
+    reconciliation.py's _normalize_name (lowercase, collapsed whitespace),
+    not a bare .strip().lower(), since category names are free-text and can
+    contain multiple words (unlike a single-letter threshold). Kept as its
+    own set, never merged into confirmed_value_claim_letters -- category
+    names and threshold letters are different identifier spaces threaded
+    through reconcile_grade_model's separate confirmed_category_value_claims
+    parameter.
+    """
+    return {
+        " ".join(c.category_name.strip().lower().split())
+        for c in corrections
+        if c.target_type == CorrectionTargetType.CATEGORY
+        and c.operation == CorrectionOperation.CONFIRM_CATEGORY_VALUE
+        and c.category_name is not None
     }
 
 

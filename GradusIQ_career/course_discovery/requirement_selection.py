@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from enum import Enum
 from itertools import combinations, product
 import re
-from typing import Any, Iterable, Mapping
+from typing import Any, Iterable, Iterator, Mapping
 
 from pydantic import Field
 
@@ -37,6 +37,44 @@ _UNSAFE_GROUP_NOTES = re.compile(
     r"approval (?:is )?required for (?:the )?(?:listed )?courses",
     re.IGNORECASE,
 )
+
+# A course-code token (e.g. "CSCE 313", "MATH 251"). Used to tell a
+# needs_review clause that may hide a real course prerequisite
+# ("...or concurrent enrollment in CSCE 313") from one that is pure prose
+# the parser simply had no rule for ("knowledge of computer algebra
+# system") -- only the former is a scheduling obligation worth gating a
+# candidate on. StructuredPrerequisite.restrictions is never gated at all
+# (its own model contract: "Informational only -- not enforced by the
+# scheduler").
+#
+# INTERIM HEURISTIC, not a permanent design: the real fix is upstream, in
+# course_discovery/prerequisites.py's clause classifier -- course-free
+# competency prose like "knowledge of computer algebra system" belongs in
+# StructuredPrerequisite.restrictions (informational, per its own
+# contract), not needs_review, the same way "also taught at Galveston and
+# Qatar campuses" already does. That parser change is catalog-wide
+# (affects every SMU/TAMU college's semantic fingerprint) and was
+# deliberately deferred rather than bundled here. This regex is a
+# consumer-local patch scoped to this one gate so a candidate isn't
+# excluded today for text that will eventually be reclassified as
+# .restrictions upstream; it should be retired (not extended) once that
+# parser work lands, not treated as the intended long-term shape of this
+# gate.
+_NEEDS_REVIEW_COURSE_REF = re.compile(r"\b[A-Z]{2,4}\s?\d{3,4}\b")
+
+
+def _needs_review_blocks_scheduling(
+    prerequisites: Mapping[str, StructuredPrerequisite], course_codes: Iterable[str]
+) -> bool:
+    """True when a candidate course carries a needs_review clause that names
+    a course -- the only shape that can hide an unmodelled scheduling
+    dependency. A course-free needs_review clause is informational and does
+    not exclude the candidate."""
+    for code in course_codes:
+        for clause in prerequisites.get(code, StructuredPrerequisite()).needs_review:
+            if _NEEDS_REVIEW_COURSE_REF.search(clause):
+                return True
+    return False
 
 
 class SelectionSearchStats(StrictModel):
@@ -188,12 +226,30 @@ _DATA_EXCLUSION_REASONS = {
 
 def _requirement_decisions(
     candidate_sets: list[RequirementCandidateSet],
+    excluded_group_ids: set[str],
 ) -> list[RequirementDecision]:
     """Apply baseline 0/1/2+ semantics after global feasibility is final."""
     decisions: list[RequirementDecision] = []
     for candidate_set in candidate_sets:
         feasible_ids = [candidate.candidate_id for candidate in candidate_set.feasible_candidates]
         excluded_ids = [candidate.candidate_id for candidate in candidate_set.excluded_candidates]
+        if candidate_set.requirement_group_id in excluded_group_ids:
+            # The student set this requirement aside. It is still required, and
+            # its underlying candidate is academically fine -- but the decision
+            # is forced to EXCLUDED here, BEFORE the sole-feasible -> AUTO_SELECTED
+            # branch below, so a single-mandatory group can never silently
+            # re-derive AUTO_SELECTED on the next reconstruction. The candidate
+            # ids are preserved under excluded_candidate_ids so a one-click
+            # restore has the evidence it needs.
+            decisions.append(RequirementDecision(
+                requirement_group_id=candidate_set.requirement_group_id,
+                requirement_name=candidate_set.requirement_name,
+                state=RequirementDecisionState.EXCLUDED,
+                feasible_candidate_ids=[],
+                excluded_candidate_ids=feasible_ids + excluded_ids,
+                selected_candidate_id=None,
+            ))
+            continue
         if len(feasible_ids) == 1:
             state = RequirementDecisionState.AUTO_SELECTED
             selected = feasible_ids[0]
@@ -417,6 +473,23 @@ def _choices_for_group(
     )
 
 
+def _iter_groups_deep(
+    groups: Iterable[RequirementGroupResult],
+) -> Iterator[RequirementGroupResult]:
+    """Every group in the tree, at any depth (pre-order).
+
+    evaluate_requirement_tree returns only the roots, each carrying nested
+    ``children``. TAMU's real trees run three levels deep (compound_all year
+    -> compound_all season -> enumerated_* leaf), and the course rows live on
+    the leaves, so any traversal that stops at a fixed depth silently misses
+    them. This matches select_structured_requirements' own fully-recursive
+    ``by_id`` index -- the two paths must agree on which groups exist.
+    """
+    for group in groups:
+        yield group
+        yield from _iter_groups_deep(group.children)
+
+
 def structured_candidate_codes(
     groups: list[RequirementGroupResult],
     raw_groups: list[Mapping[str, Any]],
@@ -436,11 +509,19 @@ def structured_candidate_codes(
     course_code's 2 resolved codes are both added directly -- there is no
     "one CourseToSchedule per requirement" double-counting risk here,
     since nothing downstream of this set builds a schedule from it.
+
+    The tree is walked to full depth: a non-satisfied group carries relevant
+    candidate courses no matter how deeply it is nested (TAMU's leaves sit at
+    depth 2). A fixed depth-1 walk here silently dropped every deep leaf's
+    codes from the caller's catalog-enrichment lookup, so those candidate
+    courses rendered with no title and no credits.
     """
     catalog_by_code = catalog_by_code or {}
-    deferred_ids = {group.id for group in groups if group.status != RequirementGroupStatus.SATISFIED}
-    child_ids = {child.id for group in groups for child in group.children}
-    relevant = deferred_ids | child_ids
+    relevant = {
+        group.id
+        for group in _iter_groups_deep(groups)
+        if group.status != RequirementGroupStatus.SATISFIED
+    }
     option_ids = {str(o["id"]) for o in options if str(o["requirement_group_id"]) in relevant}
     codes: set[str] = set()
     for row in option_courses:
@@ -532,6 +613,7 @@ def select_structured_requirements(
     credit_hour_cap: float = 15.0,
     career_rank_by_candidate_id: Mapping[str, int] | None = None,
     locked_selections: Iterable[LockedRequirementSelection] = (),
+    excluded_group_ids: Iterable[str] = (),
 ) -> RequirementSelectionResult:
     """Globally select among structured deferred requirements.
 
@@ -540,8 +622,14 @@ def select_structured_requirements(
     no-choice schedule. Candidate prerequisites with unrepresented approval
     or standing restrictions are excluded. A combination must schedule with
     no prerequisite limitations inside the graduation horizon.
+
+    ``excluded_group_ids`` are requirement groups the student deliberately set
+    aside. Their candidates are still evaluated (so a restore has evidence),
+    but the decision is forced to EXCLUDED and their courses are never
+    scheduled -- including in the career-ranked full combination.
     """
     career_ranks = normalized_career_rank_map(career_rank_by_candidate_id)
+    excluded_group_ids = set(excluded_group_ids)
     locks = tuple(locked_selections)
     locks_by_requirement: dict[str, LockedRequirementSelection] = {}
     for lock in locks:
@@ -609,11 +697,7 @@ def select_structured_requirements(
                 evidence.exclusion_reasons.add(CandidateExclusionReason.MISSING_CREDIT_DATA)
                 evidence.exclusion_details.add("one or more candidate courses have no positive credit value")
                 continue
-            if any(prerequisites.get(code, StructuredPrerequisite()).restrictions for code in choice.courses):
-                evidence.exclusion_reasons.add(CandidateExclusionReason.RESTRICTION_REQUIRES_REVIEW)
-                evidence.exclusion_details.add("one or more candidate courses carry an unrepresented restriction")
-                continue
-            if any(prerequisites.get(code, StructuredPrerequisite()).needs_review for code in choice.courses):
+            if _needs_review_blocks_scheduling(prerequisites, choice.courses):
                 evidence.exclusion_reasons.add(CandidateExclusionReason.PREREQUISITE_NEEDS_REVIEW)
                 evidence.exclusion_details.add("one or more candidate prerequisites require manual review")
                 continue
@@ -671,7 +755,7 @@ def select_structured_requirements(
     manual.extend(retained_structured)
     if not choices_by_requirement:
         candidate_sets = _candidate_sets(requirement_order, evidence_by_requirement)
-        decisions = _requirement_decisions(candidate_sets)
+        decisions = _requirement_decisions(candidate_sets, excluded_group_ids)
         failure = _validate_locks(
             locks_by_requirement, set(by_id), candidate_sets, decisions
         )
@@ -812,7 +896,9 @@ def select_structured_requirements(
         ))
 
     unconstrained_candidate_sets = _candidate_sets(requirement_order, evidence_by_requirement)
-    unconstrained_decisions = _requirement_decisions(unconstrained_candidate_sets)
+    unconstrained_decisions = _requirement_decisions(
+        unconstrained_candidate_sets, excluded_group_ids
+    )
     lock_failure = _validate_locks(
         locks_by_requirement, set(by_id), unconstrained_candidate_sets,
         unconstrained_decisions,
@@ -902,7 +988,7 @@ def select_structured_requirements(
 
     winning = best.choices
     candidate_sets = _candidate_sets(requirement_order, evidence_by_requirement)
-    decisions = _requirement_decisions(candidate_sets)
+    decisions = _requirement_decisions(candidate_sets, excluded_group_ids)
     if locks_by_requirement:
         decisions = [
             RequirementDecision(
@@ -915,7 +1001,10 @@ def select_structured_requirements(
                     item.requirement_group_id
                 ].candidate_id,
             )
+            # A group the student excluded keeps its EXCLUDED decision even if a
+            # stale lock row also names it -- the exclusion is the newer intent.
             if item.requirement_group_id in locks_by_requirement
+            and item.state != RequirementDecisionState.EXCLUDED
             else item
             for item in decisions
         ]
@@ -924,14 +1013,21 @@ def select_structured_requirements(
         for decision in decisions
         if decision.state == RequirementDecisionState.AUTO_SELECTED
     }
-    resolved_requirement_ids = auto_selected_ids | set(locks_by_requirement)
+    resolved_requirement_ids = (
+        auto_selected_ids | set(locks_by_requirement)
+    ) - excluded_group_ids
     # Career Optimization deliberately retains its existing behavior: after
     # academic feasibility has been established it may select the ranked full
     # combination. Baseline reconstruction selects only sole-feasible paths.
-    choices_to_schedule = winning if career_rank_by_candidate_id is not None else tuple(
+    # Either way, a group the student excluded is never scheduled.
+    choices_to_schedule = tuple(
         choice
         for (deferred, _), choice in zip(choices_by_requirement, winning)
-        if deferred.requirement_group_id in resolved_requirement_ids
+        if deferred.requirement_group_id not in excluded_group_ids
+        and (
+            career_rank_by_candidate_id is not None
+            or deferred.requirement_group_id in resolved_requirement_ids
+        )
     )
     selected = [
         CourseToSchedule(
@@ -944,11 +1040,22 @@ def select_structured_requirements(
         for choice in choices_to_schedule
         for code in choice.courses
     ]
-    final_unscheduled = manual if career_rank_by_candidate_id is not None else [
-        item
-        for item in unscheduled
-        if item.requirement_group_id not in resolved_requirement_ids
-    ]
+    if career_rank_by_candidate_id is not None:
+        # The ranked path schedules the full winning combination, so its only
+        # residual unscheduled items are the manual ones -- plus any group the
+        # student excluded, which must still surface for review.
+        excluded_deferred = [
+            deferred
+            for deferred, _ in choices_by_requirement
+            if deferred.requirement_group_id in excluded_group_ids
+        ]
+        final_unscheduled = list(manual) + excluded_deferred
+    else:
+        final_unscheduled = [
+            item
+            for item in unscheduled
+            if item.requirement_group_id not in resolved_requirement_ids
+        ]
     return RequirementSelectionResult(
         courses=base_courses + selected,
         unscheduled=final_unscheduled,

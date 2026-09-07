@@ -3,10 +3,7 @@
 // file is what lets TS callers under src/ consume it with full checking.
 
 import type {
-  DegreeScheduleResult,
   DegreeScheduleResponse,
-  RequirementCandidate,
-  RequirementDecisionState,
   TermPlan,
 } from '../api/degreeSchedule.mjs';
 
@@ -25,23 +22,3 @@ export declare function degreeScheduleContentState(result: DegreeScheduleRespons
 export declare function nextPlannedTerm(
   schedule: DegreeScheduleResponse | null,
 ): (TermPlan & { displayName: string; totalLabel: string }) | null;
-
-export declare function adviserReviewCount(schedule: DegreeScheduleResponse | null): number | null;
-
-export interface DegreeScheduleDecisionPresentation {
-  requirementGroupId: string;
-  requirementName: string;
-  state: Exclude<RequirementDecisionState, 'AUTO_SELECTED'>;
-  selectedCandidateId: string | null;
-  candidates: RequirementCandidate[];
-  validOptionLabel: string;
-}
-
-export interface DegreeScheduleDecisionsPresentation {
-  decisions: DegreeScheduleDecisionPresentation[];
-  legacyRequirements: DegreeScheduleResult['unscheduled'];
-}
-
-export declare function buildDegreeScheduleDecisions(
-  schedule: DegreeScheduleResponse | null,
-): DegreeScheduleDecisionsPresentation;

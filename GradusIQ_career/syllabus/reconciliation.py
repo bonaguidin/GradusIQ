@@ -86,6 +86,20 @@ RECONCILIATION_SCHEMA_VERSION = "1"
 #   the affected scores unmodified (calculator/rules.py) and simply
 #   surfaces the rule text. They stay in `findings` for display; they no
 #   longer force NEEDS_STUDENT_REVIEW on their own.
+#
+# unknown_weight: an LLM extraction-time self-report about the same fact
+#   category_weight_validation (_wrap_weight_validation, delegating to
+#   validation.validate_category_weights) already checks deterministically
+#   -- whether declared category weights sum to ~100. That check fires its
+#   own WARNING/ERROR whenever they don't, and it is NOT in this set, so it
+#   still gates confirm on its own. unknown_weight itself is unfalsifiable
+#   as a gate: it's an ExtractionWarning, and the only correction that
+#   touches GradeModel.warnings is DISMISS_WARNING -- category/set_weight
+#   (the correction that actually answers "what's the weight") never clears
+#   it, so a student who supplies the missing weight is left blocked by a
+#   note that is now factually stale. Keeping it here as informational (it
+#   stays in `findings` for display) loses nothing category_weight_
+#   validation wasn't already enforcing.
 NON_BLOCKING_WARNING_CODES: frozenset[str] = frozenset(
     {
         "unknown_assessment_count",
@@ -93,6 +107,7 @@ NON_BLOCKING_WARNING_CODES: frozenset[str] = frozenset(
         "non_deterministic_grading_rule",
         "possible_curve",
         "ambiguous_rule",
+        "unknown_weight",
     }
 )
 
@@ -555,17 +570,54 @@ def _unverifiable_finding(label: str, evidence_text: str) -> ReconciliationFindi
     )
 
 
-def _check_category_weight_consistency(category: GradeCategory) -> ReconciliationFinding | None:
+def _check_category_weight_consistency(
+    category: GradeCategory,
+    confirmed_category_value_claims: set[str] | None = None,
+) -> ReconciliationFinding | None:
     if category.weight is None or category.evidence is None or category.evidence.text is None:
         return None
     label = f"category:{category.name}.weight"
     match = _PERCENT_RE.search(category.evidence.text)
     if match is None:
-        return _unverifiable_finding(label, category.evidence.text)
-    cited = float(match.group(1))
-    if abs(cited - category.weight) > _VALUE_TOLERANCE:
-        return _mismatch_finding(label, str(category.weight), str(cited), category.evidence.text)
-    return None
+        finding: ReconciliationFinding | None = _unverifiable_finding(label, category.evidence.text)
+    else:
+        cited = float(match.group(1))
+        if abs(cited - category.weight) > _VALUE_TOLERANCE:
+            finding = _mismatch_finding(label, str(category.weight), str(cited), category.evidence.text)
+        else:
+            finding = None
+
+    # A student may affirm "this extracted weight IS what the syllabus
+    # says" for a category whose value could not be deterministically
+    # verified -- most commonly a category whose weight was just filled in
+    # via a SET_WEIGHT correction while its `evidence` still carries the
+    # text that originally supported a different fact (e.g. the category's
+    # count), since GradeCategory has one shared evidence field, not
+    # separate fields per fact. Suppression is per-category, re-derived
+    # every run (mirrors _check_threshold_range_consistency's
+    # confirmed_value_claims): only a finding this function was
+    # independently about to emit is skipped. The category and its
+    # verbatim evidence are left untouched (see
+    # corrections.CONFIRM_CATEGORY_VALUE -- a validated no-op).
+    #
+    # Deliberately narrower than the threshold path: this only suppresses
+    # claim_evidence_consistency_unverifiable (the checker couldn't parse a
+    # percent out of the evidence text at all -- an affirmation supplies
+    # information the checker lacked). It does NOT suppress
+    # claim_evidence_value_mismatch (an ERROR: the evidence text WAS parsed
+    # and it names a different number) -- a student affirmation doesn't
+    # override a positive, cited contradiction. _check_threshold_range_
+    # consistency's confirmed_value_claims suppresses both regardless of
+    # which one fired; that's a known open issue there, not the model to
+    # match here.
+    if (
+        finding is not None
+        and finding.code == "claim_evidence_consistency_unverifiable"
+        and confirmed_category_value_claims
+        and _normalize_name(category.name) in confirmed_category_value_claims
+    ):
+        return None
+    return finding
 
 
 def _check_assessment_points_consistency(assessment: Assessment) -> ReconciliationFinding | None:
@@ -628,10 +680,11 @@ def _check_threshold_range_consistency(
 def _check_claim_evidence_consistency(
     grade_model: GradeModel,
     confirmed_value_claims: set[str] | None = None,
+    confirmed_category_value_claims: set[str] | None = None,
 ) -> list[ReconciliationFinding]:
     findings: list[ReconciliationFinding] = []
     for category in grade_model.categories:
-        finding = _check_category_weight_consistency(category)
+        finding = _check_category_weight_consistency(category, confirmed_category_value_claims)
         if finding is not None:
             findings.append(finding)
     for assessment in grade_model.assessments:
@@ -669,6 +722,7 @@ def reconcile_grade_model(
     content: RelevantSyllabusContent,
     confirmed_cutoff_pairs: set[frozenset[str]] | None = None,
     confirmed_value_claims: set[str] | None = None,
+    confirmed_category_value_claims: set[str] | None = None,
 ) -> GradeModelReconciliationResult:
     """Evaluate (never repair) a source-grounded GradeModel.
 
@@ -689,6 +743,18 @@ def reconcile_grade_model(
     such a letter -- pure suppression, the threshold and its verbatim
     evidence are never touched (see corrections.CONFIRM_THRESHOLD_VALUE and
     _check_threshold_range_consistency).
+
+    `confirmed_category_value_claims` is the category equivalent: the set of
+    normalized category names a student has affirmed the extracted weight
+    for. A SEPARATE parameter from `confirmed_value_claims`, not a
+    namespaced addition to it -- category names and threshold letters are
+    different identifier spaces (a category name can collide with nothing
+    a threshold letter would, and vice versa), and keeping them apart means
+    neither check has to guess which kind of identifier it was handed.
+    Narrower than `confirmed_value_claims`: it only suppresses
+    claim_evidence_consistency_unverifiable, never claim_evidence_value_
+    mismatch -- see _check_category_weight_consistency for why. See also
+    corrections.CONFIRM_CATEGORY_VALUE.
     """
     findings: list[ReconciliationFinding] = []
     findings.extend(_wrap_weight_validation(grade_model))
@@ -700,7 +766,9 @@ def reconcile_grade_model(
     findings.extend(_check_non_deterministic_rules(grade_model))
     findings.extend(_check_assessment_category_references(grade_model))
     findings.extend(_check_extraction_warnings(grade_model))
-    findings.extend(_check_claim_evidence_consistency(grade_model, confirmed_value_claims))
+    findings.extend(
+        _check_claim_evidence_consistency(grade_model, confirmed_value_claims, confirmed_category_value_claims)
+    )
 
     coverage, coverage_findings = _evidence_coverage(grade_model, content)
     findings.extend(coverage_findings)
