@@ -2,9 +2,9 @@
 """Nightly postings ingest -- fetch, normalize, dedup, store.
 
 Loops the target roles, asks each vendor for that role in the DFW metro,
-normalizes every response into one row shape, resolves cross-source identity,
-and upserts. Every call writes a job_posting_fetch_log row whether it worked
-or not.
+normalizes every response into one row shape, stores it, resolves cross-source
+identity, and persists that identity. Every call writes a
+job_posting_fetch_log row whether it worked or not.
 
 DRY RUN IS THE DEFAULT, same as the vendor clients this builds on. Without
 --live nothing is fetched and nothing is written; the planned calls are
@@ -429,6 +429,9 @@ class DryRunStore:
         self.rows.extend(rows)
         return len(rows)
 
+    def stage_postings(self, rows: list[dict]) -> None:
+        """Supabase needs rows first; the in-memory store does not."""
+
     def write_log(self, log_row: dict) -> None:
         self.log_rows.append(log_row)
 
@@ -586,6 +589,10 @@ class SupabaseStore:
         )
         return len(result.data or [])
 
+    def stage_postings(self, rows: list[dict]) -> None:
+        """Persist rows before identity records so a failed write cannot orphan them."""
+        self.upsert_postings(rows)
+
     def write_log(self, log_row: dict) -> None:
         self.client.table(FETCH_LOG_TABLE).insert(log_row).execute()
 
@@ -616,6 +623,11 @@ def run(
             report.outcomes.append(outcome)
 
             if outcome.rows:
+                # Put the source rows in place before identity resolution mutates
+                # clusters or keys. If this boundary fails, there is nothing to
+                # roll back and no identity orphan can be created. The second
+                # upsert persists posting_identity after resolution.
+                store.stage_postings(outcome.rows)
                 resolve_and_attach_identity(outcome.rows, store, report)
                 report.rows_upserted += store.upsert_postings(outcome.rows)
 
@@ -634,7 +646,8 @@ def run_workday(*, live: bool, write: bool, store: Any = None) -> RunReport:
     paged pass with no role concept. So this loops employers, filters to DFW
     after the fact (the CXS API has no location parameter), stamps target_role
     NULL, and then hands rows to the SAME shared tail run() uses:
-    resolve_and_attach_identity -> store.upsert_postings -> store.write_log.
+    store.stage_postings -> resolve_and_attach_identity ->
+    store.upsert_postings -> store.write_log.
 
     Nothing here touches run(), fetch_one(), build_client(), or normalize.py.
     """
@@ -691,6 +704,7 @@ def run_workday(*, live: bool, write: bool, store: Any = None) -> RunReport:
 
         if rows:
             try:
+                store.stage_postings(rows)
                 resolve_and_attach_identity(rows, store, report)
                 report.rows_upserted += store.upsert_postings(rows)
             except Exception as exc:  # noqa: BLE001 -- deliberately broad
@@ -698,10 +712,9 @@ def run_workday(*, live: bool, write: bool, store: Any = None) -> RunReport:
                 # drop the employers still queued -- same posture as the
                 # fetch_board failure branch above. Fixes A and B remove the
                 # known cause (source_job_id='Texas' -> 21000); this is the
-                # backstop. resolve_and_attach_identity may already have written
-                # this employer's cluster/key rows before upsert_postings
-                # raised -- fully transactional writes (no orphan window) are
-                # tracked as the canonical_posting_id follow-up.
+                # backstop. The initial posting upsert runs before identity
+                # mutation, so a posting-write failure cannot leave orphaned
+                # cluster/key rows for this employer.
                 outcome.status = "error"
                 outcome.error_detail = f"store: {type(exc).__name__}: {exc}"
 
