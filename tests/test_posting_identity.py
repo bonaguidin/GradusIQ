@@ -28,6 +28,7 @@ from identity import (  # noqa: E402
     normalize_title,
     normalize_url,
     recover_ats_id,
+    workday_exact_key,
 )
 
 CORPUS = REPO_ROOT / "data" / "ats_fetcher" / "postings.csv"
@@ -113,6 +114,27 @@ def test_exact_key_is_none_without_recoverable_id():
     assert exact_key("https://www.indeed.com/viewjob?jk=abc") is None
     assert exact_key("https://job-boards.greenhouse.io/pmg/jobs/8496729002") == \
         "ats:greenhouse:8496729002"
+
+
+def test_workday_exact_key_uses_employer_and_source_job_id_not_url_shape():
+    posting = {
+        "source": "workday",
+        "source_job_id": "JR109672",
+        "company": "Copart, Inc.",
+        "url": "https://not-a-workday-shape.invalid/changed/path",
+    }
+    assert workday_exact_key(posting) == "ats:workday:copart:JR109672"
+
+
+def test_workday_missing_exact_identity_never_falls_back_to_fuzzy():
+    with pytest.raises(ValueError, match="company and source_job_id"):
+        identity_keys({
+            "source": "workday",
+            "source_job_id": "JR109672",
+            "company": None,
+            "title": "Software Engineering Intern",
+            "location": "Dallas, TX",
+        })
 
 
 # ---------------------------------------------------------------------------

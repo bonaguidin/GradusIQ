@@ -225,6 +225,74 @@ def test_fuzzy_path_actually_clusters():
     assert report.clusters_created == 1
 
 
+def _workday_identity_row(employer: str, requisition: str) -> dict:
+    return {
+        "source": "workday",
+        "source_job_id": requisition,
+        "url": f"https://example.wd1.myworkdayjobs.com/job/x/Engineer_{requisition}",
+        "company": employer,
+        "title": "Software Engineering Intern",
+        "location": "Dallas, TX",
+    }
+
+
+def test_workday_different_requisitions_do_not_fuzzy_merge():
+    rows = [
+        _workday_identity_row("Copart", "JR109672"),
+        _workday_identity_row("Copart", "JR111173"),
+    ]
+    store, report = DryRunStore(), RunReport(started_at=datetime.now(timezone.utc), dry_run=True)
+
+    resolve_and_attach_identity(rows, store, report)
+
+    assert rows[0]["posting_identity"] != rows[1]["posting_identity"]
+    assert report.clusters_created == 2
+    assert report.clusters_matched_fuzzy == 0
+
+
+def test_workday_same_requisition_converges():
+    rows = [
+        _workday_identity_row("Copart", "JR109672"),
+        _workday_identity_row("Copart", "JR109672"),
+    ]
+    store, report = DryRunStore(), RunReport(started_at=datetime.now(timezone.utc), dry_run=True)
+
+    resolve_and_attach_identity(rows, store, report)
+
+    assert rows[0]["posting_identity"] == rows[1]["posting_identity"]
+    assert report.clusters_created == 1
+    assert report.clusters_matched_exact == 1
+
+
+def test_workday_requisition_id_is_employer_scoped():
+    rows = [
+        _workday_identity_row("Copart", "JR109672"),
+        _workday_identity_row("Parkland Health", "JR109672"),
+    ]
+    store, report = DryRunStore(), RunReport(started_at=datetime.now(timezone.utc), dry_run=True)
+
+    resolve_and_attach_identity(rows, store, report)
+
+    assert rows[0]["posting_identity"] != rows[1]["posting_identity"]
+    assert report.clusters_created == 2
+
+
+def test_keyless_posting_gets_per_posting_fallback_key():
+    row = {
+        "source": "adzuna",
+        "source_job_id": "5858325305",
+        "url": "https://www.adzuna.com/details/5858325305",
+        "company": None,
+        "title": "Field Engineer Intern",
+        "location": "Dallas, TX",
+    }
+    store, report = DryRunStore(), RunReport(started_at=datetime.now(timezone.utc), dry_run=True)
+
+    resolve_and_attach_identity([row], store, report)
+
+    assert store.find_cluster("posting:adzuna:5858325305") == row["posting_identity"]
+
+
 def test_late_ats_row_merges_two_clusters():
     """DEDUP.md §5. A vendor delivers first and lands in a fuzzy cluster; the
     employer's own feed surfaces the job later, and that row's recovered ATS id
@@ -625,3 +693,22 @@ def test_supabase_upsert_never_sends_a_duplicate_conflict_key():
     assert written == 2
     assert all("_match_rule" not in r for r in payload)   # private keys still stripped
     assert all("fetched_at" in r for r in payload)
+
+
+def test_supabase_upsert_serializes_date_values_for_postgrest():
+    """A normalized Python date must not survive to the JSON request body."""
+    store = SupabaseStore.__new__(SupabaseStore)
+    store.client = _FakeUpsertClient()
+    store._cluster_cache = {}
+
+    store.upsert_postings([
+        {
+            "source": "adzuna",
+            "source_job_id": "5874456703",
+            "title": "Software Engineer Intern",
+            "posted_date": date(2026, 9, 7),
+            "raw_payload": {"created": "2026-09-07T16:16:21Z"},
+        }
+    ])
+
+    assert store.client.upsert_payload[0]["posted_date"] == "2026-09-07"
