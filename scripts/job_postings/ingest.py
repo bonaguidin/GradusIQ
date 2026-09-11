@@ -43,7 +43,7 @@ import json
 import os
 import sys
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -72,6 +72,17 @@ KEYS_TABLE = "posting_identity_keys"
 VENDOR_SOURCES = frozenset({"adzuna", "jsearch"})
 
 UPSERT_CONFLICT = "source,source_job_id"
+
+
+def _json_safe(value: Any) -> Any:
+    """Return the posting payload in a form PostgREST can JSON-encode."""
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    if isinstance(value, dict):
+        return {key: _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(item) for item in value]
+    return value
 
 
 def dedupe_by_conflict_key(rows: list[dict]) -> list[dict]:
@@ -558,9 +569,16 @@ class SupabaseStore:
         # Collapse intra-batch (source, source_job_id) duplicates before the
         # upsert -- Postgres 21000 otherwise. See dedupe_by_conflict_key.
         rows = dedupe_by_conflict_key(rows)
-        payload = [{k: v for k, v in r.items() if not k.startswith("_")} for r in rows]
+        payload = [
+            _json_safe({k: v for k, v in r.items() if not k.startswith("_")})
+            for r in rows
+        ]
         for r in payload:
             r["fetched_at"] = datetime.now(timezone.utc).isoformat()
+        # Fail locally before PostgREST sees the payload. _json_safe handles all
+        # date/datetime values recursively, including values in raw_payload;
+        # this validation makes any future unsupported type explicit here.
+        json.dumps(payload)
         result = (
             self.client.table(POSTINGS_TABLE)
             .upsert(payload, on_conflict=UPSERT_CONFLICT)

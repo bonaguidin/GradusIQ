@@ -625,3 +625,22 @@ def test_supabase_upsert_never_sends_a_duplicate_conflict_key():
     assert written == 2
     assert all("_match_rule" not in r for r in payload)   # private keys still stripped
     assert all("fetched_at" in r for r in payload)
+
+
+def test_supabase_upsert_serializes_date_values_for_postgrest():
+    """A normalized Python date must not survive to the JSON request body."""
+    store = SupabaseStore.__new__(SupabaseStore)
+    store.client = _FakeUpsertClient()
+    store._cluster_cache = {}
+
+    store.upsert_postings([
+        {
+            "source": "adzuna",
+            "source_job_id": "5874456703",
+            "title": "Software Engineer Intern",
+            "posted_date": date(2026, 9, 7),
+            "raw_payload": {"created": "2026-09-07T16:16:21Z"},
+        }
+    ])
+
+    assert store.client.upsert_payload[0]["posted_date"] == "2026-09-07"
