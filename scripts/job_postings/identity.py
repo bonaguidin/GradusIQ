@@ -323,6 +323,28 @@ def exact_key(url: str | None) -> str | None:
     return f"ats:{ats}:{external_id}"
 
 
+def workday_exact_key(posting: dict[str, object]) -> str | None:
+    """Employer-scoped exact key from Workday's authoritative requisition id."""
+    if posting.get("source") != "workday":
+        return None
+    employer = normalize_employer(posting.get("company"))  # type: ignore[arg-type]
+    source_job_id = posting.get("source_job_id")
+    requisition = str(source_job_id).strip() if source_job_id is not None else ""
+    if not employer or not requisition:
+        return None
+    return f"ats:workday:{employer}:{requisition}"
+
+
+def posting_fallback_key(posting: dict[str, object]) -> str | None:
+    """Stable per-source key for a valid row that has no exact or fuzzy key."""
+    source = str(posting.get("source") or "").strip()
+    source_job_id = posting.get("source_job_id")
+    identifier = str(source_job_id).strip() if source_job_id is not None else ""
+    if not source or not identifier:
+        return None
+    return f"posting:{source}:{identifier}"
+
+
 def fuzzy_key(
     employer: str | None,
     title: str | None,
@@ -348,16 +370,27 @@ def identity_keys(posting: dict[str, object]) -> tuple[str | None, str | None]:
     The caller resolves in that order and takes the first hit -- an exact match
     is evidence; a fuzzy one is an inference, and should never override it.
     """
+    # Workday is the authoritative employer feed. Its source_job_id is the
+    # requisition id; using it directly avoids coupling identity to URL shape.
+    # Do not also emit a fuzzy key: two real requisitions with the same title
+    # must never contend for one employer/title/locality key.
+    if posting.get("source") == "workday":
+        workday_key = workday_exact_key(posting)
+        if workday_key is None:
+            raise ValueError("Workday identity requires company and source_job_id")
+        return workday_key, None
+
     url = posting.get("url")
     location = posting.get("location")
     dfw = posting.get("is_dfw")
     if dfw is None:
         dfw = is_dfw(location if isinstance(location, str) else None)
-    return (
-        exact_key(url if isinstance(url, str) else None),
-        fuzzy_key(
-            posting.get("employer") or posting.get("company"),  # type: ignore[arg-type]
-            posting.get("title"),  # type: ignore[arg-type]
-            dfw if isinstance(dfw, bool) else None,
-        ),
+    exact = exact_key(url if isinstance(url, str) else None)
+    fuzzy = fuzzy_key(
+        posting.get("employer") or posting.get("company"),  # type: ignore[arg-type]
+        posting.get("title"),  # type: ignore[arg-type]
+        dfw if isinstance(dfw, bool) else None,
     )
+    if exact is None and fuzzy is None:
+        fuzzy = posting_fallback_key(posting)
+    return exact, fuzzy
