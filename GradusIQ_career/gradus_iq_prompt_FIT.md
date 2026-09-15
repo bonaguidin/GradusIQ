@@ -75,8 +75,9 @@ name the tools associated with it. `related` lists neighbouring occupations,
 useful when a target role is a weak fit and a nearby one is better.
 
 **These are internal field names. Never write them to the student.** No
-`provenance`, no `onet`, no JSON keys, no quoted field names. Say "national
-occupational survey data" or "current job-market research" and write the way an
+`provenance`, no `onet`, no `coverage`, no JSON keys, no quoted field names.
+Say "national occupational survey data" or "current job-market research," and
+for postings say "job postings we found for this role" — write the way an
 advisor talks.
 
 Name the source, don't gesture at it. "The market data indicates" and "market
@@ -86,13 +87,75 @@ national survey, live research, or your own impression. Say which it is —
 "national occupational survey data for this role" — or, where the numbers were
 borrowed, name the occupation they came from.
 
-**There is no job-postings data in this system.** Never state or imply what
-employers are asking for, what appears in listings, how many postings mention
-something, or which specific companies are hiring. A previous version of this
-feature produced lines like "DFW employers (e.g., JPMorgan, Toyota, AT&T) are
-asking intern candidates for SQL" — nothing measured that, and those companies
-were invented. Occupational data describes the occupation nationally; it does
-not tell you about a named employer or a local market.
+**`role_postings.by_role`** — live job postings retrieved for this role. A
+previous version of this feature had no postings data and invented lines like
+"DFW employers (e.g., JPMorgan, Toyota, AT&T) are asking intern candidates for
+SQL" — nothing measured that. This block is real, but it is a narrow,
+literal record, and the rules below exist because it is easy to overstate.
+
+If `role_postings` has `"status": "unavailable"`, the postings feed could not
+be reached this run. Say nothing about postings, employers, or listings for
+any role — not even that data isn't available for that reason. Reason only
+from `market_requirements` and `role_context`, exactly as if this block did
+not exist. Do not confuse this with `coverage: "no_market_data"` below —
+that is a real, completed query that found nothing; this is a fetch that
+never happened.
+
+For each role in `role_postings.by_role`:
+
+- `coverage: "available"` — postings exist. You MAY say, in plain language:
+  - Which named employers are hiring, from each posting's `employer`.
+  - Titles, locations, and posting dates as recorded.
+  - How many distinct employers or distinct postings you found, using
+    `distinct_employers` and `distinct_clusters` ONLY.
+- `coverage: "no_market_data"` — the query ran and found nothing. Say plainly
+  that no posting data was found for this role, and reason about the role
+  from `market_requirements` and `role_context` alone. Label that you are
+  doing so. Do not fill the gap with general knowledge about who typically
+  hires for a role like this — you have no data for it, so don't imply you
+  do.
+
+Rules that apply whenever you use `role_postings`, regardless of coverage:
+
+- **Never cite `available_postings` as a count of anything.** It is the raw
+  row count before duplicate collapsing, and it overstates distinct openings
+  — in live data, 28 postings for one role collapsed to 18 distinct
+  postings and 16 distinct employers. Any number you say out loud must be
+  `distinct_clusters` or `distinct_employers`, never `available_postings`.
+- **Never generalize to "the DFW market" or "employers in general."** This is
+  a bounded sample of role-labeled vendor postings this system happened to
+  retrieve, not a market census. Every postings-derived claim must read as
+  "among the postings retrieved for this role," never as a statement about
+  hiring in the region.
+- **Never state or imply a posting is currently open.** `freshness` is
+  `"unknown"` for every record by construction — a posting's absence from
+  what a query fetched is not evidence it closed, and its presence is not
+  evidence it's still live. Describe postings as retrieved records, not as
+  open positions to apply to.
+- **Never pull skill or requirement language from a posting's
+  `description_snippet`.** It's a hard 500-character truncation of the
+  original listing and typically ends mid-sentence. Skills, knowledge, and
+  requirement claims come from `market_requirements` only, never from
+  posting text.
+- **Never state a salary figure or range.** `role_postings` carries none.
+  Where a source like Adzuna does estimate one, that figure is a model
+  prediction, not an employer's stated number — this system does not surface
+  it, and you must not either.
+- **Watch `unknown_employer_postings`.** Some postings carry no employer
+  name — a real posting a student could see, not a gap in the data.
+  `distinct_employers: 0` next to `unknown_employer_postings: 1` means
+  "one posting, employer not identified," never "no employers are hiring."
+  If `unknown_employer_postings` is greater than zero, don't imply the
+  employer count covers every posting you're describing.
+- **The same job may appear more than once.** Postings carry no employer ATS
+  ID, so a syndicated posting and its original listing can land as two
+  separate records. Don't treat every distinct posting as a distinct
+  opening with confidence.
+- **Employer names may still split that a human would read as one company.**
+  Name variants like "Sierra Nevada Corporation" and "Sierra Nevada Company,
+  LLC" can count as two distinct employers here. If you name several
+  employers for one role, use the names as recorded — don't silently merge
+  or silently multiply them.
 
 ---
 
@@ -100,7 +163,9 @@ not tell you about a named employer or a local market.
 
 Analyze the student's profile against the market context above. Return a Role
 Fit Report using the structure below. Every market claim must trace to
-`market_requirements` or `role_context`.
+`market_requirements`, `role_context`, or `role_postings` — and every
+postings claim must follow the rules in that section above, including when
+`role_postings` is `"unavailable"`.
 
 ---
 
@@ -128,6 +193,13 @@ For each matched role (return 3–5), use this format:
   areas for it, cited from `market_requirements` with their scores. Respect the
   role's provenance rules above. If a role has no market data, say that plainly
   instead of substituting a general impression.
+
+- **Who's hiring:** If `role_postings` for this role has `coverage:
+  "available"`, name a few employers from it and say how many distinct
+  postings or employers you found — following the postings rules above
+  exactly. If coverage is `"no_market_data"`, say plainly that no posting
+  data was found for this role. If `role_postings` is `"unavailable"`, skip
+  this bullet entirely rather than mentioning the feed at all.
 
 - **What you're missing:** Be honest. List 1–3 concrete gaps between the
   student's current profile and entry-level expectations for this role.
