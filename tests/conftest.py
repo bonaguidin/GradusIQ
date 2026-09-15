@@ -1,5 +1,6 @@
 import pytest
 
+from GradusIQ_career.features import fit as fit_module
 from GradusIQ_career.features import gap as gap_module
 
 
@@ -40,3 +41,27 @@ def _no_live_role_research_by_default(request, monkeypatch):
         "get_role_trends",
         lambda role, client=None: None,
     )
+
+
+@pytest.fixture(autouse=True)
+def _no_live_postings_by_default(monkeypatch):
+    """Default FitRunner's posting provider to unreachable, not live Supabase.
+
+    FitRunner.build_student_context() falls back to build_service_client()
+    for any role_postings fetch when no posting_client_factory was given at
+    construction, and .env carries real SUPABASE_URL / SUPABASE_SECRET_KEY
+    for local development. Without this, every FIT test elsewhere in the
+    suite that doesn't set posting_client_factory would try a real Supabase
+    read on every build_student_context() call.
+
+    FitRunner._get_role_postings() already catches this and degrades to
+    {"status": "unavailable"}, so this is a safe default, not a crash.
+
+    Tests that want to exercise the real postings path construct
+    FitRunner(..., posting_client_factory=<fake>) directly, which bypasses
+    this patched module-level function entirely.
+    """
+    def _stub_client():
+        raise RuntimeError("posting provider stubbed out in tests")
+
+    monkeypatch.setattr(fit_module, "build_service_client", _stub_client)
