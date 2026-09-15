@@ -23,9 +23,18 @@ def _config_step(job: dict) -> dict:
     raise AssertionError("no step with id: config")
 
 
-def test_workflow_parses_and_has_both_ingest_jobs():
+def test_workflow_parses_and_has_post_ingest_integrity_job():
     wf = yaml.safe_load(WORKFLOW.read_text())
-    assert set(wf["jobs"]) == {"ingest", "workday-ingest"}
+    assert set(wf["jobs"]) == {"ingest", "workday-ingest", "integrity-check"}
+
+    integrity = wf["jobs"]["integrity-check"]
+    assert set(integrity["needs"]) == {"ingest", "workday-ingest"}
+    assert integrity["if"] == "always()"
+    assert not any(step.get("id") == "config" for step in integrity["steps"])
+    assert any(
+        step.get("run") == "uv run python scripts/job_postings/check_integrity.py"
+        for step in integrity["steps"]
+    )
 
 
 def test_adzuna_config_gate_checks_every_var_its_ingest_step_uses():
