@@ -57,6 +57,7 @@ def test_role_with_postings_returns_records_and_metadata():
     assert role["returned_postings"] == 1
     assert role["distinct_clusters"] == 1
     assert role["distinct_employers"] == 1
+    assert role["unknown_employer_postings"] == 0
     assert posting == {
         "posting_id": "p1",
         "cluster_id": "cluster-p1",
@@ -87,6 +88,7 @@ def test_role_with_zero_postings_gets_explicit_no_coverage_marker():
     assert role["postings"] == []
     assert role["distinct_clusters"] == 0
     assert role["distinct_employers"] == 0
+    assert role["unknown_employer_postings"] == 0
     assert role["reason"] == "no role-labeled DFW postings found"
 
 
@@ -134,6 +136,38 @@ def test_result_count_respects_bound():
     )
 
     assert len(_role_block(result, "Software Engineering Intern")["postings"]) == 2
+
+
+def test_employer_spelling_variants_collapse_to_one_via_shared_normalizer():
+    rows = [
+        _row("p1", "Software Engineering Intern", cluster="c1", company="Texas Instruments"),
+        _row("p2", "Software Engineering Intern", cluster="c2", company="Texas Instruments Incorporated"),
+    ]
+
+    result = build_role_posting_grounding(rows, ["Software Engineering Intern"])
+
+    role = _role_block(result, "Software Engineering Intern")
+    assert role["distinct_employers"] == 1
+    postings = role["postings"]
+    assert {p["employer"] for p in postings} == {
+        "Texas Instruments",
+        "Texas Instruments Incorporated",
+    }
+
+
+def test_null_company_is_excluded_from_distinct_employers_and_counted_separately():
+    rows = [
+        _row("p1", "Software Engineering Intern", cluster="c1", company="Acme"),
+        _row("p2", "Software Engineering Intern", cluster="c2"),
+    ]
+    rows[1]["company"] = None
+
+    result = build_role_posting_grounding(rows, ["Software Engineering Intern"])
+
+    role = _role_block(result, "Software Engineering Intern")
+    assert role["distinct_employers"] == 1
+    assert role["unknown_employer_postings"] == 1
+    assert role["postings"][1]["employer"] is None
 
 
 def test_cluster_and_employer_counts_are_distinct_counts_not_row_counts():

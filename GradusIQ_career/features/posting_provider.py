@@ -16,6 +16,8 @@ from __future__ import annotations
 from datetime import date, datetime, time, timezone
 from typing import Any, Mapping, Sequence
 
+from scripts.job_postings.identity import normalize_employer
+
 POSTINGS_TABLE = "job_postings"
 DEFAULT_LIMIT_PER_ROLE = 10
 DESCRIPTION_SNIPPET_CHARS = 500
@@ -113,11 +115,14 @@ def build_role_posting_grounding(
             for row in eligible
             if row.get("posting_identity") is not None
         }
-        employers = {
-            str(row.get("company")).strip()
-            for row in eligible
-            if isinstance(row.get("company"), str) and str(row.get("company")).strip()
-        }
+        employer_keys = set()
+        unknown_employer_postings = 0
+        for row in eligible:
+            key = normalize_employer(row.get("company"))
+            if key:
+                employer_keys.add(key)
+            else:
+                unknown_employer_postings += 1
         by_role[role] = {
             "target_role": role,
             "coverage": "available" if eligible else "no_market_data",
@@ -126,7 +131,8 @@ def build_role_posting_grounding(
             "returned_postings": len(postings),
             "postings": postings,
             "distinct_clusters": len(clusters),
-            "distinct_employers": len(employers),
+            "distinct_employers": len(employer_keys),
+            "unknown_employer_postings": unknown_employer_postings,
             "constraints": PROVIDER_LIMITATIONS,
         }
         if not eligible:
