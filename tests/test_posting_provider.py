@@ -68,7 +68,6 @@ def test_role_with_postings_returns_records_and_metadata():
         "posted_date": "2026-09-10",
         "fetched_at": "2026-09-12T10:00:00+00:00",
         "source": "adzuna",
-        "description_snippet": "Build production software with mentors.",
         "role_labeled_by": "query",
         "identity_basis": "vendor_id",
         "freshness": "unknown",
@@ -202,17 +201,6 @@ def test_coverage_counts_use_all_available_rows_not_only_returned_bound():
     assert role["returned_postings"] == 1
     assert role["distinct_clusters"] == 2
     assert role["distinct_employers"] == 2
-
-
-def test_description_snippet_is_capped_at_500_characters():
-    result = build_role_posting_grounding(
-        [_row("p1", "Software Engineering Intern", description="x" * 700)],
-        ["Software Engineering Intern"],
-    )
-
-    posting = _role_block(result, "Software Engineering Intern")["postings"][0]
-    assert len(posting["description_snippet"]) == 500
-    assert posting["description_completeness"] == "truncated"
 
 
 def test_negative_limit_is_rejected():

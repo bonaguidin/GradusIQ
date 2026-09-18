@@ -20,7 +20,6 @@ from scripts.job_postings.identity import normalize_employer
 
 POSTINGS_TABLE = "job_postings"
 DEFAULT_LIMIT_PER_ROLE = 10
-DESCRIPTION_SNIPPET_CHARS = 500
 
 PROVIDER_LIMITATIONS = [
     {
@@ -48,7 +47,7 @@ PROVIDER_LIMITATIONS = [
 
 SELECT_COLUMNS = (
     "id,posting_identity,company,title,location,url,posted_date,fetched_at,"
-    "source,target_role,is_dfw,raw_payload"
+    "source,target_role,is_dfw"
 )
 
 
@@ -172,22 +171,11 @@ def _posting_record(row: Mapping[str, Any]) -> dict[str, Any]:
         "posted_date": _iso_or_none(row.get("posted_date")),
         "fetched_at": _iso_or_none(row.get("fetched_at")),
         "source": _string_or_none(row.get("source")),
-        "description_snippet": _description_snippet(row.get("raw_payload")),
         "role_labeled_by": "query",
         "identity_basis": "vendor_id",
         "freshness": "unknown",
         "description_completeness": "truncated",
     }
-
-
-def _description_snippet(raw_payload: Any) -> str | None:
-    if not isinstance(raw_payload, Mapping):
-        return None
-    for key in ("description", "job_description", "snippet"):
-        value = raw_payload.get(key)
-        if isinstance(value, str) and value.strip():
-            return value.strip()[:DESCRIPTION_SNIPPET_CHARS]
-    return None
 
 
 def _string_or_none(value: Any) -> str | None:
