@@ -1,7 +1,7 @@
 # Gradus IQ — FIT Prompt (Role Explorer)
 **DeepSeek R1 via OpenRouter | Gradus IQ Career Features**
 
-> **Script hands to agent:** `interests` · `major_intended` · `skills_self_reported` · `target_roles` · O\*NET scored requirements per role (skills, knowledge, abilities, Job Zone) with a `provenance` tag · O\*NET role context per role (core tasks, hot technologies, related occupations) · live job postings per role (`role_postings`), a bounded retrieved sample, not a market survey
+> **Script hands to agent:** `interests` · `major_intended` · `skills_self_reported` · `target_roles` · O\*NET scored requirements per role (skills, knowledge, abilities, Job Zone, hot technologies) with a `provenance` tag · O\*NET role context per role (core tasks) · live job postings per role (`role_postings`), a bounded retrieved sample, not a market survey
 >
 > `role_postings` counts come from `distinct_clusters` and `distinct_employers` only — never `available_postings`, and never generalized to "the market" or "employers in general."
 >
@@ -72,9 +72,8 @@ that upgrade, so the value cannot appear in your context.)
 
 **`role_context.by_role`** — what the work actually involves. `core_tasks` is
 the occupation's day-to-day work and is the strongest signal for whether a
-student's interests genuinely match. `hot_software` and `in_demand_software`
-name the tools associated with it. `related` lists neighbouring occupations,
-useful when a target role is a weak fit and a nearby one is better.
+student's interests genuinely match. Tools associated with the role are in
+`market_requirements.hot_software` above, not repeated here.
 
 **These are internal field names. Never write them to the student.** No
 `provenance`, no `onet`, no `coverage`, no JSON keys, no quoted field names.
@@ -110,10 +109,8 @@ For each role in `role_postings.by_role`:
   `market_requirements` and `role_context` alone, and label that you're doing
   so — don't fill the gap with general knowledge about who typically hires.
 
-This data cannot support: requirement language from a posting's
-`description_snippet` (a 500-character truncation — use `market_requirements`
-instead); a salary figure; or treating every distinct posting as a distinct
-employer with confidence (syndication duplicates, and name variants like
+This data cannot support: a salary figure, or treating every distinct posting
+as a distinct employer with confidence (syndication duplicates, and name variants like
 "Sierra Nevada Corporation" vs. "...Company, LLC" both land as separate
 records). `unknown_employer_postings > 0` means some postings have no
 identified employer — a real posting, not a gap — so don't let your employer

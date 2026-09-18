@@ -233,7 +233,7 @@ class FitRunner(CareerFeatureRunner):
         # Collapsing those into one block would erase that distinction from
         # the prompt.
         market = get_market_requirements(target_roles)
-        signals = get_shift_signals(target_roles)
+        signals = self._role_context_for(target_roles)
         postings = self._get_role_postings(target_roles)
         return {
             "market_requirements": market,
@@ -252,6 +252,26 @@ class FitRunner(CareerFeatureRunner):
             "work_experience": career.get("work_experience", []),
             "projects": career.get("projects", []),
         }
+
+    def _role_context_for(self, target_roles: list[str]) -> dict[str, Any]:
+        """FIT's copy of get_shift_signals, stripped of fields it doesn't earn.
+
+        ``hot_software`` is byte-for-byte identical to
+        ``market_requirements.by_role[role].hot_software`` -- the prompt
+        already instructs on market_requirements for "what this occupation
+        demands", so carrying it twice is pure duplication. ``related`` is
+        real O*NET data, but FIT's output contract has no bullet that uses it
+        (SHIFT's does, via shift_signals.related -- adjacent-role surfacing in
+        FIT is a real feature, just not one scoped yet). Stripped here, on
+        FIT's own freshly-built dict, so SHIFT's separate get_shift_signals
+        call is untouched.
+        """
+        signals = get_shift_signals(target_roles)
+        for entry in signals.get("by_role", {}).values():
+            if isinstance(entry, dict):
+                entry.pop("hot_software", None)
+                entry.pop("related", None)
+        return signals
 
     def _get_role_postings(self, target_roles: list[str]) -> dict[str, Any]:
         """Fetch live posting grounding, degrading to an explicit marker on failure.
