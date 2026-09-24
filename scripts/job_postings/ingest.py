@@ -916,6 +916,144 @@ def run_workday(*, live: bool, write: bool, store: Any = None) -> RunReport:
     return report
 
 
+@dataclass(frozen=True)
+class GcReport:
+    """What gc_empty_clusters found (and, if not dry_run, deleted)."""
+
+    dry_run: bool
+    empty_cluster_ids: list[str]
+    orphaned_key_ids: list[str]
+
+    @property
+    def cluster_count(self) -> int:
+        return len(self.empty_cluster_ids)
+
+    @property
+    def key_count(self) -> int:
+        return len(self.orphaned_key_ids)
+
+    def render(self) -> str:
+        lines = [
+            "",
+            "=" * 68,
+            f"  cluster gc -- {'DRY RUN (nothing deleted)' if self.dry_run else 'LIVE'}",
+            "=" * 68,
+            f"  empty clusters   {self.cluster_count}",
+            f"  orphaned keys    {self.key_count}",
+        ]
+        if self.empty_cluster_ids:
+            lines.append("  cluster ids:")
+            for cluster_id in self.empty_cluster_ids:
+                lines.append(f"    - {cluster_id}")
+        if self.orphaned_key_ids:
+            lines.append("  key ids:")
+            for key in self.orphaned_key_ids:
+                lines.append(f"    - {key}")
+        lines.append("=" * 68)
+        return "\n".join(lines)
+
+
+def _fetch_all_cluster_ids(client: Any) -> set[str]:
+    """Every posting_clusters.id, paginated -- mirrors check_integrity.py's
+    _fetch_all, since this needs the same full-table read that check does."""
+    ids: set[str] = set()
+    start = 0
+    page_size = 1000
+    while True:
+        page = (
+            client.table(CLUSTERS_TABLE)
+            .select("id")
+            .order("id")
+            .range(start, start + page_size - 1)
+            .execute()
+            .data
+            or []
+        )
+        ids.update(row["id"] for row in page)
+        if len(page) < page_size:
+            return ids
+        start += page_size
+
+
+def _fetch_all_referenced_cluster_ids(client: Any) -> set[str]:
+    """Every posting_identity value job_postings currently points at, i.e.
+    every cluster that has at least one member."""
+    ids: set[str] = set()
+    start = 0
+    page_size = 1000
+    while True:
+        page = (
+            client.table(POSTINGS_TABLE)
+            .select("posting_identity")
+            .order("id")
+            .range(start, start + page_size - 1)
+            .execute()
+            .data
+            or []
+        )
+        ids.update(
+            row["posting_identity"] for row in page if row.get("posting_identity")
+        )
+        if len(page) < page_size:
+            return ids
+        start += page_size
+
+
+def gc_empty_clusters(*, dry_run: bool = True, client: Any = None) -> GcReport:
+    """Delete posting_clusters rows with zero member job_postings rows, and
+    their posting_identity_keys rows.
+
+    Backstop, not the fix: resolve_and_attach_identity's cluster-adoption path
+    (see its docstring) stops the leak going forward, but this is what cleans
+    up what the leak already produced -- both the 40 orphans it made before
+    that fix landed, and anything a future bug produces the same shape of.
+    Always reports counts and the affected ids, dry_run or not, so a dry run
+    is exactly as informative as a live one minus the deletes.
+
+    "Zero member rows" is the same test check_integrity.py's empty_clusters
+    check already uses: a posting_clusters row no job_postings row points at
+    via posting_identity. A cluster with even one member is never touched.
+
+    Deletes keys before clusters -- same ordering merge_clusters uses -- so a
+    crash mid-run leaves an unreachable-but-intact cluster, never a key
+    pointing at nothing.
+    """
+    if client is None:
+        from supabase import create_client
+
+        url = os.environ.get("SUPABASE_URL", "").strip()
+        secret = os.environ.get("SUPABASE_SECRET_KEY", "").strip()
+        if not url or not secret:
+            raise JobPostingConfigError(
+                "SUPABASE_URL and SUPABASE_SECRET_KEY are both required."
+            )
+        client = create_client(url, secret)
+
+    all_cluster_ids = _fetch_all_cluster_ids(client)
+    referenced_cluster_ids = _fetch_all_referenced_cluster_ids(client)
+    empty_ids = sorted(all_cluster_ids - referenced_cluster_ids)
+
+    orphaned_key_ids: list[str] = []
+    if empty_ids:
+        key_rows = (
+            client.table(KEYS_TABLE)
+            .select("key")
+            .in_("cluster_id", empty_ids)
+            .execute()
+            .data
+            or []
+        )
+        orphaned_key_ids = sorted(row["key"] for row in key_rows)
+
+    if not dry_run and empty_ids:
+        client.table(KEYS_TABLE).delete().in_("cluster_id", empty_ids).execute()
+        client.table(CLUSTERS_TABLE).delete().in_("id", empty_ids).execute()
+
+    return GcReport(
+        dry_run=dry_run, empty_cluster_ids=empty_ids, orphaned_key_ids=orphaned_key_ids
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument(
