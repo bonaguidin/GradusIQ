@@ -187,6 +187,7 @@ class RunReport:
     clusters_matched_exact: int = 0
     clusters_matched_fuzzy: int = 0
     clusters_merged: int = 0
+    clusters_adopted: int = 0
 
     @property
     def quota_spent(self) -> int:
@@ -213,6 +214,7 @@ class RunReport:
             f"    fuzzy  (employer/title)   {self.clusters_matched_fuzzy}",
             f"    new clusters              {self.clusters_created}",
             f"    clusters merged           {self.clusters_merged}",
+            f"    clusters adopted          {self.clusters_adopted}",
         ]
         errors = sum(len(o.normalization_errors) for o in self.outcomes)
         if errors:
@@ -320,7 +322,40 @@ def resolve_and_attach_identity(rows: list[dict], store: Any, report: RunReport)
     Exact before fuzzy, and never the other way round: an ATS id recovered
     from an apply URL is evidence, while an employer/title match is an
     inference, and an inference must not override evidence.
+
+    CLUSTER-DEPARTURE LEAK GUARD. A row's exact key can miss even though the
+    row itself is not new -- identity.py changing how a source computes its
+    exact key (e.g. Workday moving off fuzzy keying, commit 2c76894) means a
+    row that has been ingested every night for months suddenly presents a key
+    nothing has seen before. Before that fix, create_cluster() would mint a
+    brand-new cluster and silently abandon the row's old one: the old cluster
+    keeps its stale key row and zero members forever, because nothing ever
+    points back at it again. That is the source of the orphaned
+    posting_clusters rows check_integrity.py flags nightly.
+
+    So before minting a new cluster, check whether this row already has an
+    existing posting_identity (from the last time it was ingested) and, if
+    that cluster currently has no OTHER member rows, adopt it instead of
+    creating a new one -- the new exact key just gets attached to the same
+    cluster the row was already in. A cluster with other members is left
+    alone and a new cluster is still created: adopting there would wrongly
+    absorb postings that are not this row and have no evidence of being the
+    same job.
     """
+    # Batched, not N+1: one query per distinct source in the batch for "what
+    # cluster did this row belong to before this ingest touched it", and one
+    # query for "how many rows currently point at each of those clusters".
+    lookup_pairs = [
+        (row["source"], str(row["source_job_id"]))
+        for row in rows
+        if row.get("source_job_id") is not None
+    ]
+    existing_identities = store.get_existing_identities(lookup_pairs)
+    candidate_cluster_ids = {
+        cluster_id for cluster_id in existing_identities.values() if cluster_id
+    }
+    member_counts = store.get_cluster_member_counts(candidate_cluster_ids)
+
     for row in rows:
         exact, fuzzy = identity_keys(row)
         exact_hit = store.find_cluster(exact) if exact else None
@@ -347,16 +382,48 @@ def resolve_and_attach_identity(rows: list[dict], store: Any, report: RunReport)
             report.clusters_matched_fuzzy += 1
 
         else:
-            cluster_id = store.create_cluster(
-                keys=[k for k in (exact, fuzzy) if k],
-                match_rule="seed",
+            lookup_key = (
+                (row["source"], str(row["source_job_id"]))
+                if row.get("source_job_id") is not None
+                else None
             )
-            report.clusters_created += 1
-            rule = "seed"
+            prior_cluster_id = (
+                existing_identities.get(lookup_key) if lookup_key else None
+            )
+            prior_member_count = (
+                member_counts.get(prior_cluster_id, 0) if prior_cluster_id else 0
+            )
+            if prior_cluster_id is not None and prior_member_count <= 1:
+                # This row's own prior identity is that cluster's only member
+                # (the count includes this row itself, still unchanged in the
+                # store) -- adopt it rather than abandoning it.
+                cluster_id, rule = prior_cluster_id, "adopted"
+                report.clusters_adopted += 1
+                # The cluster's old fuzzy key was an INFERENCE -- the only
+                # reason it existed is that nothing stronger was available yet
+                # (DEDUP.md: fuzzy is inference, exact is evidence, and an
+                # inference must never override evidence). This row just
+                # supplied evidence. Leaving the fuzzy key live would let a
+                # later, unrelated posting that merely shares this employer
+                # and title text fuzzy-merge into a cluster an exact id now
+                # anchors to one specific job -- the same over-merge 2c76894
+                # fixed for Workday in the first place (121 of 130
+                # multi-posting clusters held 2+ distinct requisitions under
+                # fuzzy-only matching). Drop it before the new exact key is
+                # attached below.
+                store.drop_fuzzy_keys(cluster_id)
+            else:
+                cluster_id = store.create_cluster(
+                    keys=[k for k in (exact, fuzzy) if k],
+                    match_rule="seed",
+                )
+                report.clusters_created += 1
+                rule = "seed"
 
         # Register whichever key this row contributed that the cluster did not
         # already know. This is how a cluster first seen by fuzzy match becomes
-        # findable by exact id once an ATS row arrives.
+        # findable by exact id once an ATS row arrives -- and how an adopted
+        # cluster becomes findable by the new exact key going forward.
         store.attach_keys(cluster_id, [k for k in (exact, fuzzy) if k])
 
         # normalize.py guarantees source_job_id on anything it produced, but
@@ -366,6 +433,10 @@ def resolve_and_attach_identity(rows: list[dict], store: Any, report: RunReport)
         source_job_id = row.get("source_job_id")
         if source_job_id is not None:
             store.set_canonical(cluster_id, row["source"], str(source_job_id))
+            # Bookkeeping only (no-op against Supabase, where next run's
+            # get_existing_identities reads the DB instead): lets a later row
+            # in THIS batch see this row's freshly-resolved identity.
+            store.remember_identity(row["source"], str(source_job_id), cluster_id)
 
         row["posting_identity"] = cluster_id
         row["_match_rule"] = rule
@@ -387,9 +458,37 @@ class DryRunStore:
         self.log_rows: list[dict] = []
         self.merges: list[dict] = []
         self._next = 0
+        # (source, source_job_id) -> cluster id, the newest resolution for
+        # that row. Mirrors what a re-SELECT of job_postings.posting_identity
+        # would show against the real store -- a later write for the same key
+        # always overwrites the earlier one, same as the DB's upsert target.
+        self._identity_by_key: dict[tuple[str, str], str] = {}
 
     def find_cluster(self, key: str) -> str | None:
         return self.clusters.get(key)
+
+    def get_existing_identities(
+        self, pairs: list[tuple[str, str]]
+    ) -> dict[tuple[str, str], str | None]:
+        return {
+            pair: self._identity_by_key[pair]
+            for pair in pairs
+            if pair in self._identity_by_key
+        }
+
+    def get_cluster_member_counts(self, cluster_ids: set[str]) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        if not cluster_ids:
+            return counts
+        for cluster_id in self._identity_by_key.values():
+            if cluster_id in cluster_ids:
+                counts[cluster_id] = counts.get(cluster_id, 0) + 1
+        return counts
+
+    def remember_identity(
+        self, source: str, source_job_id: str, cluster_id: str
+    ) -> None:
+        self._identity_by_key[(source, source_job_id)] = cluster_id
 
     def create_cluster(self, keys: list[str], match_rule: str) -> str:
         self._next += 1
@@ -400,6 +499,11 @@ class DryRunStore:
     def attach_keys(self, cluster_id: str, keys: list[str]) -> None:
         for k in keys:
             self.clusters[k] = cluster_id
+
+    def drop_fuzzy_keys(self, cluster_id: str) -> None:
+        for k, v in list(self.clusters.items()):
+            if v == cluster_id and k.startswith("fuzzy:"):
+                del self.clusters[k]
 
     def merge_clusters(self, absorbed: str, surviving: str, *, match_rule: str,
                        triggered_by: str | None = None) -> None:
@@ -482,6 +586,68 @@ class SupabaseStore:
             return cluster_id
         return None
 
+    def get_existing_identities(
+        self, pairs: list[tuple[str, str]]
+    ) -> dict[tuple[str, str], str | None]:
+        """(source, source_job_id) -> the posting_identity that row carried
+        going into this ingest, or absent if the row is new.
+
+        One query per distinct source in the batch, not one per row: a
+        Workday sweep is (source x employer), so this is one query total for
+        that call; the vendor sweep is at most len(sources) queries. Read
+        after stage_postings() and before this row's own identity is
+        resolved, so it reflects the PRIOR cluster, not the one about to be
+        assigned.
+        """
+        result: dict[tuple[str, str], str | None] = {}
+        if not pairs:
+            return result
+        by_source: dict[str, list[str]] = {}
+        for source, source_job_id in pairs:
+            by_source.setdefault(source, []).append(source_job_id)
+        for source, source_job_ids in by_source.items():
+            rows = (
+                self.client.table(POSTINGS_TABLE)
+                .select("source_job_id,posting_identity")
+                .eq("source", source)
+                .in_("source_job_id", source_job_ids)
+                .execute()
+                .data
+                or []
+            )
+            for row in rows:
+                if row.get("posting_identity") is not None:
+                    result[(source, row["source_job_id"])] = row["posting_identity"]
+        return result
+
+    def get_cluster_member_counts(self, cluster_ids: set[str]) -> dict[str, int]:
+        """How many job_postings rows currently point at each of these
+        clusters. One query for the whole set, not one per cluster."""
+        counts: dict[str, int] = {}
+        if not cluster_ids:
+            return counts
+        rows = (
+            self.client.table(POSTINGS_TABLE)
+            .select("posting_identity")
+            .in_("posting_identity", list(cluster_ids))
+            .execute()
+            .data
+            or []
+        )
+        for row in rows:
+            cluster_id = row.get("posting_identity")
+            if cluster_id:
+                counts[cluster_id] = counts.get(cluster_id, 0) + 1
+        return counts
+
+    def remember_identity(
+        self, source: str, source_job_id: str, cluster_id: str
+    ) -> None:
+        """No-op against Supabase: the next ingest is a fresh process, and
+        get_existing_identities() reads the persisted row instead of any
+        in-memory state. Exists so resolve_and_attach_identity can call it
+        uniformly across both stores."""
+
     def create_cluster(self, keys: list[str], match_rule: str) -> str:
         created = (
             self.client.table(CLUSTERS_TABLE)
@@ -508,6 +674,26 @@ class SupabaseStore:
         )
         for k in keys:
             self._cluster_cache[k] = cluster_id
+
+    def drop_fuzzy_keys(self, cluster_id: str) -> None:
+        """Remove a cluster's fuzzy:* keys, keeping any ats:*/posting:* keys.
+
+        Called on adoption (see resolve_and_attach_identity): the cluster's
+        old fuzzy key was an inference, and this row just supplied stronger
+        evidence -- leaving the inference-based key live would let an
+        unrelated posting merely sharing employer/title text fuzzy-merge into
+        a cluster an exact id now anchors to one specific job.
+        """
+        (
+            self.client.table(KEYS_TABLE)
+            .delete()
+            .eq("cluster_id", cluster_id)
+            .like("key", "fuzzy:%")
+            .execute()
+        )
+        for k, v in list(self._cluster_cache.items()):
+            if v == cluster_id and k.startswith("fuzzy:"):
+                del self._cluster_cache[k]
 
     def merge_clusters(self, absorbed: str, surviving: str, *, match_rule: str,
                        triggered_by: str | None = None) -> None:
@@ -728,6 +914,144 @@ def run_workday(*, live: bool, write: bool, store: Any = None) -> RunReport:
                       file=sys.stderr)
 
     return report
+
+
+@dataclass(frozen=True)
+class GcReport:
+    """What gc_empty_clusters found (and, if not dry_run, deleted)."""
+
+    dry_run: bool
+    empty_cluster_ids: list[str]
+    orphaned_key_ids: list[str]
+
+    @property
+    def cluster_count(self) -> int:
+        return len(self.empty_cluster_ids)
+
+    @property
+    def key_count(self) -> int:
+        return len(self.orphaned_key_ids)
+
+    def render(self) -> str:
+        lines = [
+            "",
+            "=" * 68,
+            f"  cluster gc -- {'DRY RUN (nothing deleted)' if self.dry_run else 'LIVE'}",
+            "=" * 68,
+            f"  empty clusters   {self.cluster_count}",
+            f"  orphaned keys    {self.key_count}",
+        ]
+        if self.empty_cluster_ids:
+            lines.append("  cluster ids:")
+            for cluster_id in self.empty_cluster_ids:
+                lines.append(f"    - {cluster_id}")
+        if self.orphaned_key_ids:
+            lines.append("  key ids:")
+            for key in self.orphaned_key_ids:
+                lines.append(f"    - {key}")
+        lines.append("=" * 68)
+        return "\n".join(lines)
+
+
+def _fetch_all_cluster_ids(client: Any) -> set[str]:
+    """Every posting_clusters.id, paginated -- mirrors check_integrity.py's
+    _fetch_all, since this needs the same full-table read that check does."""
+    ids: set[str] = set()
+    start = 0
+    page_size = 1000
+    while True:
+        page = (
+            client.table(CLUSTERS_TABLE)
+            .select("id")
+            .order("id")
+            .range(start, start + page_size - 1)
+            .execute()
+            .data
+            or []
+        )
+        ids.update(row["id"] for row in page)
+        if len(page) < page_size:
+            return ids
+        start += page_size
+
+
+def _fetch_all_referenced_cluster_ids(client: Any) -> set[str]:
+    """Every posting_identity value job_postings currently points at, i.e.
+    every cluster that has at least one member."""
+    ids: set[str] = set()
+    start = 0
+    page_size = 1000
+    while True:
+        page = (
+            client.table(POSTINGS_TABLE)
+            .select("posting_identity")
+            .order("id")
+            .range(start, start + page_size - 1)
+            .execute()
+            .data
+            or []
+        )
+        ids.update(
+            row["posting_identity"] for row in page if row.get("posting_identity")
+        )
+        if len(page) < page_size:
+            return ids
+        start += page_size
+
+
+def gc_empty_clusters(*, dry_run: bool = True, client: Any = None) -> GcReport:
+    """Delete posting_clusters rows with zero member job_postings rows, and
+    their posting_identity_keys rows.
+
+    Backstop, not the fix: resolve_and_attach_identity's cluster-adoption path
+    (see its docstring) stops the leak going forward, but this is what cleans
+    up what the leak already produced -- both the 40 orphans it made before
+    that fix landed, and anything a future bug produces the same shape of.
+    Always reports counts and the affected ids, dry_run or not, so a dry run
+    is exactly as informative as a live one minus the deletes.
+
+    "Zero member rows" is the same test check_integrity.py's empty_clusters
+    check already uses: a posting_clusters row no job_postings row points at
+    via posting_identity. A cluster with even one member is never touched.
+
+    Deletes keys before clusters -- same ordering merge_clusters uses -- so a
+    crash mid-run leaves an unreachable-but-intact cluster, never a key
+    pointing at nothing.
+    """
+    if client is None:
+        from supabase import create_client
+
+        url = os.environ.get("SUPABASE_URL", "").strip()
+        secret = os.environ.get("SUPABASE_SECRET_KEY", "").strip()
+        if not url or not secret:
+            raise JobPostingConfigError(
+                "SUPABASE_URL and SUPABASE_SECRET_KEY are both required."
+            )
+        client = create_client(url, secret)
+
+    all_cluster_ids = _fetch_all_cluster_ids(client)
+    referenced_cluster_ids = _fetch_all_referenced_cluster_ids(client)
+    empty_ids = sorted(all_cluster_ids - referenced_cluster_ids)
+
+    orphaned_key_ids: list[str] = []
+    if empty_ids:
+        key_rows = (
+            client.table(KEYS_TABLE)
+            .select("key")
+            .in_("cluster_id", empty_ids)
+            .execute()
+            .data
+            or []
+        )
+        orphaned_key_ids = sorted(row["key"] for row in key_rows)
+
+    if not dry_run and empty_ids:
+        client.table(KEYS_TABLE).delete().in_("cluster_id", empty_ids).execute()
+        client.table(CLUSTERS_TABLE).delete().in_("id", empty_ids).execute()
+
+    return GcReport(
+        dry_run=dry_run, empty_cluster_ids=empty_ids, orphaned_key_ids=orphaned_key_ids
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
