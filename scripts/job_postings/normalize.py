@@ -169,6 +169,17 @@ def normalize_listing(listing: dict, field_map: FieldMap, *, target_role: str) -
         "raw_payload": listing,
     }
 
+    # Adzuna returns company.display_name = "" rather than omitting the key
+    # when it has no employer to report (confirmed live: the Computer
+    # Engineering Intern pull that produced distinct_employers=0). An empty
+    # string is not "no employer" to anything downstream -- normalize_employer
+    # treats a falsy value as "no employer" but "" is truthy-shaped enough to
+    # slip through comparisons that check `is None`, and fuzzy_key/employer
+    # counting both branch on identity/falsiness, not on string content. None
+    # is the one spelling every consumer already treats as absent.
+    if row["company"] == "":
+        row["company"] = None
+
     missing = [f for f in REQUIRED if row.get(f) in (None, "")]
     if missing:
         raise NormalizationError(

@@ -12,6 +12,9 @@ from GradusIQ_career.student_intelligence_profile import StudentIntelligenceProf
 
 from .base import CareerFeatureRunner, FeatureResult, load_prompt_template
 from .market_data import get_market_requirements, get_shift_signals, is_role_supported
+from .posting_provider import DEFAULT_LIMIT_PER_ROLE, get_role_posting_grounding
+
+from GradusIQ_career.supabase_client import build_service_client
 
 # Sentinel value used in the data for "not switching majors" (Decision (b) —
 # it stays in the data as-is; FIT resolves around it here in feature logic).
@@ -64,9 +67,19 @@ class FitRunner(CareerFeatureRunner):
         "overall_fit_summary": "string",
     }
 
-    def __init__(self, *args, runtime_factory=AIRuntime, **kwargs):
+    def __init__(
+        self,
+        *args,
+        runtime_factory=AIRuntime,
+        posting_client_factory=None,
+        **kwargs,
+    ):
         super().__init__(*args, **kwargs)
         self.runtime_factory = runtime_factory
+        # None, not a bound default, so a module-level monkeypatch of
+        # build_service_client (see tests/conftest.py) still takes effect --
+        # the lookup below happens per call, not once at class-definition time.
+        self.posting_client_factory = posting_client_factory
         self.last_trace: dict[str, Any] | None = None
 
     def additional_missing_fields(self, student_profile: Mapping[str, Any]) -> list[str]:
@@ -212,11 +225,20 @@ class FitRunner(CareerFeatureRunner):
         # Deliberately no research agent. Matching a student to roles doesn't
         # justify a tool loop, and an unrated occupation still has tasks and
         # tooling to match against -- so FIT stays a single fast call.
+        #
+        # role_postings is a separate context key, not folded into
+        # market_requirements: O*NET requirements are static, national, and
+        # always present; postings are live, role-scoped, and may be absent
+        # (no_market_data) or entirely unfetchable (status: "unavailable").
+        # Collapsing those into one block would erase that distinction from
+        # the prompt.
         market = get_market_requirements(target_roles)
-        signals = get_shift_signals(target_roles)
+        signals = self._role_context_for(target_roles)
+        postings = self._get_role_postings(target_roles)
         return {
             "market_requirements": market,
             "role_context": signals,
+            "role_postings": postings,
             "effective_major": effective_major,
             "major_status": major_status,
             "major_current": student.get("major_current") or student.get("major"),
@@ -230,6 +252,43 @@ class FitRunner(CareerFeatureRunner):
             "work_experience": career.get("work_experience", []),
             "projects": career.get("projects", []),
         }
+
+    def _role_context_for(self, target_roles: list[str]) -> dict[str, Any]:
+        """FIT's copy of get_shift_signals, stripped of fields it doesn't earn.
+
+        ``hot_software`` is byte-for-byte identical to
+        ``market_requirements.by_role[role].hot_software`` -- the prompt
+        already instructs on market_requirements for "what this occupation
+        demands", so carrying it twice is pure duplication. ``related`` is
+        real O*NET data, but FIT's output contract has no bullet that uses it
+        (SHIFT's does, via shift_signals.related -- adjacent-role surfacing in
+        FIT is a real feature, just not one scoped yet). Stripped here, on
+        FIT's own freshly-built dict, so SHIFT's separate get_shift_signals
+        call is untouched.
+        """
+        signals = get_shift_signals(target_roles)
+        for entry in signals.get("by_role", {}).values():
+            if isinstance(entry, dict):
+                entry.pop("hot_software", None)
+                entry.pop("related", None)
+        return signals
+
+    def _get_role_postings(self, target_roles: list[str]) -> dict[str, Any]:
+        """Fetch live posting grounding, degrading to an explicit marker on failure.
+
+        A Supabase outage or config error must not fail FIT, and it must not
+        look like ``coverage: "no_market_data"`` -- that means "queried, found
+        nothing"; this means "never queried". The prompt has to be able to
+        tell the two apart.
+        """
+        try:
+            factory = self.posting_client_factory or build_service_client
+            client = factory()
+            return get_role_posting_grounding(
+                client, target_roles, limit_per_role=DEFAULT_LIMIT_PER_ROLE
+            )
+        except Exception as exc:  # noqa: BLE001 -- external dependency boundary
+            return {"status": "unavailable", "reason": str(exc)}
 
     def default_summary(self, data):
         return data.get("overall_fit_summary", "FIT analysis completed.")
