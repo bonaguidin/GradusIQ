@@ -134,6 +134,10 @@
   --radius:    3px;
   --radius-sm: 2px;
 
+  /* Button size — scales every button's type, padding and gap together.
+     Radius and border stay fixed so corners stay square at any size. */
+  --btn-scale: 1.15;
+
   /* ── Career tab redesign tokens ──────────────────────────────────────────
      Scoped to .career-subtab-panel (Snapshot/Readiness/Role Fit/Trend
      Guidance/Profile) rather than replacing the tokens above -- the rest of
@@ -3909,9 +3913,9 @@ a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: calc(6px * var(--btn-scale));
   font-family: var(--font-ui);
-  font-size: var(--text-sm);
+  font-size: calc(var(--text-sm) * var(--btn-scale));
   font-weight: 500;
   border-radius: var(--radius);
   cursor: pointer;
@@ -3919,7 +3923,7 @@ a {
   text-decoration: none;
   white-space: nowrap;
   border: 1px solid transparent;
-  padding: var(--sp-2) var(--sp-4);
+  padding: calc(var(--sp-2) * var(--btn-scale)) calc(var(--sp-4) * var(--btn-scale));
   line-height: 1;
   letter-spacing: 0.01em;
 }
@@ -3971,8 +3975,8 @@ a {
 }
 
 .btn-sm {
-  padding: 4px var(--sp-3);
-  font-size: var(--text-xs);
+  padding: calc(4px * var(--btn-scale)) calc(var(--sp-3) * var(--btn-scale));
+  font-size: calc(var(--text-xs) * var(--btn-scale));
 }
 
 .btn-full {
@@ -5903,9 +5907,9 @@ a {
    the same color as the fill so bordered and filled buttons align optically. */
 .rv-commit-button {
   font-family: var(--font-ui);
-  font-size: 0.9375rem;
+  font-size: calc(0.9375rem * var(--btn-scale));
   font-weight: 500;
-  padding: 0.8125rem 1.625rem;
+  padding: calc(0.8125rem * var(--btn-scale)) calc(1.625rem * var(--btn-scale));
   border: 1px solid var(--accent);
   background: var(--accent);
   color: var(--on-accent, #fff);
