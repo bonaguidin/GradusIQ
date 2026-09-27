@@ -1,0 +1,231 @@
+/* ─── INTERACTION LAYER ──────────────────────────────────────────────────────
+   How controls respond, and how long that takes. index.css owns appearance;
+   this file only adds behaviour on top of it, which is why interaction.ts
+   loads it after index.css from every entry point (the app and each preview
+   harness).
+
+   Nothing here changes a control's resting colour, size, type or radius.
+   Every colour is derived from index.css tokens so institution theming keeps
+   driving it -- there are deliberately no colour literals in this file, and
+   interactionLayer.test.mjs fails if one appears. */
+
+/* ─── TIMING ─────────────────────────────────────────────────────────────── */
+:root {
+  --t-press: 90ms;   /* scale under the pointer; has to beat perception */
+  --t-quick: 160ms;  /* hover colour, borders */
+  --t-move: 220ms;   /* anything that changes position or size */
+  --t-settle: 320ms; /* the return after a press -- the only overshoot */
+  --t-fill: 520ms;   /* liquid hover fill, press ripple */
+  --t-data: 600ms;   /* figures counting, meters filling */
+
+  --ease-out: cubic-bezier(0.2, 0.6, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ─── PRESS ──────────────────────────────────────────────────────────────────
+   hover    filled buttons: a liquid fill swells from where the pointer came
+            in, and drains toward where it leaves
+   press    every button gives under the pointer
+   release  a ripple spreads from the exact point of contact (from the centre
+            for keyboard activation)
+   interaction.ts writes both origins as custom properties. */
+
+.btn,
+.rv-commit-button {
+  --press-scale: 0.96;
+  --press-fill: transparent;
+  --press-ripple: transparent;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  transition:
+    background-color var(--t-quick) var(--ease-out),
+    border-color var(--t-quick) var(--ease-out),
+    color var(--t-quick) var(--ease-out),
+    transform var(--t-settle) var(--ease-spring);
+}
+
+/* Wide controls travel further for the same scale. */
+.btn-full { --press-scale: 0.985; }
+.rv-commit-button { --press-scale: 0.97; }
+
+.btn:active:not(:disabled):not([aria-disabled="true"]),
+.rv-commit-button:active:not(:disabled) {
+  transform: scale(var(--press-scale));
+  transition:
+    background-color var(--t-quick) var(--ease-out),
+    border-color var(--t-quick) var(--ease-out),
+    color var(--t-quick) var(--ease-out),
+    transform var(--t-press) var(--ease-out);
+}
+
+/* ── liquid fill: filled buttons only ── */
+
+.btn-primary,
+.rv-commit-button {
+  --press-fill: rgb(var(--accent-hover-rgb));
+  --press-ripple: rgb(var(--on-accent-rgb) / 0.28);
+}
+
+.btn-secondary {
+  --press-fill: rgb(var(--ink-rgb) / 0.06);
+  --press-ripple: rgb(var(--ink-rgb) / 0.1);
+}
+
+/* The analysis panels fill their Run button with the institution accent
+   (index.css, "primary action: Run/Re-run analysis"), so it takes the filled
+   treatment. Scoped to the panel's own header so it can never reach the
+   pencil-icon edit button, which already draws on ::before. */
+.career-subtab-panel .analysis-panel > .editable-section-header .editable-section-actions > .btn-ghost {
+  --press-fill: rgb(var(--accent-hover-rgb));
+  --press-ripple: rgb(var(--on-accent-rgb) / 0.28);
+}
+
+/* Sign in stays neutral whatever institution theme is applied. */
+.login-form .btn-primary {
+  --press-fill: color-mix(in srgb, var(--neutral-accent), var(--neutral-on-accent) 10%);
+  --press-ripple: color-mix(in srgb, var(--neutral-on-accent) 28%, transparent);
+}
+
+/* The liquid supplies the hover colour, so index.css's instant background
+   swap is held at the resting colour underneath it. */
+.btn-primary:hover:not(:disabled),
+.rv-commit-button:hover:not(:disabled) {
+  background: var(--accent);
+}
+
+.career-subtab-panel .analysis-panel > .editable-section-header .editable-section-actions > .btn-ghost:hover:not(:disabled) {
+  background: var(--institution-accent);
+}
+
+.login-form .btn-primary:hover:not(:disabled) {
+  background: var(--neutral-accent);
+  border-color: var(--press-fill);
+}
+
+.btn-primary::before,
+.btn-secondary::before,
+.rv-commit-button::before,
+.career-subtab-panel .analysis-panel > .editable-section-header .editable-section-actions > .btn-ghost::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: var(--press-x, 50%);
+  top: var(--press-y, 50%);
+  /* Solid to 70% of the radius, and that 70% has to reach the far corner. */
+  width: calc(var(--press-reach, 100px) * 2 / 0.7);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle closest-side, var(--press-fill) 70%, transparent);
+  transform: translate(-50%, -50%) scale(0);
+  transition: transform var(--t-fill) var(--ease-out);
+  pointer-events: none;
+}
+
+/* Hover-capable pointers only: on touch the fill would stick after a tap. */
+@media (hover: hover) and (pointer: fine) {
+  .btn-primary:hover:not(:disabled)::before,
+  .btn-secondary:hover:not(:disabled)::before,
+  .rv-commit-button:hover:not(:disabled)::before,
+  .career-subtab-panel .analysis-panel > .editable-section-header .editable-section-actions > .btn-ghost:hover:not(:disabled)::before {
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+/* ── ripple: every button ── */
+
+.btn-ghost { --press-ripple: rgb(var(--accent-rgb) / 0.14); }
+.btn-danger-ghost { --press-ripple: rgb(var(--error-rgb) / 0.14); }
+.btn-add { --press-ripple: rgb(var(--ink-rgb) / 0.1); }
+
+.btn::after,
+.rv-commit-button::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: var(--ripple-x, 50%);
+  top: var(--ripple-y, 50%);
+  width: calc(var(--ripple-reach, 100px) * 2);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--press-ripple);
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0);
+  pointer-events: none;
+}
+
+.btn[data-rippling]::after,
+.rv-commit-button[data-rippling]::after {
+  animation: press-ripple var(--t-fill) var(--ease-out);
+}
+
+@keyframes press-ripple {
+  from { opacity: 1; transform: translate(-50%, -50%) scale(0); }
+  to   { opacity: 0; transform: translate(-50%, -50%) scale(1); }
+}
+
+/* ── small controls: the give, nothing else ── */
+
+/* Component stylesheets load after this file, so these are element-qualified
+   to outrank their own transition rules rather than edit them. */
+button.chat-chip { --press-scale: 0.96; }
+button.topbar-help { --press-scale: 0.9; }
+
+button.chat-chip,
+button.topbar-help {
+  transition:
+    background-color var(--t-quick) var(--ease-out),
+    border-color var(--t-quick) var(--ease-out),
+    color var(--t-quick) var(--ease-out),
+    transform var(--t-settle) var(--ease-spring);
+}
+
+button.chat-chip:active:not(:disabled),
+button.topbar-help:active {
+  transform: scale(var(--press-scale));
+  transition:
+    background-color var(--t-quick) var(--ease-out),
+    border-color var(--t-quick) var(--ease-out),
+    color var(--t-quick) var(--ease-out),
+    transform var(--t-press) var(--ease-out);
+}
+
+/* index.css fades these row actions in with a transition list of its own;
+   restated here with the press added, or they would lose the spring. */
+.cp-detail .editable-section-actions .btn-ghost,
+.cp-field .editable-section-actions .btn-ghost {
+  transition:
+    opacity var(--t-quick) var(--ease-out),
+    background-color var(--t-quick) var(--ease-out),
+    border-color var(--t-quick) var(--ease-out),
+    color var(--t-quick) var(--ease-out),
+    transform var(--t-settle) var(--ease-spring);
+}
+
+/* ─── REDUCED MOTION ─────────────────────────────────────────────────────────
+   State changes stay (the hover colour still arrives); the movement goes. */
+@media (prefers-reduced-motion: reduce) {
+  .btn:active:not(:disabled):not([aria-disabled="true"]),
+  .rv-commit-button:active:not(:disabled),
+  button.chat-chip:active:not(:disabled),
+  button.topbar-help:active {
+    transform: none;
+  }
+
+  .btn-primary::before,
+  .btn-secondary::before,
+  .rv-commit-button::before,
+  .career-subtab-panel .analysis-panel > .editable-section-header .editable-section-actions > .btn-ghost::before {
+    transition: none;
+  }
+
+  .btn::after,
+  .rv-commit-button::after {
+    display: none;
+  }
+
+  .cp-detail .editable-section-actions .btn-ghost,
+  .cp-field .editable-section-actions .btn-ghost {
+    transition: none;
+  }
+}

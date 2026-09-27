@@ -3950,6 +3950,16 @@ a {
   background: var(--accent-tint);
 }
 
+.btn-secondary {
+  background: var(--surface);
+  color: var(--ink);
+  border-color: var(--line);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  border-color: rgb(var(--ink-rgb) / 0.35);
+}
+
 .btn-danger-ghost {
   background: transparent;
   color: var(--error);
