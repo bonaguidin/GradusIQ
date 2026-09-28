@@ -3,6 +3,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { CareerReview } from './components/CareerReview';
 import './index.css';
+import './interaction.ts';
 
 const SECTIONS = {
   career_profile: {
