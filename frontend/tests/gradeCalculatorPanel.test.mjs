@@ -276,7 +276,7 @@ test('Grade Calculator: empty state, upload, review, confirm, grade entry, save 
   assert.equal(await reviewCard.locator('[data-finding-code="non_deterministic_grading_rule"]').count(), 0)
   assert.equal(await reviewCard.locator('[data-finding-code="possible_curve"]').count(), 0)
   assert.equal(await reviewCard.getByText('Your syllabus says grades may be curved').count(), 0)
-  assert.equal(await reviewCard.getByText("CampusIQ can't calculate this curve rule automatically").count(), 0)
+  assert.equal(await reviewCard.getByText("GradusIQ can't calculate this curve rule automatically").count(), 0)
   // no inline finding on any rule card anymore
   assert.equal(await page.locator('.grade-rule-card .grade-inline-finding').count(), 0)
   // the "Ignore this rule for What-If calculations" button is gone
@@ -650,7 +650,7 @@ test('Grade Calculator: unresolved overlap shows only a note; an inline row edit
   // A/C is unresolved: only a note (no "Sound right?" proposal, no action
   // button), and its raw finding stays in the general review list.
   const unresolved = page.locator('.grade-cutoff-banner[data-cutoff-pair="A,C"]')
-  await unresolved.getByText(/cutoffs for A and C overlap and CampusIQ can't pick a safe default/).waitFor()
+  await unresolved.getByText(/cutoffs for A and C overlap and GradusIQ can't pick a safe default/).waitFor()
   assert.equal(await unresolved.getByText(/Sound right\?/).count(), 0)
   assert.equal(await unresolved.getByRole('button').count(), 0)
   await page.locator('.grade-inline-findings--general').getByText("Letter grades A and C have overlapping cutoffs: A is 75–100, C is 70–80.").waitFor()
@@ -1498,7 +1498,7 @@ test('Grade Calculator: an unknown_weight finding that matches no category rende
 
   // renders unattached in the editor's general area -- not dropped, and
   // not attached to any of the three (non-matching) category rows
-  await table.getByText('The syllabus doesn\'t state a weight for "Final Project", but CampusIQ couldn\'t match that to one of the categories below.').waitFor()
+  await table.getByText('The syllabus doesn\'t state a weight for "Final Project", but GradusIQ couldn\'t match that to one of the categories below.').waitFor()
   for (const name of ['Homework assignment', 'midterm exam', 'final exam']) {
     assert.equal(
       await table.locator(`[data-category-name="${name}"]`).locator('[data-finding-code="unknown_weight"]').count(),

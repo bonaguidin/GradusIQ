@@ -17,6 +17,7 @@
   --t-settle: 320ms; /* the return after a press -- the only overshoot */
   --t-fill: 520ms;   /* liquid hover fill, press ripple */
   --t-data: 600ms;   /* figures counting, meters filling */
+  --t-pulse: 1600ms; /* one breath of a loading skeleton */
 
   --ease-out: cubic-bezier(0.2, 0.6, 0.2, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);

@@ -291,7 +291,7 @@ async function request<T>(url: string, init: RequestInit, fallbackMessage: strin
   try {
     response = await fetch(url, init);
   } catch {
-    throw new SyllabusApiError(0, 'CampusIQ is unavailable right now. Try again in a moment.');
+    throw new SyllabusApiError(0, 'GradusIQ is unavailable right now. Try again in a moment.');
   }
   const body = await readJson(response);
   if (response.ok) return body as T;
@@ -340,7 +340,7 @@ export async function ingestSyllabus(
   return request<SyllabusProfileDetail>(
     `${BASE_URL}/ingest`,
     { method: 'POST', headers: authHeaders(accessToken), body: form },
-    "CampusIQ couldn't process this syllabus.",
+    "GradusIQ couldn't process this syllabus.",
   );
 }
 
