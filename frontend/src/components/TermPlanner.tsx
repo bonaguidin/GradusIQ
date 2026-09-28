@@ -278,7 +278,7 @@ export function TermPlanner({ slug, accessToken, courses, onCourseRecordsChanged
           <span role="cell">
             <span className="course-status-badge course-status-badge--dropped">Dropped</span>
             <strong>{course.course_code}</strong>
-            <small>{course.title ?? 'Untitled course'}</small>
+            <small title={course.title ?? undefined}>{course.title ?? 'Untitled course'}</small>
           </span>
           <span role="cell">{course.credit_hours} credits</span>
           <span role="cell">—</span>
@@ -291,7 +291,7 @@ export function TermPlanner({ slug, accessToken, courses, onCourseRecordsChanged
           <span role="cell">
             <span className="course-status-badge course-status-badge--in-progress">In progress</span>
             <strong>{course.course_code}</strong>
-            <small>{course.title ?? 'Untitled course'}</small>
+            <small title={course.title ?? undefined}>{course.title ?? 'Untitled course'}</small>
           </span>
           <span role="cell">{course.credit_hours} credits</span>
           <span role="cell" className="current-grade-cell">
@@ -328,7 +328,7 @@ export function TermPlanner({ slug, accessToken, courses, onCourseRecordsChanged
       <div className="real-course-row" role="row" key={course.id}>
         <span role="cell">
           <strong>{course.course_code}</strong>
-          <small>{course.title ?? 'Untitled course'}</small>
+          <small title={course.title ?? undefined}>{course.title ?? 'Untitled course'}</small>
         </span>
         <span role="cell">{course.credit_hours} credits</span>
         <span role="cell">{course.letter_grade ?? '—'}</span>
@@ -352,7 +352,7 @@ export function TermPlanner({ slug, accessToken, courses, onCourseRecordsChanged
       <span role="cell">
         <span className="planned-badge">Planned</span>
         <strong>{course.course_code}</strong>
-        <small>{course.title ?? 'Untitled course'}</small>
+        <small title={course.title ?? undefined}>{course.title ?? 'Untitled course'}</small>
       </span>
       <span role="cell">
         {course.credit_hours === null ? 'Credits TBD' : `${course.credit_hours} credits`}
@@ -450,7 +450,7 @@ export function TermPlanner({ slug, accessToken, courses, onCourseRecordsChanged
               <div className="grade-request-row" key={course.id}>
                 <span>
                   <strong>{course.course_code}</strong>
-                  <small>{course.title ?? 'Untitled course'}</small>
+                  <small title={course.title ?? undefined}>{course.title ?? 'Untitled course'}</small>
                 </span>
                 <label className="sr-only" htmlFor={`final-grade-${course.id}`}>
                   Final grade for {course.course_code}
