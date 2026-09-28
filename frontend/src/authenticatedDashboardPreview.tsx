@@ -9,6 +9,7 @@ import { ProfileCompletionPage } from './pages/ProfileCompletionPage';
 import { applyInstitutionTheme, fetchInstitutionThemeByName } from './lib/institutionTheme';
 import type { StudentIntelligenceProfile } from './types/studentIntelligenceProfile';
 import './index.css';
+import './interaction.ts';
 
 const mode = new URLSearchParams(location.search).get('mode') ?? 'complete';
 const institution = new URLSearchParams(location.search).get('institution') === 'smu'

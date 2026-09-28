@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { TechnicalElectiveCandidate, TechnicalElectiveCandidateSuccess, TechnicalElectiveEligibility } from '../api/technicalElectives.mjs';
+import { Reveal } from './Reveal';
 
 const LABEL: Record<TechnicalElectiveEligibility, string> = {
   READY: 'Ready',
@@ -35,7 +36,7 @@ export function TechnicalElectiveCandidates({ result }: { result: TechnicalElect
         {expanded ? 'Hide course options' : 'View course options'}
       </button>
 
-      {expanded && (
+      <Reveal open={expanded}>
         <div className="technical-elective-options-body">
           <p className="technical-elective-disclaimer">
             {result.institution === 'smu'
@@ -74,7 +75,7 @@ export function TechnicalElectiveCandidates({ result }: { result: TechnicalElect
             Other departments may be approved as exceptions; ask your adviser about those options.
           </p>
         </div>
-      )}
+      </Reveal>
     </div>
   );
 }

@@ -1,0 +1,474 @@
+/* ─── INTERACTION LAYER ──────────────────────────────────────────────────────
+   How controls respond, and how long that takes. index.css owns appearance;
+   this file only adds behaviour on top of it, which is why interaction.ts
+   loads it after index.css from every entry point (the app and each preview
+   harness).
+
+   Nothing here changes a control's resting colour, size, type or radius.
+   Every colour is derived from index.css tokens so institution theming keeps
+   driving it -- there are deliberately no colour literals in this file, and
+   interactionLayer.test.mjs fails if one appears. */
+
+/* ─── TIMING ─────────────────────────────────────────────────────────────── */
+:root {
+  --t-press: 90ms;   /* scale under the pointer; has to beat perception */
+  --t-quick: 160ms;  /* hover colour, borders */
+  --t-move: 220ms;   /* anything that changes position or size */
+  --t-settle: 320ms; /* the return after a press -- the only overshoot */
+  --t-fill: 520ms;   /* liquid hover fill, press ripple */
+  --t-data: 600ms;   /* figures counting, meters filling */
+  --t-pulse: 1600ms; /* one breath of a loading skeleton */
+
+  --ease-out: cubic-bezier(0.2, 0.6, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ─── PRESS ──────────────────────────────────────────────────────────────────
+   hover    filled buttons: a liquid fill swells from where the pointer came
+            in, and drains toward where it leaves
+   press    every button gives under the pointer
+   release  a ripple spreads from the exact point of contact (from the centre
+            for keyboard activation)
+   interaction.ts writes both origins as custom properties. */
+
+/* Structural defaults sit in :where(), which has no specificity, so any
+   component that positions or clips its own button (pinned absolutely to a
+   card corner, say) keeps its layout whatever order the stylesheets load in.
+   An absolutely positioned button still anchors its own ::before/::after. */
+:where(.btn, .rv-commit-button) {
+  --press-scale: 0.96;
+  --press-fill: transparent;
+  --press-ripple: transparent;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.btn,
+.rv-commit-button {
+  transition:
+    background-color var(--t-quick) var(--ease-out),
+    border-color var(--t-quick) var(--ease-out),
+    color var(--t-quick) var(--ease-out),
+    transform var(--t-settle) var(--ease-spring);
+}
+
+/* Wide controls travel further for the same scale. */
+.btn-full { --press-scale: 0.985; }
+.rv-commit-button { --press-scale: 0.97; }
+
+.btn:active:not(:disabled):not([aria-disabled="true"]),
+.rv-commit-button:active:not(:disabled) {
+  transform: scale(var(--press-scale));
+  transition:
+    background-color var(--t-quick) var(--ease-out),
+    border-color var(--t-quick) var(--ease-out),
+    color var(--t-quick) var(--ease-out),
+    transform var(--t-press) var(--ease-out);
+}
+
+/* ── liquid fill ──
+   Filled buttons lighten toward their hover colour. Outline buttons fill
+   solid with their own colour, and their text inverts. */
+
+.btn-primary,
+.rv-commit-button {
+  --press-fill: rgb(var(--accent-hover-rgb));
+  --press-ripple: rgb(var(--on-accent-rgb) / 0.28);
+}
+
+.btn-secondary {
+  --press-fill: rgb(var(--ink-rgb) / 0.06);
+  --press-ripple: rgb(var(--ink-rgb) / 0.1);
+}
+
+/* The pencil-icon edit control (index.css, "icon-only field edit control")
+   draws its icon on ::before, so it is kept out of every outline rule. The
+   exclusion sits in :where() so it adds no specificity, and the more specific
+   rules below still win. */
+.btn-ghost:not(:where(.career-subtab-panel :is(.cp-detail, .cp-field) .editable-section-actions .btn-ghost:only-child)) {
+  --press-fill: rgb(var(--accent-rgb));
+  --press-ripple: rgb(var(--accent-rgb) / 0.14);
+}
+
+.btn-danger-ghost {
+  --press-fill: rgb(var(--error-rgb));
+  --press-ripple: rgb(var(--error-rgb) / 0.14);
+}
+
+/* The analysis panels already fill their Run button with the institution
+   accent (index.css, "primary action: Run/Re-run analysis"), so it lightens
+   like a filled button instead. */
+.career-subtab-panel .analysis-panel > .editable-section-header .editable-section-actions > .btn-ghost {
+  --press-fill: rgb(var(--accent-hover-rgb));
+  --press-ripple: rgb(var(--on-accent-rgb) / 0.28);
+}
+
+/* Sign in stays neutral whatever institution theme is applied. */
+.login-form .btn-primary {
+  --press-fill: color-mix(in srgb, var(--neutral-accent), var(--neutral-on-accent) 10%);
+  --press-ripple: color-mix(in srgb, var(--neutral-on-accent) 28%, transparent);
+}
+
+/* Skip is deliberately the quietest action in the tour (GuidedTour.css), so
+   its fill stays neutral. Element-qualified to outrank GuidedTour.css, which
+   loads after this file. */
+button.tour-skip {
+  --press-fill: var(--paper);
+  --press-ripple: rgb(var(--ink-rgb) / 0.1);
+}
+
+/* The liquid supplies the hover colour, so the instant background swap in
+   index.css is held at the resting colour underneath it. */
+.btn-primary:hover:not(:disabled),
+.rv-commit-button:hover:not(:disabled) {
+  background: var(--accent);
+}
+
+.btn-ghost:hover:not(:disabled),
+.btn-danger-ghost:hover:not(:disabled) {
+  background: transparent;
+}
+
+.career-subtab-panel .analysis-panel > .editable-section-header .editable-section-actions > .btn-ghost:hover:not(:disabled) {
+  background: var(--institution-accent);
+}
+
+.login-form .btn-primary:hover:not(:disabled) {
+  background: var(--neutral-accent);
+  border-color: var(--press-fill);
+}
+
+button.tour-skip:hover:not(:disabled) {
+  background: transparent;
+  border-color: transparent;
+}
+
+.btn-primary::before,
+.btn-secondary::before,
+.btn-danger-ghost::before,
+.rv-commit-button::before,
+.btn-ghost:not(:where(.career-subtab-panel :is(.cp-detail, .cp-field) .editable-section-actions .btn-ghost:only-child))::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: var(--press-x, 50%);
+  top: var(--press-y, 50%);
+  /* Solid to 70% of the radius, and that 70% has to reach the far corner. */
+  width: calc(var(--press-reach, 100px) * 2 / 0.7);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle closest-side, var(--press-fill) 70%, transparent);
+  transform: translate(-50%, -50%) scale(0);
+  transition: transform var(--t-fill) var(--ease-out);
+  pointer-events: none;
+}
+
+/* Hover-capable pointers only: on touch the fill would stick after a tap. */
+@media (hover: hover) and (pointer: fine) {
+  .btn-primary:hover:not(:disabled)::before,
+  .btn-secondary:hover:not(:disabled)::before,
+  .btn-danger-ghost:hover:not(:disabled)::before,
+  .rv-commit-button:hover:not(:disabled)::before,
+  .btn-ghost:not(:where(.career-subtab-panel :is(.cp-detail, .cp-field) .editable-section-actions .btn-ghost:only-child)):hover:not(:disabled)::before {
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  /* Outline text inverts only where the fill actually arrives. Outside this
+     query a tap would leave light text on a light ground. The ripple then
+     lands on the fill, so it takes the inverted colour too. */
+  .btn-ghost:not(:where(.career-subtab-panel :is(.cp-detail, .cp-field) .editable-section-actions .btn-ghost:only-child)):hover:not(:disabled) {
+    --press-ripple: rgb(var(--on-accent-rgb) / 0.28);
+    color: rgb(var(--on-accent-rgb));
+    border-color: rgb(var(--accent-rgb));
+  }
+
+  .btn-danger-ghost:hover:not(:disabled) {
+    --press-ripple: color-mix(in srgb, var(--neutral-on-accent) 28%, transparent);
+    color: var(--neutral-on-accent);
+    border-color: rgb(var(--error-rgb));
+  }
+
+  /* Stated here rather than left to GuidedTour.css: which of the two wins at
+     equal specificity depends on import order, and the preview harnesses
+     import components before index.css. */
+  button.tour-skip:hover:not(:disabled) {
+    --press-ripple: rgb(var(--ink-rgb) / 0.1);
+    color: var(--ink);
+  }
+}
+
+/* ── ripple: every button ── */
+
+.btn::after,
+.rv-commit-button::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: var(--ripple-x, 50%);
+  top: var(--ripple-y, 50%);
+  width: calc(var(--ripple-reach, 100px) * 2);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--press-ripple);
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0);
+  pointer-events: none;
+}
+
+.btn[data-rippling]::after,
+.rv-commit-button[data-rippling]::after {
+  animation: press-ripple var(--t-fill) var(--ease-out);
+}
+
+@keyframes press-ripple {
+  from { opacity: 1; transform: translate(-50%, -50%) scale(0); }
+  to   { opacity: 0; transform: translate(-50%, -50%) scale(1); }
+}
+
+/* ── small controls: the give, nothing else ── */
+
+/* Component stylesheets load after this file, so these are element-qualified
+   to outrank their own transition rules rather than edit them. */
+button.chat-chip { --press-scale: 0.96; }
+button.topbar-help { --press-scale: 0.9; }
+
+button.chat-chip,
+button.topbar-help {
+  transition:
+    background-color var(--t-quick) var(--ease-out),
+    border-color var(--t-quick) var(--ease-out),
+    color var(--t-quick) var(--ease-out),
+    transform var(--t-settle) var(--ease-spring);
+}
+
+button.chat-chip:active:not(:disabled),
+button.topbar-help:active {
+  transform: scale(var(--press-scale));
+  transition:
+    background-color var(--t-quick) var(--ease-out),
+    border-color var(--t-quick) var(--ease-out),
+    color var(--t-quick) var(--ease-out),
+    transform var(--t-press) var(--ease-out);
+}
+
+/* index.css fades these row actions in with a transition list of its own;
+   restated here with the press added, or they would lose the spring. */
+.cp-detail .editable-section-actions .btn-ghost,
+.cp-field .editable-section-actions .btn-ghost {
+  transition:
+    opacity var(--t-quick) var(--ease-out),
+    background-color var(--t-quick) var(--ease-out),
+    border-color var(--t-quick) var(--ease-out),
+    color var(--t-quick) var(--ease-out),
+    transform var(--t-settle) var(--ease-spring);
+}
+
+/* ─── MOTION CONTINUITY ──────────────────────────────────────────────────────
+   Motion that explains what just changed and where it came from. Nothing
+   here plays on scroll or runs on its own. */
+
+/* Section switches already fade and rise in (index.css, .stage-section);
+   this puts them on the shared curve. */
+.stage-section {
+  animation-duration: var(--t-move);
+  animation-timing-function: var(--ease-out);
+}
+
+/* A rail section's sub-items unroll from the item that owns them. */
+.rail-subnav {
+  animation: subnav-in var(--t-move) var(--ease-out);
+}
+
+@keyframes subnav-in {
+  from { opacity: 0; clip-path: inset(0 0 100% 0); }
+  to   { opacity: 1; clip-path: inset(0); }
+}
+
+/* ── tabs: one underline that travels (positioned by interaction.ts) ── */
+
+:where(.academic-tabs[role="tablist"]) {
+  position: relative;
+}
+
+.academic-tabs[data-tab-indicator]::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: calc(var(--tab-bottom, 0px) - 2px);
+  width: var(--tab-w, 0px);
+  height: 2px;
+  background: var(--accent);
+  transform: translateX(var(--tab-x, 0px));
+  transition:
+    transform var(--t-move) var(--ease-out),
+    width var(--t-move) var(--ease-out);
+  pointer-events: none;
+}
+
+/* Each tab's own underline hands over to the travelling one, but only once
+   interaction.ts has placed it -- without the script, nothing changes. */
+.academic-tabs[data-tab-indicator] .academic-tab--active {
+  border-bottom-color: transparent;
+}
+
+.academic-tab {
+  transition: color var(--t-quick) var(--ease-out);
+}
+
+/* The panel arrives from the side the student moved toward. */
+[role="tabpanel"][data-tab-entering] {
+  animation: tab-panel-in var(--t-move) var(--ease-out);
+}
+
+@keyframes tab-panel-in {
+  from { opacity: 0; transform: translateX(calc(var(--tab-from, 0) * 8px)); }
+}
+
+/* ── expanders: content grows out of its toggle (components/Reveal.tsx) ── */
+
+:where(.reveal) {
+  display: grid;
+  grid-template-rows: 0fr;
+}
+
+:where(.reveal[data-open]) {
+  grid-template-rows: 1fr;
+}
+
+:where(.reveal > .reveal-inner) {
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Once fully open, nothing inside (focus rings, menus) gets clipped. */
+:where(.reveal[data-settled] > .reveal-inner) {
+  overflow: visible;
+}
+
+.reveal {
+  transition: grid-template-rows var(--t-move) var(--ease-out);
+}
+
+.reveal > .reveal-inner {
+  opacity: 0;
+  transition: opacity var(--t-quick) var(--ease-out);
+}
+
+.reveal[data-open] > .reveal-inner {
+  opacity: 1;
+  transition-delay: calc(var(--t-move) - var(--t-quick));
+}
+
+/* .career-preview spaces its children with a grid gap (index.css). The
+   revealed content now sits one level down, so the gap is cancelled on the
+   wrapper and rebuilt inside it, where it grows and shrinks with the reveal. */
+:where(.career-preview > .reveal) {
+  margin-top: calc(-1 * var(--sp-3));
+}
+
+:where(.career-preview > .reveal > .reveal-inner) {
+  display: grid;
+  gap: var(--sp-3);
+}
+
+:where(.career-preview > .reveal > .reveal-inner > :first-child) {
+  margin-top: var(--sp-3);
+}
+
+/* The requirement toggle turns rather than swapping glyphs. */
+:where(.requirement-group-toggle-icon) {
+  display: inline-block;
+}
+
+.requirement-group-toggle-icon {
+  transition: transform var(--t-move) var(--ease-out);
+}
+
+.requirement-group-toggle[aria-expanded="true"] .requirement-group-toggle-icon {
+  transform: rotate(90deg);
+}
+
+/* ── figures that count to a new value (components/AnimatedNumber.tsx) ──
+   The real text is always the final value; while counting, it is hidden and
+   the moving digits are drawn over it from data-count. */
+
+:where(.figure-count) {
+  position: relative;
+}
+
+.figure-count[data-count] {
+  -webkit-text-fill-color: transparent;
+}
+
+.figure-count[data-count]::before {
+  content: attr(data-count);
+  position: absolute;
+  inset: 0 0 auto 0;
+  white-space: nowrap;
+  -webkit-text-fill-color: currentColor;
+}
+
+.figure-count[data-delta]::after {
+  content: attr(data-delta);
+  display: inline-block;
+  margin-left: var(--sp-2);
+  padding: 1px 6px;
+  border: 1px solid;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-data);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  line-height: 1.4;
+  vertical-align: middle;
+  -webkit-text-fill-color: currentColor;
+  animation: figure-delta-in var(--t-move) var(--ease-out);
+}
+
+.figure-count[data-delta-sign="up"]::after {
+  color: var(--ready);
+  background: var(--ready-tint);
+  border-color: var(--ready-border);
+}
+
+.figure-count[data-delta-sign="down"]::after {
+  color: var(--error);
+  background: var(--error-tint);
+  border-color: var(--error-tint-border);
+}
+
+@keyframes figure-delta-in {
+  from { opacity: 0; transform: translateY(3px); }
+}
+
+/* ─── REDUCED MOTION ─────────────────────────────────────────────────────────
+   index.css already stops every transition and animation for reduced
+   motion. This handles what that can't reach: states that move things (the
+   pressed scale) and the ripple's box. The count and the reveal timing check
+   the same setting in JS. State changes stay; the movement goes. */
+@media (prefers-reduced-motion: reduce) {
+  .btn:active:not(:disabled):not([aria-disabled="true"]),
+  .rv-commit-button:active:not(:disabled),
+  button.chat-chip:active:not(:disabled),
+  button.topbar-help:active {
+    transform: none;
+  }
+
+  .btn-primary::before,
+  .btn-secondary::before,
+  .btn-danger-ghost::before,
+  .rv-commit-button::before,
+  .btn-ghost:not(:where(.career-subtab-panel :is(.cp-detail, .cp-field) .editable-section-actions .btn-ghost:only-child))::before {
+    transition: none;
+  }
+
+  .btn::after,
+  .rv-commit-button::after {
+    display: none;
+  }
+
+  .cp-detail .editable-section-actions .btn-ghost,
+  .cp-field .editable-section-actions .btn-ghost {
+    transition: none;
+  }
+}
