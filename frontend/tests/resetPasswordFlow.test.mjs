@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { fileURLToPath } from 'node:url'
 import test, { after, before } from 'node:test'
 import { readFile } from 'node:fs/promises'
 import { chromium } from 'playwright'
@@ -17,9 +18,9 @@ let origin
 
 before(async () => {
   server = await createServer({
-    root: new URL('..', import.meta.url).pathname,
+    root: fileURLToPath(new URL('..', import.meta.url)),
     logLevel: 'silent',
-    cacheDir: new URL('../node_modules/.vite-reset-password-test', import.meta.url).pathname,
+    cacheDir: fileURLToPath(new URL('../node_modules/.vite-reset-password-test', import.meta.url)),
     server: { host: '127.0.0.1' },
   })
   await server.listen()

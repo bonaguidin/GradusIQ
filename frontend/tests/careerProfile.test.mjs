@@ -5,6 +5,7 @@
 // treatments, theming, and the layouts at three widths.
 
 import assert from 'node:assert/strict'
+import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import { chromium } from 'playwright'
 import { createServer } from 'vite'
@@ -14,8 +15,8 @@ const LONG_TAIL = 'per-class error analysis across the five AAMI categories.'
 
 async function startServer(t, plugins = []) {
   const server = await createServer({
-    root: new URL('..', import.meta.url).pathname,
-    cacheDir: new URL('../node_modules/.vite-career-profile', import.meta.url).pathname,
+    root: fileURLToPath(new URL('..', import.meta.url)),
+    cacheDir: fileURLToPath(new URL('../node_modules/.vite-career-profile', import.meta.url)),
     logLevel: 'silent',
     plugins,
     server: { host: '127.0.0.1' },

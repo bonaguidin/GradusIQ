@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import { readFile } from 'node:fs/promises'
 import { chromium } from 'playwright'
@@ -85,7 +86,7 @@ test('authenticated dashboard covers canonical states, routing, themes, errors, 
     }
     next()
   }) } }
-  const server = await createServer({ root: new URL('..', import.meta.url).pathname, cacheDir: new URL('../node_modules/.vite-auth-dashboard', import.meta.url).pathname, logLevel: 'silent', plugins: [apiPlugin], server: { host: '127.0.0.1' } })
+  const server = await createServer({ root: fileURLToPath(new URL('..', import.meta.url)), cacheDir: fileURLToPath(new URL('../node_modules/.vite-auth-dashboard', import.meta.url)), logLevel: 'silent', plugins: [apiPlugin], server: { host: '127.0.0.1' } })
   await server.listen(); t.after(async () => server.close())
   const address = server.httpServer?.address(); assert.ok(address && typeof address === 'object')
   const origin = `http://127.0.0.1:${String(address.port)}`
