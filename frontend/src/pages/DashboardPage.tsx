@@ -21,6 +21,8 @@ import { buildDashboardViewModel } from '../data/dashboardViewModel';
 import { missingChecklistFields } from '../lib/profileChecklist';
 import { applyDemoProfileChanges, buildDemoIntelligenceProfile } from '../data/demoIntelligenceProfile';
 import { ensureDemoPlanningStore, snapshotDemoCourseRecords } from '../data/demoPlanningStore';
+import { buildDemoGradingSchema } from '../data/demoTermFixtures';
+import { demoGpaSummary } from '../lib/demoGpa.mjs';
 import type { ProfileCompleteness } from '../types/student';
 import { ChatPanel } from '../components/ChatPanel';
 import { GuidedTour } from '../components/GuidedTour';
@@ -358,7 +360,21 @@ function DemoDashboardPage() {
     [],
   );
 
-  const dashboard = useMemo(() => (demoProfile ? buildDashboardViewModel(demoProfile) : null), [demoProfile]);
+  const baseDashboard = useMemo(() => (demoProfile ? buildDashboardViewModel(demoProfile) : null), [demoProfile]);
+  // The GPA Calculator's figures follow the live course records, so a grade
+  // entered below moves Projected GPA the way it would on a real account.
+  const dashboard = useMemo(() => {
+    if (!baseDashboard) return null;
+    return {
+      ...baseDashboard,
+      ...demoGpaSummary({
+        officialGpa: baseDashboard.officialGpa,
+        classification: baseDashboard.classification,
+        courses: demoCourseRecords,
+        grades: buildDemoGradingSchema(demoProfile?.institution.name ?? null).grades,
+      }),
+    };
+  }, [baseDashboard, demoCourseRecords, demoProfile]);
   const missingDetails = useMemo(
     () => (demoProfile ? missingChecklistFields(demoProfile) : []),
     [demoProfile],
