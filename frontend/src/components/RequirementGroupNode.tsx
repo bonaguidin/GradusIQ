@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { RequirementGroupResult, RequirementGroupStatus } from '../api/requirementSatisfaction.mjs';
 import { TechnicalElectiveSlot } from './TechnicalElectiveSlot';
+import { Reveal } from './Reveal';
 
 const STATUS_LABEL: Record<RequirementGroupStatus, string> = {
   SATISFIED: 'Satisfied',
@@ -42,7 +43,7 @@ export function RequirementGroupNode({ group }: { group: RequirementGroupResult 
             aria-expanded={expanded}
             onClick={() => setExpanded((value) => !value)}
           >
-            <span className="requirement-group-toggle-icon" aria-hidden="true">{expanded ? '▾' : '▸'}</span>
+            <span className="requirement-group-toggle-icon" aria-hidden="true">▸</span>
             {group.name}
           </button>
         ) : (
@@ -67,12 +68,14 @@ export function RequirementGroupNode({ group }: { group: RequirementGroupResult 
 
       <TechnicalElectiveSlot groupId={group.id} />
 
-      {hasChildren && expanded && (
-        <ul className="requirement-group-children">
-          {group.children.map((child) => (
-            <RequirementGroupNode key={child.id} group={child} />
-          ))}
-        </ul>
+      {hasChildren && (
+        <Reveal open={expanded}>
+          <ul className="requirement-group-children">
+            {group.children.map((child) => (
+              <RequirementGroupNode key={child.id} group={child} />
+            ))}
+          </ul>
+        </Reveal>
       )}
     </li>
   );
