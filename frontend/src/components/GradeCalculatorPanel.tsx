@@ -3,6 +3,7 @@ import { fetchPlannedCourses, fetchTerms } from '../api/planning';
 import type { PlannedCourse, PlanningTerm } from '../lib/termPlanning.mjs';
 import type { AcademicCourse } from '../types/studentIntelligenceProfile';
 import { GradeCard } from './GradeCard';
+import { AnimatedNumber } from './AnimatedNumber';
 import {
   SyllabusApiError,
   calculateSyllabusGrade,
@@ -1093,7 +1094,7 @@ export function GradeCalculatorPanel({ accessToken, courses, institutionName }: 
                   {calcResult && (
                     <div className="card" role="status" aria-live="polite">
                       <h3 className="card-heading">Current grade</h3>
-                      <p className="overview-stat-value">{calcResult.current_grade !== null ? `${calcResult.current_grade}%` : '—'}</p>
+                      <p className="overview-stat-value"><AnimatedNumber value={calcResult.current_grade} suffix="%" showDelta /></p>
                       <p className="empty-state">
                         {calcResult.completed_weight !== null
                           ? `Based on ${calcResult.completed_weight}% of the course completed.`
@@ -1109,7 +1110,7 @@ export function GradeCalculatorPanel({ accessToken, courses, institutionName }: 
 
                       <h3 className="card-heading">Projected grade</h3>
                       {calcResult.projected_grade !== null ? (
-                        <p className="overview-stat-value">{calcResult.projected_grade}%</p>
+                        <p className="overview-stat-value"><AnimatedNumber value={calcResult.projected_grade} suffix="%" showDelta /></p>
                       ) : (
                         <p className="empty-state">Enter a hypothetical score for every remaining component to see your projected grade.</p>
                       )}
