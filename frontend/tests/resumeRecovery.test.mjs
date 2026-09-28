@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
 import { chromium } from 'playwright'
@@ -78,8 +79,8 @@ test('resume page recovers persisted review across load, error, confirmation, an
   }
 
   const server = await createServer({
-    root: new URL('..', import.meta.url).pathname,
-    cacheDir: new URL('../node_modules/.vite-resume-recovery', import.meta.url).pathname,
+    root: fileURLToPath(new URL('..', import.meta.url)),
+    cacheDir: fileURLToPath(new URL('../node_modules/.vite-resume-recovery', import.meta.url)),
     logLevel: 'silent',
     plugins: [apiPlugin],
     server: { host: '127.0.0.1' },
@@ -206,8 +207,8 @@ test('a slow confirm dims the resume review too, identically to transcript', { t
   }
 
   const server = await createServer({
-    root: new URL('..', import.meta.url).pathname,
-    cacheDir: new URL('../node_modules/.vite-resume-recovery', import.meta.url).pathname,
+    root: fileURLToPath(new URL('..', import.meta.url)),
+    cacheDir: fileURLToPath(new URL('../node_modules/.vite-resume-recovery', import.meta.url)),
     logLevel: 'silent',
     plugins: [apiPlugin],
     server: { host: '127.0.0.1' },
@@ -270,8 +271,8 @@ test('resume confirm failures stay on the review screen and stay retryable', { t
   }
 
   const server = await createServer({
-    root: new URL('..', import.meta.url).pathname,
-    cacheDir: new URL('../node_modules/.vite-resume-failures', import.meta.url).pathname,
+    root: fileURLToPath(new URL('..', import.meta.url)),
+    cacheDir: fileURLToPath(new URL('../node_modules/.vite-resume-failures', import.meta.url)),
     logLevel: 'silent',
     plugins: [apiPlugin],
     server: { host: '127.0.0.1' },

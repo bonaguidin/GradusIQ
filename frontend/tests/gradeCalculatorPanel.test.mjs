@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import { chromium } from 'playwright'
 import { createServer } from 'vite'
@@ -213,8 +214,8 @@ test('Grade Calculator: empty state, upload, review, confirm, grade entry, save 
   }
 
   const server = await createServer({
-    root: new URL('..', import.meta.url).pathname,
-    cacheDir: new URL('../node_modules/.vite-grade-calculator', import.meta.url).pathname,
+    root: fileURLToPath(new URL('..', import.meta.url)),
+    cacheDir: fileURLToPath(new URL('../node_modules/.vite-grade-calculator', import.meta.url)),
     logLevel: 'silent',
     plugins: [apiPlugin],
     server: { host: '127.0.0.1' },
@@ -399,8 +400,8 @@ test('Grade Calculator replaces a framework 404 with friendly list-load copy', {
     },
   }
   const server = await createServer({
-    root: new URL('..', import.meta.url).pathname,
-    cacheDir: new URL('../node_modules/.vite-grade-calculator-list-error', import.meta.url).pathname,
+    root: fileURLToPath(new URL('..', import.meta.url)),
+    cacheDir: fileURLToPath(new URL('../node_modules/.vite-grade-calculator-list-error', import.meta.url)),
     logLevel: 'silent',
     plugins: [apiPlugin],
     server: { host: '127.0.0.1' },
@@ -450,8 +451,8 @@ test('Grade Calculator: remove a calculator from the list (confirm-gated soft de
     },
   }
   const server = await createServer({
-    root: new URL('..', import.meta.url).pathname,
-    cacheDir: new URL('../node_modules/.vite-grade-calculator-remove', import.meta.url).pathname,
+    root: fileURLToPath(new URL('..', import.meta.url)),
+    cacheDir: fileURLToPath(new URL('../node_modules/.vite-grade-calculator-remove', import.meta.url)),
     logLevel: 'silent',
     plugins: [apiPlugin],
     server: { host: '127.0.0.1' },
@@ -533,8 +534,8 @@ async function mountCutoffPanel(t, cacheKey, handle) {
     },
   }
   const server = await createServer({
-    root: new URL('..', import.meta.url).pathname,
-    cacheDir: new URL(`../node_modules/.vite-${cacheKey}`, import.meta.url).pathname,
+    root: fileURLToPath(new URL('..', import.meta.url)),
+    cacheDir: fileURLToPath(new URL(`../node_modules/.vite-${cacheKey}`, import.meta.url)),
     logLevel: 'silent',
     plugins: [apiPlugin],
     server: { host: '127.0.0.1' },
@@ -1927,8 +1928,8 @@ test('Grade Calculator: the list renders a segmented ring card per calculator', 
     },
   }
   const server = await createServer({
-    root: new URL('..', import.meta.url).pathname,
-    cacheDir: new URL('../node_modules/.vite-grade-calculator-cards', import.meta.url).pathname,
+    root: fileURLToPath(new URL('..', import.meta.url)),
+    cacheDir: fileURLToPath(new URL('../node_modules/.vite-grade-calculator-cards', import.meta.url)),
     logLevel: 'silent',
     plugins: [apiPlugin],
     server: { host: '127.0.0.1' },

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import { readFile } from 'node:fs/promises'
 import { chromium } from 'playwright'
@@ -224,8 +225,8 @@ test('the /profile/complete page still saves through the recomposed form', { tim
   }) } }
 
   const server = await createServer({
-    root: new URL('..', import.meta.url).pathname,
-    cacheDir: new URL('../node_modules/.vite-profile-page', import.meta.url).pathname,
+    root: fileURLToPath(new URL('..', import.meta.url)),
+    cacheDir: fileURLToPath(new URL('../node_modules/.vite-profile-page', import.meta.url)),
     logLevel: 'silent',
     plugins: [apiPlugin],
     server: { host: '127.0.0.1' },
