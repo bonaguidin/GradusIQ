@@ -6,6 +6,7 @@
 // shared Vite cache.
 
 import assert from 'node:assert/strict'
+import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import { chromium } from 'playwright'
 import { createServer } from 'vite'
@@ -39,8 +40,8 @@ const TRANSCRIPT_PDF = { name: 'Fall 2025 Official Transcript.pdf', mimeType: 'a
  */
 async function startServer(t, cacheKey, handler) {
   const server = await createServer({
-    root: new URL('..', import.meta.url).pathname,
-    cacheDir: new URL(`../node_modules/.vite-${cacheKey}`, import.meta.url).pathname,
+    root: fileURLToPath(new URL('..', import.meta.url)),
+    cacheDir: fileURLToPath(new URL(`../node_modules/.vite-${cacheKey}`, import.meta.url)),
     logLevel: 'silent',
     plugins: [{ name: `dp-${cacheKey}`, configureServer(s) { s.middlewares.use(handler) } }],
     server: { host: '127.0.0.1' },

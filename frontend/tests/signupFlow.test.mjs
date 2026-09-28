@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { fileURLToPath } from 'node:url'
 import test, { after, before } from 'node:test'
 import { readFile } from 'node:fs/promises'
 import { chromium } from 'playwright'
@@ -22,7 +23,7 @@ let origin
 
 before(async () => {
   server = await createServer({
-    root: new URL('..', import.meta.url).pathname,
+    root: fileURLToPath(new URL('..', import.meta.url)),
     logLevel: 'silent',
     // Private dep-optimization cache. Test files run in parallel, and every
     // Vite dev server on this root otherwise writes the same
@@ -30,7 +31,7 @@ before(async () => {
     // cache, which stalls whichever server is mid-request behind a re-optimize
     // and times out locator waits in a DIFFERENT suite. Isolating it keeps this
     // file from contributing to that.
-    cacheDir: new URL('../node_modules/.vite-signup-test', import.meta.url).pathname,
+    cacheDir: fileURLToPath(new URL('../node_modules/.vite-signup-test', import.meta.url)),
     server: { host: '127.0.0.1' },
   })
   await server.listen()
