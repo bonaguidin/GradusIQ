@@ -1794,14 +1794,14 @@ a {
 .analysis-empty {
   font-size: var(--text-base);
   color: var(--muted);
-  font-style: italic;
   line-height: 1.6;
   padding: var(--sp-2) 0;
 }
 
 .analysis-loading {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   gap: var(--sp-3);
   padding: var(--sp-4) 0;
   color: var(--muted);
@@ -3096,7 +3096,8 @@ a {
 
 .career-optimization-loading {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   gap: var(--sp-2);
   min-height: 44px;
   color: var(--muted);
@@ -4220,6 +4221,56 @@ a {
   animation: spin 0.7s linear infinite;
 }
 
+/* ─── SKELETONS ───────────────────────────────────────────────────────────
+   The shape of what is coming, breathing rather than sweeping. Inside a
+   loading block the spinner is drawn as four bars in the shape of a written
+   result, so every analysis-style loader is covered without markup changes;
+   a .spinner anywhere else still spins. */
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 0.9; }
+}
+
+.analysis-loading > .spinner,
+.career-optimization-loading > .spinner {
+  --skeleton-bar: rgb(var(--ink-rgb) / 0.08);
+  width: 100%;
+  max-width: 560px;
+  height: 64px;
+  border: 0;
+  border-radius: 0;
+  background:
+    linear-gradient(var(--skeleton-bar) 0 0) 0 0 / 38% 12px,
+    linear-gradient(var(--skeleton-bar) 0 0) 0 24px / 100% 9px,
+    linear-gradient(var(--skeleton-bar) 0 0) 0 40px / 92% 9px,
+    linear-gradient(var(--skeleton-bar) 0 0) 0 56px / 64% 8px;
+  background-repeat: no-repeat;
+  animation: skeleton-pulse var(--t-pulse) ease-in-out infinite;
+}
+
+/* Grade calculator cards while the list loads: the card, and the ring it
+   will hold. */
+.grade-card--skeleton {
+  aspect-ratio: 1;
+  justify-content: center;
+  animation: skeleton-pulse var(--t-pulse) ease-in-out infinite;
+}
+
+.grade-card--skeleton::before {
+  content: "";
+  align-self: center;
+  width: 56%;
+  aspect-ratio: 1;
+  border: 10px solid rgb(var(--ink-rgb) / 0.07);
+  border-radius: 50%;
+}
+
+.grade-card-loading > p {
+  margin-top: var(--sp-3);
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
 .spinner-small {
   display: inline-block;
   width: 12px;
@@ -4353,7 +4404,6 @@ a {
 .empty-state {
   font-size: var(--text-sm);
   color: var(--muted);
-  font-style: italic;
   padding: var(--sp-3) 0;
 }
 

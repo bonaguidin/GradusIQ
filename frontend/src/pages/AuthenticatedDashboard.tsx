@@ -27,6 +27,7 @@ import { updateProfile } from '../api/profile';
 import { ProfileChecklist } from '../components/career/ProfileChecklist';
 import { ProfileCompletionContext, type ProfileFieldRequest } from '../components/profile/ProfileCompletionContext';
 import { AnimatedNumber } from '../components/AnimatedNumber';
+import { countLabel } from '../lib/countLabel.mjs';
 import { buildDashboardViewModel } from '../data/dashboardViewModel';
 import { missingChecklistFields } from '../lib/profileChecklist';
 
@@ -371,7 +372,7 @@ export function AuthenticatedDashboard() {
                 <div className="overview-grid">
                   <section className="overview-block">
                     <div className="overview-block-title">Academic readiness</div>
-                    <p>{dashboard.completeness.academics.transcript_data_present ? `${String(dashboard.courses.length)} confirmed courses across ${String(dashboard.terms.length)} terms.` : 'No confirmed transcript data yet.'}</p>
+                    <p>{dashboard.completeness.academics.transcript_data_present ? `${countLabel(dashboard.courses.length, 'confirmed course')} across ${countLabel(dashboard.terms.length, 'term')}.` : 'No confirmed transcript data yet.'}</p>
                     {!dashboard.completeness.academics.transcript_data_present && <Link to="/transcript" className="btn btn-primary btn-sm">Upload transcript</Link>}
                     <div className="academic-readiness-cards">
                       <div>
@@ -412,7 +413,7 @@ export function AuthenticatedDashboard() {
                   </section>
                   <section className="overview-block">
                     <div className="overview-block-title">Career readiness</div>
-                    <p>{dashboard.career.confirmed ? `${String(dashboard.career.target_roles.length)} target roles and ${String(dashboard.career.skills.technical.length + dashboard.career.skills.soft.length)} skills confirmed.` : 'No confirmed career profile yet.'}</p>
+                    <p>{dashboard.career.confirmed ? `${countLabel(dashboard.career.target_roles.length, 'target role')} and ${countLabel(dashboard.career.skills.technical.length + dashboard.career.skills.soft.length, 'skill')} confirmed.` : 'No confirmed career profile yet.'}</p>
                     {!dashboard.career.confirmed && <Link to="/resume" className="btn btn-primary btn-sm">Upload resume</Link>}
                     <div className="career-readiness-cards">
                       <div>
@@ -425,7 +426,10 @@ export function AuthenticatedDashboard() {
                             </div>
                           </div>
                         ) : (
-                          <p className="empty-state">Not yet available — run Role Fit under Career.</p>
+                          <>
+                            <p className="empty-state">No role match yet.</p>
+                            <button type="button" className="btn btn-ghost btn-sm" onClick={() => navigateToCareerSubTab('intelligence')}>Open Role Fit</button>
+                          </>
                         )}
                       </div>
                       <div>
@@ -440,7 +444,10 @@ export function AuthenticatedDashboard() {
                             </div>
                           </div>
                         ) : (
-                          <p className="empty-state">Not yet available — run Readiness Check under Career.</p>
+                          <>
+                            <p className="empty-state">No readiness check yet.</p>
+                            <button type="button" className="btn btn-ghost btn-sm" onClick={() => navigateToCareerSubTab('intelligence')}>Open Readiness Check</button>
+                          </>
                         )}
                       </div>
                     </div>

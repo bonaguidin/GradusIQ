@@ -63,7 +63,7 @@ const FINDING_TEMPLATES: Record<string, (finding: SyllabusFinding) => string | n
     const m = /^(\S+) rule is not structured precisely enough to apply deterministically: (.*)$/.exec(finding.message);
     if (!m) return null;
     const label = ruleTypeLabel(m[1] as SyllabusRule['rule_type']).toLowerCase();
-    return `CampusIQ can't calculate this ${label} rule automatically: ${m[2]}`;
+    return `GradusIQ can't calculate this ${label} rule automatically: ${m[2]}`;
   },
   overlapping_grade_thresholds: (finding) => {
     const m = /^thresholds '(.+?)' \(([\d.]+)-([\d.]+)\) and '(.+?)' \(([\d.]+)-([\d.]+)\) overlap$/.exec(finding.message);
@@ -78,12 +78,12 @@ const FINDING_TEMPLATES: Record<string, (finding: SyllabusFinding) => string | n
   unresolved_rule_reference: (finding) => {
     const m = /^rule (?:source|target)='(.+?)' does not match any known category or assessment$/.exec(finding.message);
     if (!m) return null;
-    return `A grading rule references "${m[1]}", but CampusIQ couldn't match it to a category or assessment.`;
+    return `A grading rule references "${m[1]}", but GradusIQ couldn't match it to a category or assessment.`;
   },
   unresolved_assessment_category_reference: (finding) => {
     const m = /^assessment '(.+?)' references category '(.+?)', which is not a known category$/.exec(finding.message);
     if (!m) return null;
-    return `"${m[1]}" references a category ("${m[2]}") CampusIQ couldn't find in this syllabus.`;
+    return `"${m[1]}" references a category ("${m[2]}") GradusIQ couldn't find in this syllabus.`;
   },
   duplicate_category: (finding) => {
     if (!finding.field) return null;
@@ -711,7 +711,7 @@ export function GradeCalculatorPanel({ accessToken, courses, institutionName }: 
       setSelectedProfileId(created.id);
       setGradeDraft(draftFromModel(created.confirmed_grade_model ?? created.extracted_grade_model));
     } catch (err) {
-      setUploadError(err instanceof SyllabusApiError ? err.message : "CampusIQ couldn't process this syllabus.");
+      setUploadError(err instanceof SyllabusApiError ? err.message : "GradusIQ couldn't process this syllabus.");
     } finally {
       setUploading(false);
     }
@@ -1190,13 +1190,22 @@ export function GradeCalculatorPanel({ accessToken, courses, institutionName }: 
 
       {!showUpload && (
         <>
-          {profiles === null && !listError && <p className="empty-state">Loading your grade calculators…</p>}
+          {profiles === null && !listError && (
+            <div className="grade-card-loading" role="status" aria-live="polite">
+              <ul className="grade-card-grid" aria-hidden="true">
+                {[0, 1, 2].map((slot) => (
+                  <li key={slot}><div className="grade-card grade-card--skeleton" /></li>
+                ))}
+              </ul>
+              <p>Loading your grade calculators…</p>
+            </div>
+          )}
           {listError && <p className="login-error" role="alert">{listError}</p>}
 
           {profiles !== null && profiles.length === 0 && (
             <div className="real-empty">
               <h3>See what you need to reach your target grade</h3>
-              <p>Upload your syllabus and CampusIQ will identify how your course is graded, let you verify it, and calculate scenarios.</p>
+              <p>Upload your syllabus and GradusIQ will identify how your course is graded, let you verify it, and calculate scenarios.</p>
               <button type="button" className="btn btn-primary" onClick={() => setShowUpload(true)}>
                 Upload syllabus
               </button>
@@ -1547,7 +1556,7 @@ function CutoffTable({
           key={`unresolved:${u.letters[0]},${u.letters[1]}`}
           data-cutoff-pair={`${u.letters[0]},${u.letters[1]}`}
         >
-          The cutoffs for {u.letters[0]} and {u.letters[1]} overlap and CampusIQ can't pick a safe default — edit those
+          The cutoffs for {u.letters[0]} and {u.letters[1]} overlap and GradusIQ can't pick a safe default — edit those
           rows below and save.
         </p>
       ))}
@@ -1926,7 +1935,7 @@ function CategoryWeightEditor({
         >
           <span className="grade-inline-finding-glyph" aria-hidden="true">·</span>
           <span className="grade-inline-finding-text">
-            The syllabus doesn't state a weight for "{f.field}", but CampusIQ couldn't match that to one of the categories below.
+            The syllabus doesn't state a weight for "{f.field}", but GradusIQ couldn't match that to one of the categories below.
           </span>
         </p>
       ))}
@@ -2055,7 +2064,7 @@ function SyllabusRulesList({
             <p>{rule.description}</p>
             {rule.evidence?.page && <p className="grade-evidence-note">Source: page {rule.evidence.page}</p>}
             {!isDeterministic && (
-              <p className="empty-state">The syllabus does not provide enough information for CampusIQ to calculate this rule.</p>
+              <p className="empty-state">The syllabus does not provide enough information for GradusIQ to calculate this rule.</p>
             )}
             <InlineFindings
               findings={findingsByAnchor.get(`rule:${index}`) ?? []}
