@@ -1601,9 +1601,10 @@ a {
 }
 
 .grade-table td {
-  padding: var(--sp-3) var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
   border-bottom: 1px solid var(--line);
   vertical-align: middle;
+  transition: background-color var(--t-quick) var(--ease-out);
 }
 
 .grade-table tr:last-child td {
@@ -1642,11 +1643,25 @@ a {
 .grade-c   { color: var(--muted); }
 .grade-df  { color: var(--error); }
 
-/* Score numbers */
+/* Score numbers: right-aligned so the decimal points stack, header with them. */
 .grade-table td:last-child {
   font-family: var(--font-data);
   font-size: var(--text-sm);
   color: var(--muted);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.grade-table th:last-child {
+  text-align: right;
+}
+
+/* Credits and grade-calculator figures sit on tabular numerals so digits
+   line up row to row. */
+.degree-schedule-course-row span:last-child,
+.grade-weight-row .form-input,
+.grade-cutoff-row .form-input {
+  font-variant-numeric: tabular-nums;
 }
 
 /* GPA display (legacy classes preserved, restyled) */
@@ -4481,10 +4496,13 @@ a {
   margin-top: 0;
 }
 
-.real-course-table,
-.real-course-row {
+/* One set of column tracks for the whole list -- each row is a subgrid of
+   the table -- so credits and grades line up down the page however long a
+   course title is. Rows sit flush, separated by their rules, like a table. */
+.real-course-table {
   display: grid;
-  gap: var(--sp-2);
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  column-gap: var(--sp-4);
 }
 
 .real-course-row small,
@@ -4493,21 +4511,52 @@ a {
 }
 
 .real-course-row {
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto; /* where subgrid is unsupported */
+  grid-template-columns: subgrid;
   align-items: center;
-  padding: var(--sp-4);
+  padding: var(--sp-3) var(--sp-4);
   border-bottom: 1px solid var(--line);
+  transition: background-color var(--t-quick) var(--ease-out);
+}
+
+.real-course-row:hover {
+  background: rgb(var(--ink-rgb) / 0.025);
 }
 
 .real-course-row span:first-child {
   display: flex;
   flex-direction: column;
   gap: var(--sp-1);
+  min-width: 0;
+}
+
+/* One line per title; the full title is on the element's title attribute. */
+.real-course-row > span:first-child > small {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Figures right-aligned in their column, on tabular numerals. */
+.real-course-row > span:nth-child(2) {
+  justify-self: end;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.real-course-row > span:nth-child(3) {
+  justify-self: end;
 }
 
 @media (max-width: 640px) {
-  .real-course-row {
-    grid-template-columns: 1fr;
+  .real-course-table {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .real-course-row > span:nth-child(n + 2) {
+    justify-self: start;
   }
 }
 
