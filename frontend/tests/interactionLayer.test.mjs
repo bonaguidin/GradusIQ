@@ -50,7 +50,7 @@ test('the layer has no colour literals, so institution theming still drives it',
   const css = stripComments(await readFile(LAYER, 'utf8'))
   assert.doesNotMatch(css, /#[0-9a-f]{3,8}\b/i)
   assert.doesNotMatch(css, /\b(rgba?|hsla?)\(\s*\d/)
-  assert.doesNotMatch(css, /\b(white|black)\b/)
+  assert.doesNotMatch(css, /\b(white|black)\b(?!-)/) // not white-space
 })
 
 test('buttons give under the pointer, and the movement is removed for reduced motion', async () => {

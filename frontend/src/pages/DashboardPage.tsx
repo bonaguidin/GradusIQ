@@ -25,6 +25,7 @@ import type { ProfileCompleteness } from '../types/student';
 import { ChatPanel } from '../components/ChatPanel';
 import { GuidedTour } from '../components/GuidedTour';
 import { AuthenticatedDashboard } from './AuthenticatedDashboard';
+import { AnimatedNumber } from '../components/AnimatedNumber';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -563,7 +564,7 @@ function DemoDashboardPage() {
                 <h2 className="academic-section-heading">GPA Calculator</h2>
                 <div className="overview-stats">
                   <div className="overview-stat"><span className="overview-stat-value">{dashboard.officialGpa?.toFixed(2) ?? '—'}</span><span className="overview-stat-label">Official GPA</span></div>
-                  <div className="overview-stat"><span className="overview-stat-value">{dashboard.projectedGpa?.toFixed(2) ?? '—'}</span><span className="overview-stat-label">Projected GPA</span></div>
+                  <div className="overview-stat"><span className="overview-stat-value"><AnimatedNumber value={dashboard.projectedGpa} decimals={2} showDelta /></span><span className="overview-stat-label">Projected GPA</span></div>
                   <div className="overview-stat"><span className="overview-stat-value">{dashboard.earnedHours}</span><span className="overview-stat-label">Earned Hours</span></div>
                 </div>
                 <p className="gpa-projection-note">

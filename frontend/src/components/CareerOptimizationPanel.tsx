@@ -15,6 +15,7 @@ import {
 } from '../lib/careerSchedulePresentation.mjs';
 import { displayTermKey } from '../lib/degreeSchedulePresentation.mjs';
 import { DegreeScheduleTerms } from './DegreeScheduleTerms';
+import { Reveal } from './Reveal';
 
 function CourseList({ courses }: { courses: { courseCode: string; termKey: string }[] }) {
   if (courses.length === 0) return <span>None</span>;
@@ -205,7 +206,7 @@ export function CareerOptimizationPanel({
               >
                 {scheduleExpanded ? 'Hide career-optimized schedule' : 'View complete career-optimized schedule'}
               </button>
-              {scheduleExpanded && (
+              <Reveal open={scheduleExpanded}>
                 <>
                   <div className="career-preview-header">
                     <p>This is a preview only. Nothing has been added to your official or planned coursework.</p>
@@ -216,7 +217,7 @@ export function CareerOptimizationPanel({
                   </div>
                   <DegreeScheduleTerms terms={viewedSchedule.terms} ariaLabel={currentView === 'optimized' ? 'Career-optimized schedule preview' : 'Academic schedule'} />
                 </>
-              )}
+              </Reveal>
             </section>
           )}
 
