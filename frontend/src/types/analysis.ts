@@ -53,12 +53,24 @@ export interface GapAnalysisData {
 
 export type FitLevel = 'high' | 'medium' | 'low';
 
+export type FitHiringSignalCoverage = 'available' | 'no_market_data' | 'unavailable';
+
+export interface FitHiringSignal {
+  coverage: FitHiringSignalCoverage;
+  employers: string[];
+  posting_count: number | null;
+}
+
 export interface FitRoleMatch {
   role: string;
   fit_level: FitLevel;
   rationale: string;
   supporting_signals: string[];
   missing_signals: string[];
+  // Optional: cached/demo results predating this field omit it. fit.py
+  // always populates it for live runs (see fit.py's
+  // _apply_hiring_signal_ground_truth).
+  hiring_signal?: FitHiringSignal;
 }
 
 export interface FitAnalysisData {
