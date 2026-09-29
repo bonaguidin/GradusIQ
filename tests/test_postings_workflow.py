@@ -25,10 +25,16 @@ def _config_step(job: dict) -> dict:
 
 def test_workflow_parses_and_has_post_ingest_integrity_job():
     wf = yaml.safe_load(WORKFLOW.read_text())
-    assert set(wf["jobs"]) == {"ingest", "workday-ingest", "integrity-check"}
+    assert set(wf["jobs"]) == {
+        "ingest", "workday-ingest", "gc-clusters", "integrity-check",
+    }
+
+    gc = wf["jobs"]["gc-clusters"]
+    assert set(gc["needs"]) == {"ingest", "workday-ingest"}
+    assert gc["if"] == "always()"
 
     integrity = wf["jobs"]["integrity-check"]
-    assert set(integrity["needs"]) == {"ingest", "workday-ingest"}
+    assert set(integrity["needs"]) == {"ingest", "workday-ingest", "gc-clusters"}
     assert integrity["if"] == "always()"
     assert not any(step.get("id") == "config" for step in integrity["steps"])
     assert any(

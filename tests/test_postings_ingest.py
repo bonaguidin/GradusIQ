@@ -21,12 +21,16 @@ sys.path.insert(0, str(REPO_ROOT / "scripts" / "job_postings"))
 
 import workday  # noqa: E402
 from ingest import (  # noqa: E402
+    CLUSTERS_TABLE,
+    KEYS_TABLE,
+    POSTINGS_TABLE,
     UPSERT_CONFLICT,
     DryRunStore,
     FetchOutcome,
     RunReport,
     SupabaseStore,
     dedupe_by_conflict_key,
+    gc_empty_clusters,
     load_target_roles,
     resolve_and_attach_identity,
     run_workday,
@@ -83,6 +87,18 @@ def test_adzuna_listing_normalizes():
     assert row["is_dfw"] is True
     assert row["location_kind"] == "dfw_metro"
     assert row["raw_payload"] is ADZUNA_LISTING
+
+
+def test_adzuna_empty_company_normalizes_to_none_not_empty_string():
+    """Regression: Adzuna returns company.display_name = "" (not an absent
+    key) when it has no employer to report -- confirmed live on the Computer
+    Engineering Intern pull that produced distinct_employers=0. An empty
+    string is not None to anything downstream that checks identity/falsiness
+    against None specifically (fuzzy_key's `if not employer_key` catches it,
+    but employer-counting code that checks `is None` would not)."""
+    listing = {**ADZUNA_LISTING, "company": {"display_name": ""}}
+    row = normalize_listing(listing, ADZUNA, target_role="Finance Intern")
+    assert row["company"] is None
 
 
 def test_jsearch_listing_normalizes_and_joins_location():
@@ -275,6 +291,103 @@ def test_workday_requisition_id_is_employer_scoped():
 
     assert rows[0]["posting_identity"] != rows[1]["posting_identity"]
     assert report.clusters_created == 2
+
+
+def test_rekeyed_row_with_sole_membership_adopts_its_old_cluster():
+    """Regression for the cluster-departure leak (planning-docs context, and
+    see resolve_and_attach_identity's docstring): a row's exact-key algorithm
+    changes (e.g. Workday's commit 2c76894, which moved it off fuzzy keying),
+    so a row ingested nightly under an old fuzzy key suddenly computes a
+    brand-new exact key nobody has seen. Before the adoption fix this
+    abandoned the row's old cluster -- its sole member -- which is exactly how
+    the orphaned posting_clusters rows check_integrity.py flags were produced.
+
+    Simulated directly against DryRunStore's internals (store.clusters,
+    store.remember_identity) rather than by monkeypatching identity_keys,
+    since the scenario is "this row's computed key changed since last night",
+    not anything identity_keys() would compute differently within one call.
+    """
+    store = DryRunStore()
+    report = RunReport(started_at=datetime.now(timezone.utc), dry_run=True)
+
+    # Night 1 (pre-fix): the row landed under a fuzzy key only, as an old
+    # cluster's sole member.
+    old_cluster_id = "dry-cluster-old"
+    store.clusters["fuzzy:acme:software engineering intern:dfw"] = old_cluster_id
+    store.remember_identity("workday", "R123", old_cluster_id)
+
+    # Night 2 (post-fix): the same row now computes an exact key that has
+    # never been seen, and Workday rows never emit a fuzzy key at all -- both
+    # exact_hit and fuzzy_hit miss.
+    row = _workday_identity_row("Acme", "R123")
+
+    resolve_and_attach_identity([row], store, report)
+
+    assert row["posting_identity"] == old_cluster_id
+    assert row["_match_rule"] == "adopted"
+    assert report.clusters_created == 0
+    assert report.clusters_adopted == 1
+    # The new exact key now also resolves to the adopted cluster, so the next
+    # ingest finds it by exact match rather than repeating the adoption.
+    assert store.find_cluster("ats:workday:acme:R123") == old_cluster_id
+    # The old fuzzy key is gone -- left live, it would let an unrelated
+    # posting that merely shares this employer/title text fuzzy-merge into a
+    # cluster an exact id now anchors to one specific requisition.
+    assert "fuzzy:acme:software engineering intern:dfw" not in store.clusters
+    keys_for_cluster = [k for k, v in store.clusters.items() if v == old_cluster_id]
+    assert keys_for_cluster == ["ats:workday:acme:R123"]
+
+
+def test_adopted_cluster_no_longer_fuzzy_matches_a_later_adzuna_row():
+    """The cross-source merge exposure Step 1 flagged: without dropping the
+    old fuzzy key, a later Adzuna row for the same employer/title/dfw bucket
+    would fuzzy-hit the adopted cluster on weak evidence, even though an
+    exact Workday requisition id now anchors it to one specific job."""
+    store = DryRunStore()
+    report = RunReport(started_at=datetime.now(timezone.utc), dry_run=True)
+
+    old_cluster_id = "dry-cluster-old"
+    store.clusters["fuzzy:acme:software engineering intern:dfw"] = old_cluster_id
+    store.remember_identity("workday", "R123", old_cluster_id)
+
+    row = _workday_identity_row("Acme", "R123")
+    resolve_and_attach_identity([row], store, report)
+    assert row["posting_identity"] == old_cluster_id  # adopted, per the test above
+
+    later_adzuna = {
+        "source": "adzuna", "source_job_id": "a1",
+        "url": "https://www.adzuna.com/land/ad/555",
+        "company": "Acme", "title": "Software Engineering Intern",
+        "location": "Dallas, TX",
+    }
+    resolve_and_attach_identity([later_adzuna], store, report)
+
+    assert later_adzuna["posting_identity"] != old_cluster_id
+    assert later_adzuna["_match_rule"] == "seed"
+    assert report.clusters_matched_fuzzy == 0
+
+
+def test_rekeyed_row_with_siblings_still_mints_a_new_cluster():
+    """Same re-keying scenario as above, but the row's old cluster has
+    ANOTHER member that is not this row. Adopting would wrongly absorb a
+    still-valid sibling posting with no evidence they are the same job, so
+    the old (safe) create_cluster behavior must be preserved here."""
+    store = DryRunStore()
+    report = RunReport(started_at=datetime.now(timezone.utc), dry_run=True)
+
+    old_cluster_id = "dry-cluster-old"
+    store.clusters["fuzzy:acme:software engineering intern:dfw"] = old_cluster_id
+    store.remember_identity("workday", "R123", old_cluster_id)
+    store.remember_identity("workday", "R999", old_cluster_id)  # a real sibling
+
+    row = _workday_identity_row("Acme", "R123")
+
+    resolve_and_attach_identity([row], store, report)
+
+    assert row["posting_identity"] != old_cluster_id
+    assert row["_match_rule"] == "seed"
+    assert report.clusters_created == 1
+    assert report.clusters_adopted == 0
 
 
 def test_keyless_posting_gets_per_posting_fallback_key():
@@ -712,3 +825,128 @@ def test_supabase_upsert_serializes_date_values_for_postgrest():
     ])
 
     assert store.client.upsert_payload[0]["posted_date"] == "2026-09-07"
+
+
+# ---------------------------------------------------------------------------
+# gc_empty_clusters -- the orphaned-cluster backstop
+# ---------------------------------------------------------------------------
+
+class _FakeGcTable:
+    """One table handle. Supports the chains gc_empty_clusters actually
+    issues: select().order().range() (paginated read, page 1 only since these
+    tests never exceed 1000 rows), select().in_() (filtered read), and
+    delete().in_() (filtered delete, applied to the backing list)."""
+
+    def __init__(self, client: "_FakeGcClient", name: str):
+        self.client = client
+        self.name = name
+        self._in_col: str | None = None
+        self._in_values: set | None = None
+        self._deleting = False
+
+    def select(self, _cols):
+        return self
+
+    def order(self, _col):
+        return self
+
+    def range(self, _start, _end):
+        return self
+
+    def in_(self, col, values):
+        self._in_col = col
+        self._in_values = set(values)
+        return self
+
+    def delete(self):
+        self._deleting = True
+        return self
+
+    def _rows(self) -> list[dict]:
+        return {
+            CLUSTERS_TABLE: self.client.clusters,
+            POSTINGS_TABLE: self.client.postings,
+            KEYS_TABLE: self.client.keys,
+        }[self.name]
+
+    def execute(self):
+        rows = self._rows()
+        if self._in_values is not None:
+            matched = [r for r in rows if r.get(self._in_col) in self._in_values]
+        else:
+            matched = list(rows)
+
+        if self._deleting:
+            self.client.deletes.append((self.name, self._in_col, set(self._in_values or [])))
+            kept = [r for r in rows if r.get(self._in_col) not in (self._in_values or set())]
+            if self.name == CLUSTERS_TABLE:
+                self.client.clusters = kept
+            elif self.name == KEYS_TABLE:
+                self.client.keys = kept
+            return type("R", (), {"data": None})()
+
+        return type("R", (), {"data": matched})()
+
+
+class _FakeGcClient:
+    def __init__(self, *, clusters: list[dict], postings: list[dict], keys: list[dict]):
+        self.clusters = list(clusters)
+        self.postings = list(postings)
+        self.keys = list(keys)
+        self.deletes: list[tuple[str, str, set]] = []
+
+    def table(self, name):
+        return _FakeGcTable(self, name)
+
+
+def test_gc_empty_clusters_dry_run_reports_but_touches_nothing():
+    clusters = [{"id": "c-empty-1"}, {"id": "c-empty-2"}, {"id": "c-has-member"}]
+    postings = [{"id": "p1", "posting_identity": "c-has-member"}]
+    keys = [
+        {"key": "fuzzy:x", "cluster_id": "c-empty-1"},
+        {"key": "ats:workday:x:1", "cluster_id": "c-empty-2"},
+        {"key": "ats:workday:y:2", "cluster_id": "c-has-member"},
+    ]
+    client = _FakeGcClient(clusters=clusters, postings=postings, keys=keys)
+
+    report = gc_empty_clusters(dry_run=True, client=client)
+
+    assert sorted(report.empty_cluster_ids) == ["c-empty-1", "c-empty-2"]
+    assert sorted(report.orphaned_key_ids) == ["ats:workday:x:1", "fuzzy:x"]
+    assert client.deletes == []
+    assert len(client.clusters) == 3
+    assert len(client.keys) == 3
+
+
+def test_gc_empty_clusters_never_selects_a_cluster_with_a_member():
+    """The HALT condition this task's diagnostics called out: selecting
+    anything with a member row would mean the zero-member query is wrong."""
+    clusters = [{"id": "c-has-member"}]
+    postings = [{"id": "p1", "posting_identity": "c-has-member"}]
+    keys = [{"key": "ats:workday:y:2", "cluster_id": "c-has-member"}]
+    client = _FakeGcClient(clusters=clusters, postings=postings, keys=keys)
+
+    report = gc_empty_clusters(dry_run=True, client=client)
+
+    assert report.empty_cluster_ids == []
+    assert report.orphaned_key_ids == []
+
+
+def test_gc_empty_clusters_live_deletes_keys_before_clusters_and_spares_members():
+    clusters = [{"id": "c-empty-1"}, {"id": "c-has-member"}]
+    postings = [{"id": "p1", "posting_identity": "c-has-member"}]
+    keys = [
+        {"key": "fuzzy:x", "cluster_id": "c-empty-1"},
+        {"key": "ats:workday:y:2", "cluster_id": "c-has-member"},
+    ]
+    client = _FakeGcClient(clusters=clusters, postings=postings, keys=keys)
+
+    report = gc_empty_clusters(dry_run=False, client=client)
+
+    assert report.empty_cluster_ids == ["c-empty-1"]
+    assert report.orphaned_key_ids == ["fuzzy:x"]
+    # Keys deleted before clusters -- a crash mid-run leaves an unreachable
+    # but intact cluster, never a key pointing at nothing.
+    assert [d[0] for d in client.deletes] == [KEYS_TABLE, CLUSTERS_TABLE]
+    assert client.clusters == [{"id": "c-has-member"}]
+    assert client.keys == [{"key": "ats:workday:y:2", "cluster_id": "c-has-member"}]

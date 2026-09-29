@@ -861,6 +861,123 @@ def test_fit_runner_does_not_invoke_the_research_agent(monkeypatch):
     assert called == []
 
 
+# --------------------------------------------------------- FIT posting data
+# role_postings is its own context key, deliberately separate from
+# market_requirements/role_context: postings are live and role-scoped, can be
+# absent (no_market_data) or entirely unfetchable (status: "unavailable"),
+# and the prompt has to tell those two apart.
+
+
+class _FakePostingResponse:
+    def __init__(self, data):
+        self.data = data
+
+
+class _FakePostingQuery:
+    def __init__(self, rows):
+        self.rows = rows
+        self.filters = []
+
+    def select(self, columns):
+        return self
+
+    def eq(self, column, value):
+        self.filters.append(("eq", column, value))
+        return self
+
+    def neq(self, column, value):
+        self.filters.append(("neq", column, value))
+        return self
+
+    def execute(self):
+        data = [
+            dict(row)
+            for row in self.rows
+            if all(
+                (row.get(column) == value if op == "eq" else row.get(column) != value)
+                for op, column, value in self.filters
+            )
+        ]
+        return _FakePostingResponse(data)
+
+
+class _FakePostingClient:
+    def __init__(self, rows):
+        self.rows = rows
+
+    def table(self, name):
+        return _FakePostingQuery(self.rows)
+
+
+def _posting_row(role, **overrides):
+    row = {
+        "id": "p1",
+        "posting_identity": "cluster-1",
+        "company": "Acme",
+        "title": "Intern",
+        "location": "Dallas, TX",
+        "url": "https://example.test/p1",
+        "posted_date": "2026-09-10",
+        "fetched_at": "2026-09-12T10:00:00+00:00",
+        "source": "adzuna",
+        "target_role": role,
+        "is_dfw": True,
+        "raw_payload": {"description": "desc"},
+    }
+    row.update(overrides)
+    return row
+
+
+def test_fit_context_carries_role_postings_when_provider_returns_data():
+    student = sample_student()
+    student["career"]["target_roles"] = ["Business Analyst Intern"]
+    client = _FakePostingClient([_posting_row("Business Analyst Intern")])
+
+    context = FitRunner(
+        client=FakeClient("{}"), posting_client_factory=lambda: client
+    ).build_student_context(student)
+
+    role = context["role_postings"]["by_role"]["Business Analyst Intern"]
+    assert role["coverage"] == "available"
+    assert role["postings"][0]["posting_id"] == "p1"
+
+
+def test_fit_context_degrades_safely_when_posting_provider_raises():
+    student = sample_student()
+    student["career"]["target_roles"] = ["Business Analyst Intern"]
+
+    def _boom():
+        raise RuntimeError("supabase unreachable")
+
+    # build_student_context must not raise even though the posting provider does --
+    # that's the whole point of the try/except boundary in _get_role_postings.
+    context = FitRunner(
+        client=FakeClient("{}"), posting_client_factory=_boom
+    ).build_student_context(student)
+
+    assert context["role_postings"] == {
+        "status": "unavailable",
+        "reason": "supabase unreachable",
+    }
+    # Distinguishable from a completed query that found nothing.
+    assert "by_role" not in context["role_postings"]
+
+
+def test_fit_context_role_with_no_market_data_reaches_the_prompt_intact():
+    student = sample_student()
+    student["career"]["target_roles"] = ["Business Analyst Intern"]
+    client = _FakePostingClient([])  # no rows for any role
+
+    context = FitRunner(
+        client=FakeClient("{}"), posting_client_factory=lambda: client
+    ).build_student_context(student)
+
+    role = context["role_postings"]["by_role"]["Business Analyst Intern"]
+    assert role["coverage"] == "no_market_data"
+    assert role["no_market_data"] is True
+    assert role["postings"] == []
+
+
 # ------------------------------------------------------- O*NET catalog cache
 # data/reference/onet_soc_requirements.json is 5.5MB, and every provider entry
 # point reads it. These pin that it is parsed once per process rather than once

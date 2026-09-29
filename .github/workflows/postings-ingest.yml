@@ -198,8 +198,68 @@ jobs:
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
         run: uv run python scripts/job_postings/retention.py --apply
 
-  integrity-check:
+  # Backstop for the cluster-departure leak (see ingest.py's
+  # resolve_and_attach_identity docstring): deletes posting_clusters rows with
+  # zero member job_postings rows, and their posting_identity_keys rows.
+  #
+  # DRY RUN ON THE SCHEDULE TOO -- deliberately not the same posture as the
+  # two ingest jobs above. Ingest writing live nightly was already reviewed
+  # and authorized; turning this job's deletes on for every scheduled run is
+  # a separate decision (it deletes rows, ingest only ever adds/updates them)
+  # and shouldn't ride in silently on this PR. It only deletes live when the
+  # `live` workflow_dispatch input is explicitly set, same switch ingest.py
+  # uses for --write. Until someone flips that on for a run (or this comment
+  # is revisited and the schedule branch is added back), this job only
+  # reports counts and ids -- integrity-check downstream still sees and flags
+  # whatever it finds, same as before this job existed.
+  gc-clusters:
     needs: [ingest, workday-ingest]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Sync dependencies
+        run: uv sync --frozen
+
+      - name: Check configuration
+        id: config
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          set -euo pipefail
+          missing=""
+          [ -z "${SUPABASE_URL:-}" ]        && missing="$missing SUPABASE_URL"
+          [ -z "${SUPABASE_SECRET_KEY:-}" ] && missing="$missing SUPABASE_SECRET_KEY"
+          if [ -n "$missing" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Cluster gc skipped -- missing secrets:$missing"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: GC empty clusters
+        if: steps.config.outputs.ready == 'true'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          set -euo pipefail
+          FLAGS=""
+          [ "${{ inputs.live }}" = "true" ] && FLAGS="--live"
+          echo "running: gc_clusters.py $FLAGS"
+          uv run python scripts/job_postings/gc_clusters.py $FLAGS
+
+  integrity-check:
+    needs: [ingest, workday-ingest, gc-clusters]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 10
