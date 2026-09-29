@@ -21,6 +21,7 @@ VALID_DATA = {
             "rationale": "Confirmed Python work supports a developing fit.",
             "supporting_signals": ["Python"],
             "missing_signals": ["Production experience"],
+            "hiring_signal": {"coverage": "unavailable", "employers": [], "posting_count": None},
         }
     ],
     "overall_fit_summary": "A realistic developing fit.",
