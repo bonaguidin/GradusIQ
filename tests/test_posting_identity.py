@@ -20,6 +20,7 @@ sys.path.insert(0, str(REPO_ROOT / "scripts" / "job_postings"))
 from identity import (  # noqa: E402
     LocationKind,
     classify_location,
+    employer_display_name,
     exact_key,
     fuzzy_key,
     identity_keys,
@@ -157,6 +158,21 @@ def test_workday_missing_exact_identity_never_falls_back_to_fuzzy():
 )
 def test_normalize_employer(raw, expected):
     assert normalize_employer(raw) == expected
+
+
+@pytest.mark.parametrize(
+    "raw, expected",
+    [
+        ("Micron", "Micron Technology, Inc."),
+        ("Micron Technology, Inc.", "Micron Technology, Inc."),
+        ("micron", "Micron Technology, Inc."),  # alias lookup is case-insensitive via normalize_employer
+        ("Toyota Motor North America, Inc.", "Toyota Motor North America, Inc."),  # no alias -- unchanged
+        ("", ""),
+        (None, None),
+    ],
+)
+def test_employer_display_name(raw, expected):
+    assert employer_display_name(raw) == expected
 
 
 # ---------------------------------------------------------------------------

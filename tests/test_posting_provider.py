@@ -154,6 +154,22 @@ def test_employer_spelling_variants_collapse_to_one_via_shared_normalizer():
     }
 
 
+def test_known_alias_variant_displays_as_its_canonical_form():
+    """Unlike the Texas Instruments case above (normalize_employer's own
+    legal-suffix stripping collapses the *count* but each posting still
+    shows its own raw spelling), "Micron" has an explicit entry in
+    scripts/job_postings/identity.py's EMPLOYER_DISPLAY_ALIASES -- shared
+    with fit.py's hiring_signal.employers -- so the posting's own `employer`
+    field is rewritten to the canonical form, not left as the raw "Micron".
+    """
+    rows = [_row("p1", "Software Engineering Intern", cluster="c1", company="Micron")]
+
+    result = build_role_posting_grounding(rows, ["Software Engineering Intern"])
+
+    role = _role_block(result, "Software Engineering Intern")
+    assert role["postings"][0]["employer"] == "Micron Technology, Inc."
+
+
 def test_null_company_is_excluded_from_distinct_employers_and_counted_separately():
     rows = [
         _row("p1", "Software Engineering Intern", cluster="c1", company="Acme"),

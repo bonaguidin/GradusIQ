@@ -16,7 +16,7 @@ from __future__ import annotations
 from datetime import date, datetime, time, timezone
 from typing import Any, Mapping, Sequence
 
-from scripts.job_postings.identity import normalize_employer
+from scripts.job_postings.identity import employer_display_name, normalize_employer
 
 POSTINGS_TABLE = "job_postings"
 DEFAULT_LIMIT_PER_ROLE = 10
@@ -161,10 +161,17 @@ def _clean_roles(target_roles: Sequence[str]) -> list[str]:
 
 
 def _posting_record(row: Mapping[str, Any]) -> dict[str, Any]:
+    # employer_display_name folds the small set of known raw-string variants
+    # normalize_employer() doesn't merge on its own (e.g. "Micron" / "Micron
+    # Technology, Inc.") into one canonical form -- shared with fit.py's
+    # hiring_signal.employers (scripts/job_postings/identity.py's
+    # EMPLOYER_DISPLAY_ALIASES) so the model's prompt context and the
+    # frontend-facing field can't disagree on the same employer's name.
+    # Display only: the DB `company` column itself is untouched.
     return {
         "posting_id": _string_or_none(row.get("id")),
         "cluster_id": _string_or_none(row.get("posting_identity")),
-        "employer": _string_or_none(row.get("company")),
+        "employer": employer_display_name(_string_or_none(row.get("company"))),
         "title": _string_or_none(row.get("title")),
         "location": _string_or_none(row.get("location")),
         "url": _string_or_none(row.get("url")),
