@@ -529,6 +529,13 @@ def _matches_contract(value: object, contract: object) -> bool:
         return isinstance(value, (int, float)) and not isinstance(value, bool)
     if isinstance(contract, str):
         return isinstance(value, str)
+    if contract is None:
+        # A genuinely nullable leaf (e.g. FIT's hiring_signal.posting_count,
+        # which is int | None) -- the key must still be present (enforced by
+        # the dict branch above), but any value including null is an
+        # acceptable shape. The Pydantic contract, not this structural check,
+        # is what enforces the actual type when present.
+        return True
     return False
 
 

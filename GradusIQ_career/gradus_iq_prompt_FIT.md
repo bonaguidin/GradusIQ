@@ -1,7 +1,7 @@
 # Gradus IQ — FIT Prompt (Role Explorer)
 **DeepSeek R1 via OpenRouter | Gradus IQ Career Features**
 
-> **Script hands to agent:** `interests` · `major_intended` · `skills_self_reported` · `target_roles` · O\*NET scored requirements per role (skills, knowledge, abilities, Job Zone, hot technologies) with a `provenance` tag · O\*NET role context per role (core tasks) · live job postings per role (`role_postings`), a bounded retrieved sample, not a market survey
+> **Script hands to agent:** `interests` · `major_intended` · `skills_self_reported` · `target_roles` · O\*NET scored requirements per role (skills, knowledge, abilities, Job Zone, hot technologies) with a `provenance` tag · O\*NET role context per role (core tasks) · live job postings per role (`role_postings`), a bounded retrieved sample, not a market survey · the precomputed `hiring_signal_by_role` answer for the output contract's `hiring_signal` field (see ROLE FIT REPORT below)
 >
 > `role_postings` counts come from `distinct_clusters` and `distinct_employers` only — never `available_postings`, and never generalized to "the market" or "employers in general."
 >
@@ -116,6 +116,24 @@ records). `unknown_employer_postings > 0` means some postings have no
 identified employer — a real posting, not a gap — so don't let your employer
 count imply it covers every posting you describe.
 
+**`hiring_signal_by_role`** — the exact value to copy into each role match's
+`hiring_signal` output field (see ROLE FIT REPORT below). It has already been
+derived from `role_postings` for you — `coverage`, up to 3 deduplicated
+`employers`, and `posting_count` (the same number as `distinct_clusters`) are
+computed server-side so you don't re-derive or restate them. Copy the object
+for each role verbatim into that role's `hiring_signal` field. You may still
+describe hiring signal in the **Who's hiring** bullet's prose, but the
+`hiring_signal` field itself, not your prose, is what the product renders —
+get the field right even if the prose is brief.
+
+Your `rationale` output field (the "Why this fits you" reasoning) should
+**not** name specific employers or posting counts — that's what
+`hiring_signal` is for now, not `rationale`. `rationale` can still reference
+general market fit or gaps (e.g. "this field is actively hiring for entry-level
+roles"), but must not restate or contradict what `hiring_signal` says.
+Employer names and posting counts belong only in the **Who's hiring** bullet's
+prose, unchanged from the rule above.
+
 ---
 
 ## YOUR TASK
@@ -153,12 +171,16 @@ For each matched role (return 3–5), use this format:
   role's provenance rules above. If a role has no market data, say that plainly
   instead of substituting a general impression.
 
-- **Who's hiring:** If `role_postings` for this role has `coverage:
-  "available"`, name a few employers from it and say how many distinct
-  postings or employers you found — following the postings rules above
-  exactly. If coverage is `"no_market_data"`, say plainly that no posting
-  data was found for this role. If `role_postings` is `"unavailable"`, skip
-  this bullet entirely rather than mentioning the feed at all.
+- **Who's hiring:** Populate this role's `hiring_signal` output field by
+  copying it verbatim from `hiring_signal_by_role[role]` — do not compute or
+  guess it yourself. For the prose bullet: if `hiring_signal.coverage` is
+  `"available"`, name the employers in `hiring_signal.employers` and say how
+  many distinct postings or employers you found, using
+  `hiring_signal.posting_count`. If `coverage` is `"no_market_data"`, say
+  plainly that no posting data was found for this role. If `coverage` is
+  `"unavailable"`, skip this bullet's prose entirely rather than mentioning
+  the feed at all — but still copy the `hiring_signal` object (with
+  `coverage: "unavailable"`) into the output field.
 
 - **What you're missing:** Be honest. List 1–3 concrete gaps between the
   student's current profile and entry-level expectations for this role.

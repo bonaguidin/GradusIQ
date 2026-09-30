@@ -2,6 +2,7 @@ import { useAuth } from '../auth/useAuth';
 import { analyzeFit } from '../api/analysis';
 import { analysisFailureMessage, type AnalysisRunState } from '../hooks/useAnalysisRun';
 import { useCachedAnalysisRun } from '../hooks/useCachedAnalysisRun';
+import { hiringSignalLine } from '../lib/hiringSignalLine.mjs';
 import type { FeatureResult, FitAnalysisData, FitLevel, FitRoleMatch } from '../types/analysis';
 import { AnalysisPanel, type AnalysisPhase } from './AnalysisPanel';
 
@@ -99,6 +100,7 @@ function RoleMatchCard({ match }: { match: FitRoleMatch }) {
         </span>
       </div>
       <p className="theme-summary">{match.rationale}</p>
+      <HiringSignalLine hiringSignal={match.hiring_signal} />
 
       <div className="gap-columns">
         <div>
@@ -133,4 +135,17 @@ function RoleMatchCard({ match }: { match: FitRoleMatch }) {
       </div>
     </div>
   );
+}
+
+// Renders fit.py's server-derived hiring_signal (coverage/employers/posting_count
+// -- see fit.py's _hiring_signal_by_role). Absent entirely for cached/demo
+// results that predate this field; render nothing rather than guess. The
+// per-state decision lives in hiringSignalLine.mjs, tested independently of
+// this component's JSX.
+function HiringSignalLine({ hiringSignal }: { hiringSignal?: FitRoleMatch['hiring_signal'] }) {
+  const line = hiringSignalLine(hiringSignal);
+  if (!line) {
+    return null;
+  }
+  return <p className={`hiring-signal hiring-signal--${line.variant}`}>{line.text}</p>;
 }

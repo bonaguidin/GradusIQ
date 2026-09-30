@@ -2082,6 +2082,17 @@ a {
   background: var(--error-tint);
 }
 
+/* FIT hiring_signal line -- sits between rationale and the gap-columns split. */
+.hiring-signal {
+  font-size: var(--text-sm);
+  color: var(--muted);
+  margin: 0 0 var(--sp-3);
+}
+
+.hiring-signal--empty {
+  font-style: italic;
+}
+
 .theme-refs {
   list-style: none;
   display: flex;

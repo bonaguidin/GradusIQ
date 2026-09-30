@@ -12,12 +12,28 @@ class StrictOutputModel(BaseModel):
 NonEmptyString = Annotated[str, Field(min_length=1)]
 
 
+class FitHiringSignal(StrictOutputModel):
+    coverage: Literal["available", "no_market_data", "unavailable"]
+    employers: list[NonEmptyString] = Field(max_length=3)
+    posting_count: int | None = Field(default=None, ge=0)
+
+
+def _unavailable_hiring_signal() -> FitHiringSignal:
+    return FitHiringSignal(coverage="unavailable", employers=[], posting_count=None)
+
+
 class FitRoleMatch(StrictOutputModel):
     role: str = Field(min_length=1)
     fit_level: Literal["high", "medium", "low"]
     rationale: str = Field(min_length=1)
     supporting_signals: list[str]
     missing_signals: list[str]
+    # Optional at the schema boundary (older cached/demo results predate this
+    # field) but always populated for live runs -- fit.py's run_canonical
+    # overwrites this per role with server-derived ground truth after
+    # validation, regardless of what the model returned. See
+    # posting_provider.py / fit.py's _hiring_signal_by_role.
+    hiring_signal: FitHiringSignal = Field(default_factory=_unavailable_hiring_signal)
 
 
 class FitOutput(StrictOutputModel):
