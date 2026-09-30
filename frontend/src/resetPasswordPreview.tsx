@@ -7,6 +7,7 @@ import { ResetPasswordRequestPage } from './pages/ResetPasswordRequestPage';
 import { ResetPasswordConfirmPage } from './pages/ResetPasswordConfirmPage';
 import { LoginPage } from './pages/LoginPage';
 import './index.css';
+import './interaction.ts';
 
 /**
  * Harness for both reset-password pages, mirroring signupPreview.tsx's shape.

@@ -21,10 +21,13 @@ import { buildDashboardViewModel } from '../data/dashboardViewModel';
 import { missingChecklistFields } from '../lib/profileChecklist';
 import { applyDemoProfileChanges, buildDemoIntelligenceProfile } from '../data/demoIntelligenceProfile';
 import { ensureDemoPlanningStore, snapshotDemoCourseRecords } from '../data/demoPlanningStore';
+import { buildDemoGradingSchema } from '../data/demoTermFixtures';
+import { demoGpaSummary } from '../lib/demoGpa.mjs';
 import type { ProfileCompleteness } from '../types/student';
 import { ChatPanel } from '../components/ChatPanel';
 import { GuidedTour } from '../components/GuidedTour';
 import { AuthenticatedDashboard } from './AuthenticatedDashboard';
+import { AnimatedNumber } from '../components/AnimatedNumber';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -357,7 +360,21 @@ function DemoDashboardPage() {
     [],
   );
 
-  const dashboard = useMemo(() => (demoProfile ? buildDashboardViewModel(demoProfile) : null), [demoProfile]);
+  const baseDashboard = useMemo(() => (demoProfile ? buildDashboardViewModel(demoProfile) : null), [demoProfile]);
+  // The GPA Calculator's figures follow the live course records, so a grade
+  // entered below moves Projected GPA the way it would on a real account.
+  const dashboard = useMemo(() => {
+    if (!baseDashboard) return null;
+    return {
+      ...baseDashboard,
+      ...demoGpaSummary({
+        officialGpa: baseDashboard.officialGpa,
+        classification: baseDashboard.classification,
+        courses: demoCourseRecords,
+        grades: buildDemoGradingSchema(demoProfile?.institution.name ?? null).grades,
+      }),
+    };
+  }, [baseDashboard, demoCourseRecords, demoProfile]);
   const missingDetails = useMemo(
     () => (demoProfile ? missingChecklistFields(demoProfile) : []),
     [demoProfile],
@@ -563,7 +580,7 @@ function DemoDashboardPage() {
                 <h2 className="academic-section-heading">GPA Calculator</h2>
                 <div className="overview-stats">
                   <div className="overview-stat"><span className="overview-stat-value">{dashboard.officialGpa?.toFixed(2) ?? '—'}</span><span className="overview-stat-label">Official GPA</span></div>
-                  <div className="overview-stat"><span className="overview-stat-value">{dashboard.projectedGpa?.toFixed(2) ?? '—'}</span><span className="overview-stat-label">Projected GPA</span></div>
+                  <div className="overview-stat"><span className="overview-stat-value"><AnimatedNumber value={dashboard.projectedGpa} decimals={2} showDelta /></span><span className="overview-stat-label">Projected GPA</span></div>
                   <div className="overview-stat"><span className="overview-stat-value">{dashboard.earnedHours}</span><span className="overview-stat-label">Earned Hours</span></div>
                 </div>
                 <p className="gpa-projection-note">

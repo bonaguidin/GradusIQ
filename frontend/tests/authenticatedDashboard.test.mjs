@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import { readFile } from 'node:fs/promises'
 import { chromium } from 'playwright'
@@ -85,7 +86,7 @@ test('authenticated dashboard covers canonical states, routing, themes, errors, 
     }
     next()
   }) } }
-  const server = await createServer({ root: new URL('..', import.meta.url).pathname, cacheDir: new URL('../node_modules/.vite-auth-dashboard', import.meta.url).pathname, logLevel: 'silent', plugins: [apiPlugin], server: { host: '127.0.0.1' } })
+  const server = await createServer({ root: fileURLToPath(new URL('..', import.meta.url)), cacheDir: fileURLToPath(new URL('../node_modules/.vite-auth-dashboard', import.meta.url)), logLevel: 'silent', plugins: [apiPlugin], server: { host: '127.0.0.1' } })
   await server.listen(); t.after(async () => server.close())
   const address = server.httpServer?.address(); assert.ok(address && typeof address === 'object')
   const origin = `http://127.0.0.1:${String(address.port)}`
@@ -133,8 +134,10 @@ test('authenticated dashboard covers canonical states, routing, themes, errors, 
   await page.getByText('Degree Progress').waitFor()
   await page.locator('.overview-stat--ring').getByText('—', { exact: true }).waitFor()
   assert.equal(await page.locator('.degree-progress-ring').count(), 0)
-  await page.getByText('Not yet available — run Role Fit under Career.').waitFor()
-  await page.getByText('Not yet available — run Readiness Check under Career.').waitFor()
+  await page.getByText('No role match yet.').waitFor()
+  await page.getByText('No readiness check yet.').waitFor()
+  await page.getByRole('button', { name: 'Open Role Fit' }).waitFor()
+  await page.getByRole('button', { name: 'Open Readiness Check' }).waitFor()
   // No in-progress coursework in this fixture (its one course is
   // 'completed') -- the current-term card's empty state, not a fallback to
   // a future term.

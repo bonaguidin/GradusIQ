@@ -5,6 +5,7 @@ import { AuthContext, type AuthContextValue } from './auth/AuthContext';
 import { SignUpPage } from './pages/SignUpPage';
 import type { SignupOutcome } from './lib/signupRules.mjs';
 import './index.css';
+import './interaction.ts';
 
 /**
  * Harness for the sign-up page's two endings.
