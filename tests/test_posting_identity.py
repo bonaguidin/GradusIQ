@@ -267,6 +267,33 @@ def test_is_dfw_named_locality_beats_remote():
         ("Argyle, WI", False, LocationKind.NON_DFW),
         ("Anna, TX", True, LocationKind.DFW_METRO),
         ("Anna, OH", False, LocationKind.NON_DFW),
+        # Moved from the bare set to TX-gated 2026-09-30 -- measured against
+        # the live corpus: allen 78.3% FP (Glen Allen VA, Allen Park MI),
+        # midlothian 90.9% FP (Midlothian VA), lancaster 100% FP (Lancaster
+        # PA/CA/OH, and "Lancaster Ave" as a street name in Villanova PA).
+        ("Allen, TX", True, LocationKind.DFW_METRO),
+        ("Allen, Texas", True, LocationKind.DFW_METRO),
+        ("USA:TX:Allen:190 E Stacy Rd:RET/RET", True, LocationKind.DFW_METRO),
+        ("Glen Allen, VA", False, LocationKind.NON_DFW),
+        ("Allen Park-3220 Fairlane Dr", False, LocationKind.NON_DFW),
+        ("Woodhaven-23460 Allen Rd", False, LocationKind.NON_DFW),
+        ("Midlothian, TX", True, LocationKind.DFW_METRO),
+        ("Midlothian, Texas", True, LocationKind.DFW_METRO),
+        ("Midlothian, VA", False, LocationKind.NON_DFW),
+        ("Midlothian-4700 Commonwealth Centre Pkwy", False, LocationKind.NON_DFW),
+        ("Lancaster, TX", True, LocationKind.DFW_METRO),
+        ("USA:CA:Lancaster:2002 W Ave J:RET/RET", False, LocationKind.NON_DFW),
+        ("USA:OH:Lancaster:1351 River Valley Blvd:RET/RET", False, LocationKind.NON_DFW),
+        ("USA:PA:Lancaster:117 Park City Center:RET/RET", False, LocationKind.NON_DFW),
+        ("797 EAST LANCASTER AVE SUITE 100 VILLANOVA, PA", False, LocationKind.NON_DFW),
+        # murphy/prosper also moved 2026-09-30, but `location` alone isn't
+        # enough for their genuine Michaels-sourced hits -- see
+        # test_classify_location_bulletfields_fallback below for those.
+        # These are the shapes where `location` alone already carries Texas.
+        ("Murphy, TX", True, LocationKind.DFW_METRO),
+        ("Prosper, TX", True, LocationKind.DFW_METRO),
+        ("USA:TX:Prosper:1101 S Preston Rd:RET/RET", True, LocationKind.DFW_METRO),
+        ("Texas - Prosper", True, LocationKind.DFW_METRO),
         # Bare additions -- distinctive enough to match without a state token.
         ("Trophy Club, TX", True, LocationKind.DFW_METRO),
         ("Colleyville", True, LocationKind.DFW_METRO),
@@ -276,6 +303,80 @@ def test_is_dfw_named_locality_beats_remote():
 )
 def test_classify_location(location, verdict, kind):
     assert classify_location(location) == (verdict, kind)
+
+
+# Real shapes seen in the corpus: Michaels' Workday feed writes `location`
+# (`locationsText`) as just "<City>-<Street>", with no state at all. The
+# actual state lives only in `bulletFields`, a free-text descriptor.
+_MICHAELS_MURPHY_TX_PAYLOAD = {
+    "bulletFields": [
+        "Texas", "United States; Country; Texas; Murphy; Dallas-Fort Worth, TX", "R00324109",
+    ],
+}
+_MICHAELS_PROSPER_TX_PAYLOAD = {
+    "bulletFields": [
+        "Texas", "United States; Country; Texas; Prosper; Dallas-Fort Worth, TX", "R00320812",
+    ],
+}
+_MICHAELS_ORILLIA_ON_PAYLOAD = {
+    "bulletFields": ["Ontario", "Ontario; Country; Orillia, ON; Orillia; Canada", "R00324398"],
+}
+
+
+def test_classify_location_bulletfields_fallback_resolves_genuine_michaels_hits():
+    """location alone ("Murphy-209 E FM 544") has no TX token -- without the
+    bulletFields fallback this genuine DFW posting would incorrectly gate
+    out. With it, it's included.
+    """
+    assert classify_location("Murphy-209 E FM 544", _MICHAELS_MURPHY_TX_PAYLOAD) == (
+        True,
+        LocationKind.DFW_METRO,
+    )
+    assert classify_location("Prosper-940 S. Preston Road", _MICHAELS_PROSPER_TX_PAYLOAD) == (
+        True,
+        LocationKind.DFW_METRO,
+    )
+
+
+def test_classify_location_bulletfields_fallback_still_excludes_real_false_positives():
+    """"Murphy Rd" in Orillia, Ontario, Canada -- a street-name collision,
+    not even a US one. bulletFields names Ontario/Canada, never Texas, so
+    this must stay excluded even with the fallback active.
+    """
+    assert classify_location("Orillia-95 Murphy Rd", _MICHAELS_ORILLIA_ON_PAYLOAD) == (
+        False,
+        LocationKind.NON_DFW,
+    )
+
+
+def test_classify_location_bulletfields_fallback_without_raw_payload_stays_excluded():
+    """Without raw_payload at all (the pre-fix call shape, and every caller
+    that has no vendor payload to give), a Michaels-shaped genuine DFW
+    posting has no Texas signal anywhere classify_location can see -- it
+    stays excluded, same as before this fix. This is the false-negative
+    tradeoff the murphy/prosper fix accepts for callers with no payload,
+    not a bug.
+    """
+    assert classify_location("Murphy-209 E FM 544") == (False, LocationKind.NON_DFW)
+    assert classify_location("Murphy-209 E FM 544", None) == (False, LocationKind.NON_DFW)
+
+
+@pytest.mark.parametrize(
+    "raw_payload",
+    [
+        {},  # no bulletFields key at all -- e.g. Adzuna/JSearch's payload shape
+        {"bulletFields": None},
+        {"bulletFields": "Texas"},  # not a list
+        {"bulletFields": [None, 123, {"nested": "Texas"}]},  # non-string items
+        "not a mapping at all",
+        123,
+    ],
+)
+def test_classify_location_bulletfields_fallback_handles_malformed_payload_gracefully(raw_payload):
+    """Every non-Workday source, and any malformed/unexpected shape, must
+    degrade to "no Texas signal here" rather than raise.
+    """
+    assert classify_location("Murphy-209 E FM 544", raw_payload) == (False, LocationKind.NON_DFW)
 
 
 def test_classify_location_verdict_agrees_with_is_dfw():
