@@ -87,16 +87,32 @@ def test_runner_surfaces_unavailable_hiring_signal_when_posting_client_factory_r
 
 def test_top_normalized_employers_dedupes_by_normalized_key_and_caps_at_three():
     postings = [
-        {"employer": "Micron"},
-        {"employer": "micron"},  # same normalized key as "Micron" -- dropped
         {"employer": "Toyota"},
+        {"employer": "toyota"},  # same normalized key as "Toyota" -- dropped
+        {"employer": "Comerica"},
         {"employer": None},  # no employer named -- skipped, not fabricated
         {"employer": ""},
         {"employer": "Dell"},
-        {"employer": "Comerica"},  # beyond the cap of 3
+        {"employer": "USAA"},  # beyond the cap of 3
     ]
     employers = _top_normalized_employers(postings)
-    assert employers == ["Micron", "Toyota", "Dell"]
+    assert employers == ["Toyota", "Comerica", "Dell"]
+
+
+def test_top_normalized_employers_folds_known_alias_variants_into_one_entry():
+    """normalize_employer() alone does not merge "Micron" and "Micron
+    Technology, Inc." -- they normalize to different keys ("micron" vs
+    "micron technology") since normalize_employer() only strips legal-form
+    suffixes, not "Technology". _EMPLOYER_DISPLAY_ALIASES covers this known
+    case on top of that, so it must not resurface as two entries here.
+    """
+    postings = [
+        {"employer": "Micron"},
+        {"employer": "Micron Technology, Inc."},
+        {"employer": "Toyota"},
+    ]
+    employers = _top_normalized_employers(postings)
+    assert employers == ["Micron Technology, Inc.", "Toyota"]
 
 
 def test_top_normalized_employers_empty_when_no_named_employers():
@@ -113,7 +129,13 @@ def test_rationale_naming_an_employer_is_logged_not_blocked(monkeypatch, caplog)
     fail the run or alter the returned data.
     """
     _no_op_market(monkeypatch)
-    rationale = "Micron actively recruits for this role, which supports a developing fit."
+    # Uses the alias's canonical form -- _employer_names_by_role (which this
+    # check compares rationale against) now returns "Micron Technology,
+    # Inc." for this posting's raw "Micron" company field, via the same
+    # _EMPLOYER_DISPLAY_ALIASES _top_normalized_employers uses. A rationale
+    # saying just "Micron" would no longer match; see the alias's own
+    # comment for why that tradeoff was accepted.
+    rationale = "Micron Technology, Inc. actively recruits for this role, which supports a developing fit."
     client = QueueClient([_model_response(rationale=rationale)])
     runner = FitRunner(
         client=client,
@@ -126,7 +148,7 @@ def test_rationale_naming_an_employer_is_logged_not_blocked(monkeypatch, caplog)
     assert result["status"] == "success"
     assert result["data"]["role_matches"][0]["rationale"] == rationale
     messages = [r.message for r in caplog.records if r.name == "GradusIQ_career.features.fit"]
-    assert any("fit_rationale_employer_mention" in m and "Micron" in m for m in messages)
+    assert any("fit_rationale_employer_mention" in m and "Micron Technology, Inc." in m for m in messages)
 
 
 def test_rationale_not_naming_an_employer_logs_nothing(monkeypatch, caplog):
@@ -166,7 +188,7 @@ def test_model_fabricated_hiring_signal_is_overwritten_with_server_truth(monkeyp
     hiring_signal = result["data"]["role_matches"][0]["hiring_signal"]
     assert hiring_signal == {
         "coverage": "available",
-        "employers": ["Micron"],
+        "employers": ["Micron Technology, Inc."],
         "posting_count": 1,
     }
     assert hiring_signal != fabricated

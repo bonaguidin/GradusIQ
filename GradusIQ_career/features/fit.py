@@ -22,6 +22,29 @@ logger = logging.getLogger(__name__)
 
 _MAX_HIRING_SIGNAL_EMPLOYERS = 3
 
+# normalize_employer() (scripts/job_postings/identity.py) only strips
+# legal-form suffixes (inc/llc/corp/...) by design -- it's also used for
+# identity/dedup keys elsewhere, and deliberately kept narrow to avoid
+# over-merging distinct companies (its own docstring gives "Match Group"
+# collapsing to "match" as the failure mode to avoid). It does NOT merge
+# "Micron" and "Micron Technology, Inc." -- those normalize to "micron" and
+# "micron technology", two different keys -- so hiring_signal.employers
+# showed both as separate entries for the same employer (confirmed live,
+# n=20 measurement against real data).
+#
+# Fixed here, not in normalize_employer(): a small, explicit alias map,
+# scoped to hiring_signal.employers display only. Keyed by
+# normalize_employer()'s own output, so it composes with that function
+# rather than duplicating its normalization. "Micron Technology, Inc." was
+# picked as the canonical display form over "Micron" -- the fuller legal
+# name is the less ambiguous of the two raw strings actually seen in the
+# data, and nothing in this single confirmed case argues for the shorter
+# form instead.
+_EMPLOYER_DISPLAY_ALIASES: dict[str, str] = {
+    normalize_employer("Micron"): "Micron Technology, Inc.",
+    normalize_employer("Micron Technology, Inc."): "Micron Technology, Inc.",
+}
+
 _UNAVAILABLE_HIRING_SIGNAL: dict[str, Any] = {
     "coverage": "unavailable",
     "employers": [],
@@ -438,15 +461,18 @@ def _top_normalized_employers(
     postings: Any, limit: int | None = _MAX_HIRING_SIGNAL_EMPLOYERS
 ) -> list[str]:
     """Dedupe posting employers by normalized key, so the displayed names can't
-    disagree with ``distinct_employers`` (e.g. "Micron" and "Micron Technology,
-    Inc." collapsing to one entry, the same key ``distinct_employers`` counts
-    them under). The displayed string is the first raw ``employer`` value seen
-    for that key, in the postings' existing order (posted_date desc, fetched_at
-    desc, id asc) -- deterministic, not the normalized key itself, since the
-    normalized form (lowercased, suffix-stripped) reads worse to a student than
-    the employer's own spelling. ``limit=None`` returns every deduped name,
-    used by ``_employer_names_by_role`` where the 3-name display cap doesn't
-    apply.
+    disagree with ``distinct_employers``. The displayed string is the first raw
+    ``employer`` value seen for that key, in the postings' existing order
+    (posted_date desc, fetched_at desc, id asc) -- deterministic, not the
+    normalized key itself, since the normalized form (lowercased,
+    suffix-stripped) reads worse to a student than the employer's own
+    spelling. ``_EMPLOYER_DISPLAY_ALIASES`` layers on top of that normalized
+    key for the small set of known variants ``normalize_employer()`` doesn't
+    fold together on its own (e.g. "Micron" / "Micron Technology, Inc.") --
+    those collapse into one entry, displayed as the alias's canonical form
+    instead of whichever raw string was seen first. ``limit=None`` returns
+    every deduped name, used by ``_employer_names_by_role`` where the 3-name
+    display cap doesn't apply.
     """
     if not isinstance(postings, list):
         return []
@@ -456,8 +482,12 @@ def _top_normalized_employers(
             continue
         raw = posting.get("employer")
         key = normalize_employer(raw if isinstance(raw, str) else None)
-        if key and key not in seen:
-            seen[key] = raw
+        if not key:
+            continue
+        alias = _EMPLOYER_DISPLAY_ALIASES.get(key)
+        dedup_key = alias or key
+        if dedup_key not in seen:
+            seen[dedup_key] = alias or raw
     values = list(seen.values())
     return values if limit is None else values[:limit]
 
