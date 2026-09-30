@@ -283,21 +283,23 @@ def test_fetch_board_respects_the_max_pages_cap(monkeypatch):
 # usable_workday_boards -- the CSV rows the ingest actually sweeps
 # ---------------------------------------------------------------------------
 
-def test_usable_workday_boards_are_the_twelve_with_a_site_path():
+def test_usable_workday_boards_are_the_eighteen_with_a_site_path():
     boards = usable_workday_boards()
     names = {name for name, _, _ in boards}
 
-    assert len(boards) == 12
-    # Confirmed usable on 2026-08-19 -- host AND site segment present.
+    # Updated 2026-09-30: 6 of the original 7 host-only rows got a verified
+    # site-path segment (Bank of America, Comerica, USAA, Capital One, PwC,
+    # Accenture -- see dfw_employers_ats.csv's notes column for each). Globe
+    # Life remains unresolved -- no confirmed site, and no confirmed
+    # Workday ATS at all -- so it's still excluded.
+    assert len(boards) == 18
     assert {
         "Fidelity Investments", "AT&T", "Toyota Motor North America", "Solera",
         "Vistra Energy", "Atmos Energy", "Parkland Health", "McKesson",
         "Southwest Airlines", "Kimberly-Clark", "Michaels", "Copart",
+        "Bank of America", "Comerica", "USAA", "Capital One", "PwC", "Accenture",
     } == names
-    # The 7 host-only rows must NOT be swept -- their slug builds no board.
-    for excluded in ("Bank of America", "Comerica", "USAA", "Capital One",
-                     "Globe Life", "PwC", "Accenture"):
-        assert excluded not in names
+    assert "Globe Life" not in names
 
 
 def test_usable_workday_boards_returns_real_board_objects():

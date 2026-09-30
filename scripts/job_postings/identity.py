@@ -176,6 +176,39 @@ def normalize_employer(name: str | None) -> str:
     return " ".join(tokens)
 
 
+# The alias map normalize_employer's own docstring points to: curated,
+# hand-built, keyed by normalize_employer()'s output so it composes with
+# that function rather than duplicating its normalization. normalize_employer
+# only strips legal-form suffixes (inc/llc/corp/...) by design -- "Micron"
+# and "Micron Technology, Inc." normalize to different keys ("micron" vs
+# "micron technology") since "Technology" isn't a legal suffix, so the two
+# strings never collapse on their own. Confirmed live (FIT's hiring_signal
+# measurement, 2026-09-29/30): both variants appear for the same employer.
+#
+# Shared by every consumer that surfaces an employer name for display
+# (fit.py's hiring_signal, posting_provider.py's raw postings[].employer) so
+# they can't disagree with each other -- one map, not two kept in sync by
+# hand. Display-only: the DB `company` column, normalize.py, and
+# normalize_employer() itself are untouched.
+EMPLOYER_DISPLAY_ALIASES: dict[str, str] = {
+    normalize_employer("Micron"): "Micron Technology, Inc.",
+    normalize_employer("Micron Technology, Inc."): "Micron Technology, Inc.",
+}
+
+
+def employer_display_name(raw_employer: str | None) -> str | None:
+    """The canonical display form for a raw employer string, if
+    EMPLOYER_DISPLAY_ALIASES has one for it; otherwise the raw string
+    unchanged. None/empty input passes through unchanged -- "no employer
+    named" is a real, distinct case from "employer named, no alias applies,"
+    and this function only ever handles the second one.
+    """
+    if not raw_employer:
+        return raw_employer
+    key = normalize_employer(raw_employer)
+    return EMPLOYER_DISPLAY_ALIASES.get(key, raw_employer)
+
+
 def normalize_title(title: str | None) -> str:
     """Canonical title key: req numbers and trailing asides gone, seniority
     spellings unified, everything else preserved.

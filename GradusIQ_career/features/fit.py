@@ -10,7 +10,7 @@ from GradusIQ_career.ai.context import AgentContext, GroundingMetadata
 from GradusIQ_career.ai.contracts import FitOutput
 from GradusIQ_career.ai.runtime import AIRuntime
 from GradusIQ_career.student_intelligence_profile import StudentIntelligenceProfile
-from scripts.job_postings.identity import normalize_employer
+from scripts.job_postings.identity import EMPLOYER_DISPLAY_ALIASES, normalize_employer
 
 from .base import CareerFeatureRunner, FeatureResult, load_prompt_template
 from .market_data import get_market_requirements, get_shift_signals, is_role_supported
@@ -21,29 +21,6 @@ from GradusIQ_career.supabase_client import build_service_client
 logger = logging.getLogger(__name__)
 
 _MAX_HIRING_SIGNAL_EMPLOYERS = 3
-
-# normalize_employer() (scripts/job_postings/identity.py) only strips
-# legal-form suffixes (inc/llc/corp/...) by design -- it's also used for
-# identity/dedup keys elsewhere, and deliberately kept narrow to avoid
-# over-merging distinct companies (its own docstring gives "Match Group"
-# collapsing to "match" as the failure mode to avoid). It does NOT merge
-# "Micron" and "Micron Technology, Inc." -- those normalize to "micron" and
-# "micron technology", two different keys -- so hiring_signal.employers
-# showed both as separate entries for the same employer (confirmed live,
-# n=20 measurement against real data).
-#
-# Fixed here, not in normalize_employer(): a small, explicit alias map,
-# scoped to hiring_signal.employers display only. Keyed by
-# normalize_employer()'s own output, so it composes with that function
-# rather than duplicating its normalization. "Micron Technology, Inc." was
-# picked as the canonical display form over "Micron" -- the fuller legal
-# name is the less ambiguous of the two raw strings actually seen in the
-# data, and nothing in this single confirmed case argues for the shorter
-# form instead.
-_EMPLOYER_DISPLAY_ALIASES: dict[str, str] = {
-    normalize_employer("Micron"): "Micron Technology, Inc.",
-    normalize_employer("Micron Technology, Inc."): "Micron Technology, Inc.",
-}
 
 _UNAVAILABLE_HIRING_SIGNAL: dict[str, Any] = {
     "coverage": "unavailable",
@@ -466,13 +443,14 @@ def _top_normalized_employers(
     (posted_date desc, fetched_at desc, id asc) -- deterministic, not the
     normalized key itself, since the normalized form (lowercased,
     suffix-stripped) reads worse to a student than the employer's own
-    spelling. ``_EMPLOYER_DISPLAY_ALIASES`` layers on top of that normalized
-    key for the small set of known variants ``normalize_employer()`` doesn't
-    fold together on its own (e.g. "Micron" / "Micron Technology, Inc.") --
-    those collapse into one entry, displayed as the alias's canonical form
-    instead of whichever raw string was seen first. ``limit=None`` returns
-    every deduped name, used by ``_employer_names_by_role`` where the 3-name
-    display cap doesn't apply.
+    spelling. ``EMPLOYER_DISPLAY_ALIASES`` (``scripts/job_postings/identity.py``,
+    shared with ``posting_provider.py``'s raw ``postings[].employer`` field)
+    layers on top of that normalized key for the small set of known variants
+    ``normalize_employer()`` doesn't fold together on its own (e.g. "Micron" /
+    "Micron Technology, Inc.") -- those collapse into one entry, displayed as
+    the alias's canonical form instead of whichever raw string was seen
+    first. ``limit=None`` returns every deduped name, used by
+    ``_employer_names_by_role`` where the 3-name display cap doesn't apply.
     """
     if not isinstance(postings, list):
         return []
@@ -484,7 +462,7 @@ def _top_normalized_employers(
         key = normalize_employer(raw if isinstance(raw, str) else None)
         if not key:
             continue
-        alias = _EMPLOYER_DISPLAY_ALIASES.get(key)
+        alias = EMPLOYER_DISPLAY_ALIASES.get(key)
         dedup_key = alias or key
         if dedup_key not in seen:
             seen[dedup_key] = alias or raw

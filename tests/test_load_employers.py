@@ -200,10 +200,13 @@ def test_real_csv_state_after_the_slug_pass():
     assert platforms.get("workday") == 19
     assert platforms.get("lever") == 1
 
-    # Match Group on Lever, plus the twelve Workday boards whose slug carries a
-    # site path. The other seven Workday rows are hosts without a site and
-    # cannot be built into an endpoint.
-    assert len(fetchable(rows)) == 13
+    # Match Group on Lever, plus Workday boards whose slug carries a site
+    # path. Updated 2026-09-30: 6 of the original 7 host-only rows (Bank of
+    # America, Comerica, USAA, Capital One, PwC, Accenture) got a verified
+    # site-path segment -- see dfw_employers_ats.csv's notes column for each.
+    # Globe Life remains unresolved (no confirmed ATS/site at all), so it's
+    # still not fetchable: Lever's 1 + Workday's now-18-with-site-path = 19.
+    assert len(fetchable(rows)) == 19
 
 
 @pytest.mark.skipif(not CSV.exists(), reason="employer CSV not in the repo")
