@@ -18,6 +18,7 @@ import { DegreeSchedulePanel } from '../components/DegreeSchedulePanel';
 import { DegreePlannerSummary } from '../components/DegreePlannerSummary';
 import type { DegreeScheduleResponse } from '../api/degreeSchedule.mjs';
 import { FitAnalysisPanel, FIT_LEVEL_LABEL } from '../components/FitAnalysisPanel';
+import { JobSearchPanel } from '../components/JobSearchPanel';
 import { GapAnalysisPanel } from '../components/GapAnalysisPanel';
 import { ShiftAnalysisPanel } from '../components/ShiftAnalysisPanel';
 import { TermPlanner } from '../components/TermPlanner';
@@ -699,12 +700,7 @@ export function AuthenticatedDashboard() {
             {activeSection === 'career' && careerSubTab === 'job-search' && (
               <div className="stage-section">
                 <h2 className="career-section-heading">Job Search</h2>
-                <div className="job-search-shell">
-                  <label>Target role<select defaultValue={dashboard.career.target_roles[0] ?? ''} disabled={dashboard.career.target_roles.length === 0}>{dashboard.career.target_roles.length === 0 && <option value="">No target role provided</option>}{dashboard.career.target_roles.map((role) => <option key={role}>{role}</option>)}</select></label>
-                  <label>Location<input value={dashboard.career.geographic_preference ?? ''} placeholder="No location preference provided" readOnly /></label>
-                  <button type="button" className="btn btn-primary" disabled>Search Jobs</button>
-                </div>
-                <div className="real-empty"><h3>Live job search is not connected yet</h3><p>Your target role and location are ready, but this repository does not yet expose a production job-search service.</p></div>
+                <JobSearchPanel targetRoles={dashboard.career.target_roles} accessToken={accessToken} />
               </div>
             )}
 

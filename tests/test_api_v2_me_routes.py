@@ -31,8 +31,9 @@ ME_ROUTES = [
     ("get", "/api/v2/student/me/profile", None),
     ("post", "/api/v2/student/me/action-plan", None),
     ("get", "/api/v2/student/me/career-role-options", None),
+    ("get", "/api/v2/student/me/job-search?role=Software+Engineering+Intern", None),
 ]
-ME_IDS = ["analyze", "chat", "profile", "action-plan", "role-options"]
+ME_IDS = ["analyze", "chat", "profile", "action-plan", "role-options", "job-search"]
 
 
 def make_test_config(**overrides):
@@ -1430,3 +1431,119 @@ def test_action_plan_typed_error_is_preserved_when_assembly_fails(client, monkey
     assert body["action_plan"]["execution_status"] == "ERROR"
     assert body["action_plan"]["failure"]["error_class"] == "CycleDetected"
     assert body["dependency_order"] is None
+
+
+# --- /api/v2/student/me/job-search -----------------------------------------
+
+class _FakePostingsClient:
+    """Mimics the chain posting_provider.get_role_posting_grounding() drives:
+    table().select().eq("target_role", ...).eq("is_dfw", True).neq("source", "workday").execute()
+    """
+
+    def __init__(self, rows):
+        self._rows = rows
+
+    def table(self, name):
+        assert name == "job_postings"
+        return self
+
+    def select(self, *a, **k):
+        return self
+
+    def eq(self, *a, **k):
+        return self
+
+    def neq(self, *a, **k):
+        return self
+
+    def execute(self):
+        return SimpleNamespace(data=self._rows)
+
+
+def _posting_row(**overrides):
+    row = {
+        "id": "posting-1",
+        "posting_identity": "cluster-1",
+        "company": "Acme Corp",
+        "title": "Software Engineering Intern",
+        "location": "Dallas, TX",
+        "url": "https://example.com/jobs/1",
+        "posted_date": "2026-09-30",
+        "fetched_at": "2026-09-30T12:00:00Z",
+        "source": "adzuna",
+        "target_role": "Software Engineering Intern",
+        "is_dfw": True,
+    }
+    row.update(overrides)
+    return row
+
+
+def test_job_search_returns_cached_postings_for_a_role_with_data(client, monkeypatch):
+    _patch_session(monkeypatch, profile=_full_profile())
+    monkeypatch.setattr(
+        api, "build_service_client", lambda: _FakePostingsClient([_posting_row()])
+    )
+
+    response = _call(client, "get", "/api/v2/student/me/job-search?role=Software+Engineering+Intern", None)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["role"] == "Software Engineering Intern"
+    assert body["coverage"] == "available"
+    assert len(body["postings"]) == 1
+    posting = body["postings"][0]
+    assert posting["employer"] == "Acme Corp"
+    assert posting["title"] == "Software Engineering Intern"
+    assert posting["location"] == "Dallas, TX"
+    assert posting["url"] == "https://example.com/jobs/1"
+    assert posting["posted_date"] == "2026-09-30"
+
+
+def test_job_search_reports_no_market_data_for_a_role_with_zero_rows(client, monkeypatch):
+    _patch_session(monkeypatch, profile=_full_profile())
+    monkeypatch.setattr(api, "build_service_client", lambda: _FakePostingsClient([]))
+
+    response = _call(client, "get", "/api/v2/student/me/job-search?role=Software+Engineering+Intern", None)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["coverage"] == "no_market_data"
+    assert body["postings"] == []
+
+
+def test_job_search_never_makes_a_live_vendor_call(client, monkeypatch):
+    """Pins the quota-safety constraint: the endpoint must read only from the
+    Supabase cache via build_service_client(), never call out to Adzuna/
+    JSearch directly."""
+    _patch_session(monkeypatch, profile=_full_profile())
+    calls = []
+    monkeypatch.setattr(
+        api,
+        "build_service_client",
+        lambda: calls.append("called") or _FakePostingsClient([_posting_row()]),
+    )
+
+    response = _call(client, "get", "/api/v2/student/me/job-search?role=Software+Engineering+Intern", None)
+
+    assert response.status_code == 200
+    assert calls == ["called"]
+
+
+def test_job_search_rejects_a_role_not_on_the_students_profile(client, monkeypatch):
+    _patch_session(monkeypatch, profile=_full_profile())
+    monkeypatch.setattr(
+        api, "build_service_client", lambda: pytest.fail("must not query postings")
+    )
+
+    response = _call(client, "get", "/api/v2/student/me/job-search?role=Underwater+Basket+Weaving+Intern", None)
+
+    assert response.status_code == 422
+    assert "target roles" in response.json()["detail"]
+
+
+def test_job_search_rejects_missing_role_query_param(client, monkeypatch):
+    _patch_session(monkeypatch, profile=_full_profile())
+
+    response = _call(client, "get", "/api/v2/student/me/job-search", None)
+
+    assert response.status_code == 422
