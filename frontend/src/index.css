@@ -1186,7 +1186,7 @@ a {
 
 .job-search-shell {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
   gap: var(--sp-4);
   margin-bottom: var(--sp-6);
