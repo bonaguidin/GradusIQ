@@ -78,6 +78,15 @@ SCENARIOS = [
     scenario("intended_major_only", "An intended major remains usable when current major is absent.", EvalFeature.FIT, SyntheticStudentInput(current_major=None, intended_major="Computer Science", target_roles=["Software Engineering Intern"], interests=["software"], technical_skills=["Python"])),
     scenario("gap_local_onet_role", "A locally resolved role should not require research fallback.", EvalFeature.GAP, SyntheticStudentInput(current_major="Computer Science", intended_major="Computer Science", target_roles=["Software Engineering Intern"], technical_skills=["Python", "Git"], experience=[SyntheticExperience(role="Student Developer")]), live_eligible=True, grounding=("local O*NET role",)),
     scenario("gap_skill_experience_mismatch", "Gaps should reflect missing technical and experience evidence.", EvalFeature.GAP, SyntheticStudentInput(current_major="Business", intended_major="Business", target_roles=["Business Analyst Intern"], technical_skills=[], soft_skills=["communication"], experience=[SyntheticExperience(role="Retail Associate")]), live_eligible=True, grounding=("local O*NET role requirements",)),
+    # NOTE 2026-09-30: Operations Intern (13-1199.00) was chosen here because O*NET had
+    # neither ratings nor a related occupation for it -- the one demo role that reached
+    # the agent. A manual_override related-occupation entry (Logisticians, 13-1081.00;
+    # see build_onet.py's MANUAL_RELATED_OVERRIDES) has since given it a rated neighbour
+    # too, so a *live* run of this scenario no longer actually exercises the research
+    # fallback -- it borrows instead, same as Finance Intern. Left as-is (still a
+    # realistic student input) rather than picking a new target role to re-establish
+    # live coverage of this path; see test_gap_research_fallback_reaches_mocked_established_path
+    # for where the fallback behavior itself is still exercised, with an explicit fixture.
     scenario("gap_research_fallback", "An unsupported local role should exercise the established research fallback.", EvalFeature.GAP, SyntheticStudentInput(current_major="Industrial Engineering", intended_major="Industrial Engineering", target_roles=["Operations Intern"], technical_skills=["Excel"], experience=[SyntheticExperience(role="Warehouse Volunteer")]), live_eligible=True, grounding=("controlled role research fallback",)),
     scenario("moderate_skill_gaps", "Moderate readiness retains actionable deterministic checks.", EvalFeature.GAP, SyntheticStudentInput(current_major="Business", target_roles=["Business Analyst Intern"], technical_skills=["Excel"], experience=[SyntheticExperience(role="Club Treasurer")])),
     scenario("shift_trend_grounding", "A standard role should combine local O*NET and trend evidence.", EvalFeature.SHIFT, SyntheticStudentInput(current_major="Computer Science", target_roles=["Software Engineering Intern"], interests=["backend"], technical_skills=["Python", "Git"]), live_eligible=True, grounding=("local O*NET role", "controlled trend research")),

@@ -58,6 +58,43 @@ REF_MIN_IMPORTANCE = 50
 # candidates than SHIFT's adjacent_paths can use, and weaker ones.
 RELATED_TIER = "Primary-Short"
 
+# A handful of SOC codes have ZERO rows in O*NET's own Related Occupations.txt,
+# in either direction (confirmed against the raw 30.3 release, not a RELATED_TIER
+# filtering artifact) -- so market_data.py's neighbor-borrow fallback
+# (_nearest_rated_neighbour) has nothing to walk for them, even though they are
+# otherwise unrated and would benefit most from it (e.g. 13-1199.00, GradusIQ's
+# "Operations Intern" mapping -- see data/onet/README.md's coverage-gap table).
+#
+# This is a hand-curated exception, same spirit as data/role_requirements.json
+# ("SOC codes reference the ... taxonomy for realism only"), not O*NET graph
+# data. Each entry is marked "manual_override": True in the emitted JSON so
+# market_data.py's disclosure note and FIT/SHIFT's prompts can tell a curated
+# pick apart from one O*NET itself rated as related -- picked by matching the
+# target's own official O*NET task/skill description, not guessed. Only
+# applied when the real Related Occupations table has nothing for that code;
+# never overrides genuine O*NET relatedness data.
+MANUAL_RELATED_OVERRIDES = {
+    # Business Operations Specialists, All Other -- O*NET's residual/catch-all
+    # code for generalist business-ops roles, has no ratings and no related-
+    # occupations rows at all (confirmed against Related Occupations.txt,
+    # 2026-09-30, O*NET 30.3). Its own 13-1199.0X sibling specializations
+    # (Business Continuity Planners, Sustainability Specialists, Online
+    # Merchants, Security Management Specialists) are all niche and none
+    # reciprocally relates to it or each other, so a same-family pick isn't
+    # actually a stronger match than a content-matched one outside the family.
+    # Logisticians (13-1081.00) is rated, and its official O*NET description
+    # ("coordinate the ongoing logistical functions of a firm... acquisition,
+    # distribution, internal allocation, delivery") and core tasks (customer/
+    # vendor coordination, proposals, estimates) line up with role_requirements
+    # .json's hand-curated Operations Intern skill list (process analysis,
+    # data-driven problem solving, supply chain fundamentals, project
+    # coordination) far better than the generic alternative, General and
+    # Operations Managers (11-1021.00) -- which is a people-management
+    # occupation ("manage through subordinate supervisors"), not an
+    # entry-level analyst/coordinator task profile.
+    "13-1199.00": ["13-1081.00"],
+}
+
 # ---------------------------------------------------------------- helpers
 
 def soc6(code):
@@ -155,6 +192,18 @@ def build_reference(occ_rows, rating_rows, sw_rows, jz_rows, tasks, related, ver
         related_by_soc[row["O*NET-SOC Code"].strip()].append(
             (int(row["Index"]), {"soc": target, "title": titles.get(target, target)}))
 
+    def related_for(code):
+        real = [entry for _idx, entry in sorted(related_by_soc.get(code, []))]
+        if real:
+            return real
+        overrides = MANUAL_RELATED_OVERRIDES.get(code)
+        if not overrides:
+            return []
+        return [
+            {"soc": target, "title": titles.get(target, target), "manual_override": True}
+            for target in overrides
+        ]
+
     roles = {}
     for code, soc6_code, title, _desc in occ_rows:
         domains = by_domain.get(code, {})
@@ -178,7 +227,7 @@ def build_reference(occ_rows, rating_rows, sw_rows, jz_rows, tasks, related, ver
             "hot_software": software,
             "in_demand_software": demanded,
             "core_tasks": tasks_for_code,
-            "related": [entry for _idx, entry in sorted(related_by_soc.get(code, []))],
+            "related": related_for(code),
             "_data_status": status,
         }
 
@@ -202,6 +251,17 @@ def build_reference(occ_rows, rating_rows, sw_rows, jz_rows, tasks, related, ver
                 "no_data": "no ratings, software, or tasks in this release",
             },
             "license": "O*NET data © under CC-BY 4.0 (US DOL/ETA)",
+            "manual_related_overrides": {
+                "note": (
+                    "SOC codes where O*NET's own Related Occupations.txt has zero rows "
+                    "(either direction) and a hand-picked neighbor was substituted so "
+                    "the app's borrow-nearest-rated-neighbor fallback has something to "
+                    "use. Not O*NET graph data -- see MANUAL_RELATED_OVERRIDES in "
+                    "build_onet.py for the per-SOC rationale. Each affected entry's "
+                    "related[] item carries \"manual_override\": true."
+                ),
+                "socs": sorted(MANUAL_RELATED_OVERRIDES),
+            },
         },
         "must_have_threshold": MUST_HAVE_THRESHOLD,
         "roles": roles,
