@@ -78,6 +78,10 @@ Mostly newer or recently reorganized SOC codes that haven't been surveyed yet.
 
 **Consequence:** GAP cannot fall back to O\*NET importance scores for these occupations, because there is nothing to fall back to. For a career product aimed at business and finance students, that's a real hole. It needs a product answer — nearest-neighbor occupation, postings-only mode, or an explicit "we don't have good data for this role yet" — not a code fix.
 
+**Nearest-neighbor landed** (`docs/plans/gap-shift-data-grounding.md`, Step B's `market_data._nearest_rated_neighbour`), walking each occupation's real O\*NET Related Occupations entries for the first one with ratings — this alone closes the gap for most of GradusIQ's 14 target roles (e.g. Finance Intern / 13-2051.00 borrows from 13-2052.00 Personal Financial Advisors).
+
+**One further wrinkle: a few SOCs have zero Related Occupations rows at all, in either direction** — not a `RELATED_TIER` filtering artifact, confirmed against the raw release. 13-1199.00 (Business Operations Specialists, All Other — GradusIQ's "Operations Intern" mapping) is one; its own same-family `.0X` specializations (Business Continuity Planners, Sustainability Specialists, Online Merchants, Security Management Specialists) don't reciprocally relate to it or each other either, so "same family" isn't automatically "closer." For these, `MANUAL_RELATED_OVERRIDES` in `build_onet.py` hand-picks a content-matched, rated occupation (13-1199.00 → 13-1081.00 Logisticians, chosen for task/skill fit — see the comment there for the full rationale) and tags the override `"manual_override": true` in the emitted JSON, so it's never mistaken for O\*NET's own relatedness data. Only fills a real gap — never overrides an occupation O\*NET did rate as related.
+
 Software/tools data **is** present for these occupations. Only the rated skills/knowledge/abilities are missing.
 
 ---
