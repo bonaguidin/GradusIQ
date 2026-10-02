@@ -1240,3 +1240,182 @@ test('Vercel rewrites cover the complete syllabus Grade Calculator route family'
     ],
   )
 })
+
+// --- Routes added by fix/api-proxy-allowlist-gaps -------------------------
+//
+// Each of these shipped on the FastAPI side with no matching vercel.json
+// rewrite / ME_TARGETS entry -- invisible everywhere except a real Vercel
+// deployment, since the local Vite dev proxy forwards any /api/* path
+// unconditionally. See tests/test_me_route_proxy_coverage.py (Python side)
+// for the systemic cross-check; these pin the proxy function's own
+// forwarding and validation behavior for the specific new targets.
+
+test('me-gpa, me-grading-schema, me-catalog-cross-listings, me-course-records-pending-final-grades forward bare GETs', async () => {
+  const cases = [
+    ['me-gpa', '/api/v2/student/me/gpa'],
+    ['me-grading-schema', '/api/v2/student/me/grading-schema'],
+    ['me-catalog-cross-listings', '/api/v2/student/me/catalog/cross-listings'],
+    ['me-course-records-pending-final-grades', '/api/v2/student/me/course-records/pending-final-grades'],
+  ]
+  for (const [target, path] of cases) {
+    const { handler, seen } = planningHandler()
+    const response = await handler.fetch(
+      new Request(`https://gradusiq.example/api/proxy?target=${target}`, {
+        method: 'GET',
+        headers: { Authorization: 'Bearer t' },
+      }),
+    )
+    assert.equal(response.status, 200)
+    assert.equal(seen[0].url, `https://backend.example${path}`)
+  }
+})
+
+test('me-career-role-options forwards a bare GET', async () => {
+  const { handler, seen } = planningHandler()
+  const response = await handler.fetch(
+    new Request('https://gradusiq.example/api/proxy?target=me-career-role-options', {
+      method: 'GET',
+      headers: { Authorization: 'Bearer t' },
+    }),
+  )
+  assert.equal(response.status, 200)
+  assert.equal(seen[0].url, 'https://backend.example/api/v2/student/me/career-role-options')
+})
+
+test('me-course-record and me-course-record-finalize require a UUID id', async () => {
+  const uuid = '11111111-2222-3333-4444-555555555555'
+  for (const [target, method, path] of [
+    ['me-course-record', 'PATCH', `/api/v2/student/me/course-records/${uuid}`],
+    ['me-course-record-finalize', 'POST', `/api/v2/student/me/course-records/${uuid}/finalize`],
+  ]) {
+    const { handler, seen } = planningHandler()
+    const response = await handler.fetch(
+      new Request(`https://gradusiq.example/api/proxy?target=${target}&id=${uuid}`, {
+        method,
+        headers: { Authorization: 'Bearer t', 'Content-Type': 'application/json' },
+        body: '{}',
+      }),
+    )
+    assert.equal(response.status, 200)
+    assert.equal(seen[0].url, `https://backend.example${path}`)
+    assert.equal(seen[0].method, method)
+
+    const { handler: bad, seen: badSeen } = planningHandler()
+    const rejected = await bad.fetch(
+      new Request(`https://gradusiq.example/api/proxy?target=${target}&id=not-a-uuid`, {
+        method,
+        body: '{}',
+      }),
+    )
+    assert.equal(rejected.status, 400)
+    assert.equal(badSeen.length, 0)
+  }
+})
+
+test('me-analysis-cache forwards gap/fit/shift and rejects anything else', async () => {
+  for (const feature of ['gap', 'fit', 'shift']) {
+    const { handler, seen } = planningHandler()
+    const response = await handler.fetch(
+      new Request(`https://gradusiq.example/api/proxy?target=me-analysis-cache&feature=${feature}`, {
+        method: 'GET',
+        headers: { Authorization: 'Bearer t' },
+      }),
+    )
+    assert.equal(response.status, 200)
+    assert.equal(seen[0].url, `https://backend.example/api/v2/student/me/analysis-cache/${feature}`)
+  }
+
+  // chat/action-plan/course-discovery are valid ME_ANALYZE_FEATURES but have
+  // no cache file -- me-analysis-cache uses its own ME_CACHE_FEATURES set and
+  // must reject them, unlike me-analyze.
+  for (const feature of ['chat', 'action-plan', 'unknown']) {
+    const { handler: bad, seen: badSeen } = planningHandler()
+    const response = await bad.fetch(
+      new Request(`https://gradusiq.example/api/proxy?target=me-analysis-cache&feature=${feature}`, {
+        method: 'GET',
+      }),
+    )
+    assert.equal(response.status, 400)
+    assert.equal(badSeen.length, 0)
+  }
+})
+
+test('me-job-search forwards an encoded role and rejects junk', async () => {
+  const { handler, seen } = planningHandler()
+  await handler.fetch(
+    new Request(
+      'https://gradusiq.example/api/proxy?target=me-job-search&role=' +
+        encodeURIComponent('Software Engineering Intern'),
+      { method: 'GET', headers: { Authorization: 'Bearer t' } },
+    ),
+  )
+  assert.equal(
+    seen[0].url,
+    'https://backend.example/api/v2/student/me/job-search?role=Software%20Engineering%20Intern',
+  )
+
+  const rejected = ['', '<script>', 'a'.repeat(81), '123 Intern', 'Intern; DROP TABLE']
+  for (const role of rejected) {
+    const { handler: bad, seen: badSeen } = planningHandler()
+    const response = await bad.fetch(
+      new Request(
+        `https://gradusiq.example/api/proxy?target=me-job-search&role=${encodeURIComponent(role)}`,
+        { method: 'GET' },
+      ),
+    )
+    assert.equal(response.status, 400)
+    assert.equal(badSeen.length, 0)
+  }
+})
+
+test('me-schedule-choices and me-schedule-exclusions are PUT and forward the body', async () => {
+  for (const [target, path] of [
+    ['me-schedule-choices', '/api/v2/student/me/schedule/choices'],
+    ['me-schedule-exclusions', '/api/v2/student/me/schedule/exclusions'],
+  ]) {
+    const { handler, seen } = planningHandler()
+    const response = await handler.fetch(
+      new Request(`https://gradusiq.example/api/proxy?target=${target}`, {
+        method: 'PUT',
+        headers: { Authorization: 'Bearer t', 'Content-Type': 'application/json' },
+        body: '{"schedule_version":1,"selections":[]}',
+      }),
+    )
+    assert.equal(response.status, 200)
+    assert.equal(seen[0].url, `https://backend.example${path}`)
+    assert.equal(seen[0].method, 'PUT')
+
+    // PUT stays rejected for targets that never declared it -- confirms the
+    // method guard widened for exactly these two, not PUT in general.
+    const { handler: bad, seen: badSeen } = planningHandler()
+    const rejected = await bad.fetch(
+      new Request('https://gradusiq.example/api/proxy?target=me-terms', { method: 'PUT' }),
+    )
+    assert.equal(rejected.status, 405)
+    assert.equal(badSeen.length, 0)
+  }
+})
+
+test('Vercel rewrites cover every route added by fix/api-proxy-allowlist-gaps', async () => {
+  const config = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'))
+  const rewrites = new Map(config.rewrites.map(({ source, destination }) => [source, destination]))
+  const expected = [
+    ['/api/v2/student/me/gpa', '/api/proxy?target=me-gpa'],
+    ['/api/v2/student/me/grading-schema', '/api/proxy?target=me-grading-schema'],
+    ['/api/v2/student/me/catalog/cross-listings', '/api/proxy?target=me-catalog-cross-listings'],
+    [
+      '/api/v2/student/me/course-records/pending-final-grades',
+      '/api/proxy?target=me-course-records-pending-final-grades',
+    ],
+    ['/api/v2/student/me/course-records/:id/finalize', '/api/proxy?target=me-course-record-finalize&id=:id'],
+    ['/api/v2/student/me/course-records/:id', '/api/proxy?target=me-course-record&id=:id'],
+    ['/api/v2/student/me/analysis-cache/:feature', '/api/proxy?target=me-analysis-cache&feature=:feature'],
+    ['/api/v2/student/me/career-role-options', '/api/proxy?target=me-career-role-options'],
+    ['/api/v2/student/me/job-search', '/api/proxy?target=me-job-search&role=:role'],
+    ['/api/v2/student/me/schedule/choices', '/api/proxy?target=me-schedule-choices'],
+    ['/api/v2/student/me/schedule/exclusions', '/api/proxy?target=me-schedule-exclusions'],
+  ]
+  for (const [source, destination] of expected) {
+    assert.equal(rewrites.get(source), destination, `missing or wrong rewrite for ${source}`)
+  }
+})
