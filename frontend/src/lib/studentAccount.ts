@@ -226,9 +226,9 @@ function failed(message: string): StudentAccountState {
  * connection between them is enough, and the live audit confirmed each insert
  * is independently attemptable.
  *
- * The detection signal is NOT /api/v2/student/me/gpa's 409. That route is not
- * proxied at all (the frontend exposes me-analyze, me-chat and me-profile),
- * so the browser cannot reach it. It is also not needed: profile_builder.py's
+ * The detection signal is NOT /api/v2/student/me/gpa's 409, even though the
+ * route is reachable (proxied as me-gpa) -- nothing in this codebase actually
+ * calls it today. It is not needed here either way: profile_builder.py's
  * _resolve_institution_name returns None instead of raising where the GPA route
  * raises 409, so a half-provisioned student comes back from /me/profile as a
  * plain HTTP 200 whose `student.institution` is null. Confirmed by running
