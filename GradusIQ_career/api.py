@@ -136,6 +136,7 @@ from GradusIQ_career.course_discovery.models import (
 from GradusIQ_career.course_discovery.needs import derive_career_skill_needs
 from GradusIQ_career.course_discovery.prerequisites import structured_prerequisite
 from GradusIQ_career.features.market_data import is_role_supported, supported_target_roles
+from GradusIQ_career.features.posting_provider import get_role_posting_grounding
 from GradusIQ_career.course_discovery.service import CourseDiscoveryService
 from GradusIQ_career.course_discovery.requirement_satisfaction import (
     evaluate_requirement_tree,
@@ -529,6 +530,13 @@ def _matches_contract(value: object, contract: object) -> bool:
         return isinstance(value, (int, float)) and not isinstance(value, bool)
     if isinstance(contract, str):
         return isinstance(value, str)
+    if contract is None:
+        # A genuinely nullable leaf (e.g. FIT's hiring_signal.posting_count,
+        # which is int | None) -- the key must still be present (enforced by
+        # the dict branch above), but any value including null is an
+        # acceptable shape. The Pydantic contract, not this structural check,
+        # is what enforces the actual type when present.
+        return True
     return False
 
 
@@ -1640,6 +1648,42 @@ def get_me_career_role_options(request: Request) -> dict:
     client = _session_client(request)
     _resolve_session_student_id(client)  # 404s if no student row is visible; unused otherwise
     return {"roles": supported_target_roles()}
+
+
+@router.get(
+    "/api/v2/student/me/job-search",
+    dependencies=[Depends(authorize_proxy_request)],
+)
+def get_me_job_search(request: Request, role: str) -> dict:
+    """Cached postings for one of the caller's own target roles.
+
+    Reads the same Adzuna-backed cache FIT's hiring_signal already reads
+    (features/posting_provider.py) -- never a live per-request vendor call.
+    job-posting-integration-spec.md is explicit that a student page load must
+    never trigger a live Adzuna/JSearch call, since the vendor quota is
+    already fully allocated to the nightly scheduled fetch. There is no
+    location parameter: is_dfw is a boolean baked in at ingest time, not a
+    queryable location axis.
+    """
+    client = _session_client(request)
+    student_id = _resolve_session_student_id(client)
+    canonical = build_student_intelligence_profile(client, student_id)
+    if role not in canonical.career.target_roles:
+        raise HTTPException(status_code=422, detail="Role is not one of your target roles.")
+    try:
+        service_client = build_service_client()
+    except SupabaseConfigError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    try:
+        grounding = get_role_posting_grounding(service_client, [role])
+    except Exception as exc:  # noqa: BLE001 -- external dependency boundary
+        raise HTTPException(status_code=502, detail="Job postings are temporarily unavailable.") from exc
+    role_result = grounding["by_role"][role]
+    return {
+        "role": role,
+        "coverage": role_result["coverage"],
+        "postings": role_result["postings"],
+    }
 
 
 @router.patch(

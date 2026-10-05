@@ -120,8 +120,34 @@ const ME_TARGETS = Object.assign(Object.create(null), {
   'me-syllabus-grade-state': { method: 'PUT', needsFeature: false, needsSyllabusRecord: true },
   'me-syllabus-calculate': { method: 'POST', needsFeature: false, needsSyllabusRecord: true },
   'me-syllabus-solve-target': { method: 'POST', needsFeature: false, needsSyllabusRecord: true },
+  // GPA Calculator / Academic Record reads with no body and no path param.
+  'me-gpa': { method: 'GET', needsFeature: false },
+  'me-grading-schema': { method: 'GET', needsFeature: false },
+  'me-catalog-cross-listings': { method: 'GET', needsFeature: false },
+  'me-course-records-pending-final-grades': { method: 'GET', needsFeature: false },
+  // Edits a single confirmed, in-progress course record; `needsCourseRecord`
+  // validates the `id` query param as a UUID, same shape as
+  // needsPlannedRecord/needsSyllabusRecord above.
+  'me-course-record': { method: 'PATCH', needsFeature: false, needsCourseRecord: true },
+  'me-course-record-finalize': { method: 'POST', needsFeature: false, needsCourseRecord: true },
+  // GAP/FIT/SHIFT's persistent cache read. Its own `needsCacheFeature` flag
+  // (not `needsFeature`/ME_ANALYZE_FEATURES) because the cache only ever
+  // holds these three, not the wider analyze vocabulary (chat, action-plan,
+  // course-discovery, professor-comments have no cache file).
+  'me-analysis-cache': { method: 'GET', needsFeature: false, needsCacheFeature: true },
+  'me-career-role-options': { method: 'GET', needsFeature: false },
+  // Cached, role-filtered job postings -- reads only, never a live vendor
+  // call. `needsRole` validates the `role` query param the same way
+  // `needsQuery` validates catalog search's `q`.
+  'me-job-search': { method: 'GET', needsFeature: false, needsRole: true },
+  // Degree Schedule's two PUT replace-in-full routes. Same shape as
+  // me-syllabus-grade-state -- the method guard at the top of the handler
+  // was widened for both, same reasoning as that one.
+  'me-schedule-choices': { method: 'PUT', needsFeature: false },
+  'me-schedule-exclusions': { method: 'PUT', needsFeature: false },
 })
 const ME_ANALYZE_FEATURES = new Set(['gap', 'fit', 'shift', 'professor-comments', 'course-discovery'])
+const ME_CACHE_FEATURES = new Set(['gap', 'fit', 'shift'])
 
 // Must stay in step with TABLE_BY_SEGMENT in GradusIQ_career/resume/review.py.
 const REVIEW_TABLES = new Set([
@@ -141,6 +167,14 @@ const RECORD_ID_PATTERN =
 // depth rather than the only thing standing between a caller and a query.
 const MAX_SEARCH_QUERY_LENGTH = 64
 const SEARCH_QUERY_PATTERN = /^[A-Za-z0-9 .,'&:/+-]{1,64}$/
+
+// Job Search's `role` carries a target-role name, not free text -- restricted
+// to the characters the curated role vocabulary actually uses (letters,
+// spaces, hyphens). The backend independently validates it against the
+// caller's own career.target_roles, same defence-in-depth shape as
+// SEARCH_QUERY_PATTERN above.
+const MAX_ROLE_LENGTH = 80
+const ROLE_PATTERN = /^[A-Za-z][A-Za-z -]{0,79}$/
 
 function jsonError(status, detail) {
   return Response.json({ detail }, { status })
@@ -168,8 +202,25 @@ function backendPath(student, feature) {
   return `/api/students/${slug}/analyze/${feature}`
 }
 
-function meBackendPath(target, feature, reviewTable, recordId, searchQuery, termId) {
+function meBackendPath(target, feature, reviewTable, recordId, searchQuery, termId, role) {
   if (target === 'me-terms') return '/api/v2/student/me/terms'
+  if (target === 'me-gpa') return '/api/v2/student/me/gpa'
+  if (target === 'me-grading-schema') return '/api/v2/student/me/grading-schema'
+  if (target === 'me-catalog-cross-listings') return '/api/v2/student/me/catalog/cross-listings'
+  if (target === 'me-course-records-pending-final-grades') {
+    return '/api/v2/student/me/course-records/pending-final-grades'
+  }
+  if (target === 'me-course-record') {
+    return `/api/v2/student/me/course-records/${encodeURIComponent(recordId)}`
+  }
+  if (target === 'me-course-record-finalize') {
+    return `/api/v2/student/me/course-records/${encodeURIComponent(recordId)}/finalize`
+  }
+  if (target === 'me-analysis-cache') return `/api/v2/student/me/analysis-cache/${encodeURIComponent(feature)}`
+  if (target === 'me-career-role-options') return '/api/v2/student/me/career-role-options'
+  if (target === 'me-job-search') return `/api/v2/student/me/job-search?role=${encodeURIComponent(role)}`
+  if (target === 'me-schedule-choices') return '/api/v2/student/me/schedule/choices'
+  if (target === 'me-schedule-exclusions') return '/api/v2/student/me/schedule/exclusions'
   if (target === 'me-planned-courses') {
     // The only forwarded query string besides search. Built here from a
     // validated UUID rather than by copying the inbound search params, so a
@@ -234,7 +285,10 @@ export function createProxyHandler({ env = process.env, fetchImpl = globalThis.f
       const target = requestUrl.searchParams.get('target') ?? ''
       const supportedMethod =
         method === 'POST' || method === 'GET' || method === 'PATCH' || method === 'DELETE' ||
-        (method === 'PUT' && target === 'me-syllabus-grade-state')
+        (method === 'PUT' &&
+          (target === 'me-syllabus-grade-state' ||
+            target === 'me-schedule-choices' ||
+            target === 'me-schedule-exclusions'))
       if (!supportedMethod) return jsonError(405, 'Method not allowed.')
 
       const student = requestUrl.searchParams.get('student') ?? ''
@@ -243,6 +297,7 @@ export function createProxyHandler({ env = process.env, fetchImpl = globalThis.f
       const recordId = requestUrl.searchParams.get('id') ?? ''
       const searchQuery = requestUrl.searchParams.get('q') ?? ''
       const termId = requestUrl.searchParams.get('term_id') ?? ''
+      const role = requestUrl.searchParams.get('role') ?? ''
 
       const isMeTarget = target !== ''
       let path
@@ -274,6 +329,15 @@ export function createProxyHandler({ env = process.env, fetchImpl = globalThis.f
         if (spec.needsSyllabusRecord && !RECORD_ID_PATTERN.test(recordId)) {
           return jsonError(400, 'Invalid analysis route.')
         }
+        if (spec.needsCourseRecord && !RECORD_ID_PATTERN.test(recordId)) {
+          return jsonError(400, 'Invalid analysis route.')
+        }
+        if (spec.needsCacheFeature && !ME_CACHE_FEATURES.has(feature)) {
+          return jsonError(400, 'Invalid analysis route.')
+        }
+        if (spec.needsRole && (role.length > MAX_ROLE_LENGTH || !ROLE_PATTERN.test(role))) {
+          return jsonError(400, 'Invalid analysis route.')
+        }
         if (
           spec.needsQuery &&
           (searchQuery.length > MAX_SEARCH_QUERY_LENGTH || !SEARCH_QUERY_PATTERN.test(searchQuery))
@@ -287,7 +351,7 @@ export function createProxyHandler({ env = process.env, fetchImpl = globalThis.f
           return jsonError(400, 'Invalid analysis route.')
         }
         isBinaryTarget = spec.binary === true
-        path = meBackendPath(target, feature, reviewTable, recordId, searchQuery, termId)
+        path = meBackendPath(target, feature, reviewTable, recordId, searchQuery, termId, role)
       } else {
         // PATCH exists only for the session-scoped review edit above. The
         // slug-addressed surface stays GET/POST-only: without this guard a

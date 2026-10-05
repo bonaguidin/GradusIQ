@@ -1186,7 +1186,7 @@ a {
 
 .job-search-shell {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
   gap: var(--sp-4);
   margin-bottom: var(--sp-6);
@@ -2080,6 +2080,17 @@ a {
 .fit-badge--low {
   color: var(--error);
   background: var(--error-tint);
+}
+
+/* FIT hiring_signal line -- sits between rationale and the gap-columns split. */
+.hiring-signal {
+  font-size: var(--text-sm);
+  color: var(--muted);
+  margin: 0 0 var(--sp-3);
+}
+
+.hiring-signal--empty {
+  font-style: italic;
 }
 
 .theme-refs {

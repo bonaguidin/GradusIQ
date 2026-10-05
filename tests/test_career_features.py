@@ -1,3 +1,4 @@
+import json
 from copy import deepcopy
 
 import pytest
@@ -149,10 +150,20 @@ def _live_agent_requirements():
     }
 
 
+# Operations Intern (13-1199.00) used to be the one demo role that reached
+# the agent: no O*NET ratings AND no related occupations to borrow from. A
+# manual_override related-occupation entry (Logisticians, 13-1081.00, added
+# in build_onet.py -- see MANUAL_RELATED_OVERRIDES) now gives it a rated
+# neighbour too, same as Finance Intern, so within the real demo catalog
+# every one of the 14 target roles is grounded and none reaches the agent.
+# Tests below that need to exercise the agent-fallback path construct an
+# explicit ``market`` fixture with provenance "none" instead of relying on
+# a real role currently being ungrounded -- decoupled from catalog content,
+# the same way test_ai_runtime_gap_shift.py's agent-fallback test already is.
+_UNGROUNDED_MARKET = {"by_role": {"Operations Intern": {"provenance": "none"}}}
+
+
 def test_role_requirements_for_uses_agent_skills_but_static_soc_code(monkeypatch):
-    # Operations Intern (13-1199.00) is the only demo role that reaches the
-    # agent: no O*NET ratings AND no related occupations to borrow from.
-    # Finance Intern used to qualify, but now borrows from a rated neighbour.
     agent_data = _live_agent_requirements()
     monkeypatch.setattr(
         gap_module.role_research_agent,
@@ -160,7 +171,9 @@ def test_role_requirements_for_uses_agent_skills_but_static_soc_code(monkeypatch
         lambda role: agent_data if role == "Operations Intern" else None,
     )
 
-    result = GapRunner(client=FakeClient("{}")).role_requirements_for(["Operations Intern"])
+    result = GapRunner(client=FakeClient("{}")).role_requirements_for(
+        ["Operations Intern"], market=_UNGROUNDED_MARKET
+    )
     entry = result["Operations Intern"]
 
     # soc_code/soc_title always come from the static file, never the agent.
@@ -178,7 +191,9 @@ def test_role_requirements_for_agent_empty_list_does_not_clobber_populated_stati
     agent_data = dict(_live_agent_requirements(), nice_to_have_certifications=[])
     monkeypatch.setattr(gap_module.role_research_agent, "get_role_requirements", lambda role: agent_data)
 
-    result = GapRunner(client=FakeClient("{}")).role_requirements_for(["Operations Intern"])
+    result = GapRunner(client=FakeClient("{}")).role_requirements_for(
+        ["Operations Intern"], market=_UNGROUNDED_MARKET
+    )
     entry = result["Operations Intern"]
 
     assert entry["nice_to_have_certifications"] == ["Six Sigma Yellow Belt"]
@@ -232,8 +247,14 @@ def test_role_requirements_for_handles_mixed_agent_and_static_results_across_rol
         lambda role: agent_data if role == "Operations Intern" else None,
     )
 
+    market = {
+        "by_role": {
+            "Operations Intern": {"provenance": "none"},
+            "Business Analyst Intern": {"provenance": "onet"},
+        }
+    }
     result = GapRunner(client=FakeClient("{}")).role_requirements_for(
-        ["Operations Intern", "Business Analyst Intern"]
+        ["Operations Intern", "Business Analyst Intern"], market=market
     )
 
     assert result["Operations Intern"]["soc_code"] == "13-1199.00"
@@ -258,12 +279,23 @@ def test_agent_is_not_called_for_roles_onet_already_rates(monkeypatch):
 
     monkeypatch.setattr(gap_module.role_research_agent, "get_role_requirements", _spy)
 
+    # 13-1111.00 has its own ratings; 13-2051.00 and 13-1199.00 each borrow
+    # from a rated neighbour -- market built explicitly rather than taken from
+    # the real catalog, so this test exercises the grounded/ungrounded branch
+    # on purpose rather than incidentally through whichever role the live
+    # catalog happens to leave uncovered.
+    market = {
+        "by_role": {
+            "Business Analyst Intern": {"provenance": "onet"},
+            "Finance Intern": {"provenance": "onet_neighbor"},
+            "Operations Intern": {"provenance": "none"},
+        }
+    }
     result = GapRunner(client=FakeClient("{}")).role_requirements_for(
-        ["Business Analyst Intern", "Finance Intern", "Operations Intern"]
+        ["Business Analyst Intern", "Finance Intern", "Operations Intern"], market=market
     )
 
-    # 13-1111.00 has its own ratings -> skipped. 13-2051.00 borrows from a rated
-    # neighbour -> also skipped. Only 13-1199.00, with neither, is researched.
+    # Only the ungrounded role is researched.
     assert called == ["Operations Intern"]
     assert result["Business Analyst Intern"]["requirements_source"] == "static"
     # Borrowed, so the agent never ran for it and the static lists stand.
@@ -277,6 +309,24 @@ def test_gap_context_marks_agent_filled_roles_with_agent_provenance(monkeypatch)
         "get_role_requirements",
         lambda role: _live_agent_requirements() if role == "Operations Intern" else None,
     )
+    # Business Analyst Intern and Finance Intern come from the real catalog
+    # (own ratings / neighbour borrow respectively). Operations Intern's
+    # provenance is overridden to "none" in the market fixture -- it has a
+    # real static entry in role_requirements.json (needed for _merge_requirements
+    # to produce a result at all), but every real demo role is actually
+    # grounded now that it too borrows from a neighbour (manual_override in
+    # build_onet.py), so forcing "none" here is what isolates the
+    # agent-upgrade path under test from that fix.
+    real_market = gap_module.get_market_requirements(["Business Analyst Intern", "Finance Intern"])
+    fake_market = {
+        "by_role": {
+            **real_market["by_role"],
+            "Operations Intern": {"provenance": "none"},
+        },
+        "notes": real_market["notes"],
+    }
+    monkeypatch.setattr(gap_module, "get_market_requirements", lambda roles: fake_market)
+
     student = sample_student()
     student["career"]["target_roles"] = ["Business Analyst Intern", "Finance Intern", "Operations Intern"]
 
@@ -287,11 +337,9 @@ def test_gap_context_marks_agent_filled_roles_with_agent_provenance(monkeypatch)
     # Borrowed from a rated neighbour rather than researched: 13-2051.00 has no
     # O*NET ratings of its own but 13-2052.00 is in its related list, and
     # neighbour borrowing is decided in market_data before the agent is
-    # consulted. Was "agent" before that change landed.
+    # consulted.
     assert by_role["Finance Intern"]["provenance"] == "onet_neighbor"
     # Upgraded from "none" because the agent supplied this role's requirements.
-    # Operations Intern carries that case now: Finance Intern borrows from a
-    # rated neighbour, so it never reaches the agent at all.
     assert by_role["Operations Intern"]["provenance"] == "agent"
 
 
@@ -712,14 +760,55 @@ def test_borrowing_is_disclosed_in_notes():
     assert "disclosed" in notes.lower()
 
 
-def test_role_with_no_rated_neighbour_still_falls_through_to_research():
+def test_operations_intern_now_borrows_from_a_manually_overridden_neighbour():
+    """13-1199.00 has zero rows in O*NET's own Related Occupations.txt in
+    either direction (confirmed against the raw 30.3 release) -- it used to
+    be the one demo role with no rated neighbour to borrow from. A curated
+    exception (MANUAL_RELATED_OVERRIDES in build_onet.py, Logisticians /
+    13-1081.00) closes that gap the same way real O*NET relatedness data
+    would, and is disclosed as a borrow exactly like Finance Intern's."""
     from GradusIQ_career.features.market_data import get_market_requirements
 
     entry = get_market_requirements(["Operations Intern"])["by_role"]["Operations Intern"]
 
-    # 13-1199.00 has no related occupations at all in the release.
-    assert entry["provenance"] == "none"
-    assert entry["borrowed_from"] is None
+    assert entry["provenance"] == "onet_neighbor"
+    assert entry["borrowed_from"] == {"soc": "13-1081.00", "title": "Logisticians"}
+    assert entry["requirements"]["skills"], "borrowed ratings should be populated"
+
+
+def test_role_with_no_rated_neighbour_at_all_still_falls_through_to_research(monkeypatch, tmp_path):
+    """A role with neither its own ratings nor any neighbour (manually
+    overridden or O*NET-native) must still reach the agent. Exercised against
+    a synthetic catalog entry rather than a real SOC, since every one of the
+    14 demo roles is grounded now that Operations Intern also borrows."""
+    from GradusIQ_career.features import market_data
+
+    fake_catalog = tmp_path / "onet.json"
+    fake_catalog.write_text(json.dumps({
+        "must_have_threshold": 70,
+        "roles": {
+            "99-9999.00": {
+                "title": "Totally Unrated Occupation",
+                "skills": [], "knowledge": [], "abilities": [],
+                "hot_software": [], "related": [], "_data_status": "no_data",
+            },
+        },
+    }), encoding="utf-8")
+
+    real_data_path = market_data._DATA_PATH
+    real_role_cache = market_data._role_soc_cache
+    monkeypatch.setattr(market_data, "_DATA_PATH", fake_catalog)
+    monkeypatch.setattr(market_data, "_onet_cache", None)
+    monkeypatch.setattr(market_data, "_role_soc_cache", {"Totally Unrated Role": "99-9999.00"})
+
+    try:
+        entry = market_data.get_market_requirements(["Totally Unrated Role"])["by_role"]["Totally Unrated Role"]
+        assert entry["provenance"] == "none"
+        assert entry["borrowed_from"] is None
+    finally:
+        monkeypatch.setattr(market_data, "_DATA_PATH", real_data_path)
+        monkeypatch.setattr(market_data, "_onet_cache", None)
+        monkeypatch.setattr(market_data, "_role_soc_cache", real_role_cache)
 
 
 def test_agent_is_not_called_for_a_role_that_borrowed_from_a_neighbour(monkeypatch):
@@ -731,11 +820,14 @@ def test_agent_is_not_called_for_a_role_that_borrowed_from_a_neighbour(monkeypat
         lambda role: called.append(role) or None,
     )
 
+    # Both now borrow from a rated neighbour (Finance Intern natively,
+    # Operations Intern via the manual override), so the agent runs for
+    # neither.
     GapRunner(client=FakeClient("{}")).role_requirements_for(
         ["Finance Intern", "Operations Intern"]
     )
 
-    assert called == ["Operations Intern"]
+    assert called == []
 
 
 # ---------------------------------------------------- readiness-score guard
@@ -859,6 +951,123 @@ def test_fit_runner_does_not_invoke_the_research_agent(monkeypatch):
     FitRunner(client=FakeClient("{}")).build_student_context(student)
 
     assert called == []
+
+
+# --------------------------------------------------------- FIT posting data
+# role_postings is its own context key, deliberately separate from
+# market_requirements/role_context: postings are live and role-scoped, can be
+# absent (no_market_data) or entirely unfetchable (status: "unavailable"),
+# and the prompt has to tell those two apart.
+
+
+class _FakePostingResponse:
+    def __init__(self, data):
+        self.data = data
+
+
+class _FakePostingQuery:
+    def __init__(self, rows):
+        self.rows = rows
+        self.filters = []
+
+    def select(self, columns):
+        return self
+
+    def eq(self, column, value):
+        self.filters.append(("eq", column, value))
+        return self
+
+    def neq(self, column, value):
+        self.filters.append(("neq", column, value))
+        return self
+
+    def execute(self):
+        data = [
+            dict(row)
+            for row in self.rows
+            if all(
+                (row.get(column) == value if op == "eq" else row.get(column) != value)
+                for op, column, value in self.filters
+            )
+        ]
+        return _FakePostingResponse(data)
+
+
+class _FakePostingClient:
+    def __init__(self, rows):
+        self.rows = rows
+
+    def table(self, name):
+        return _FakePostingQuery(self.rows)
+
+
+def _posting_row(role, **overrides):
+    row = {
+        "id": "p1",
+        "posting_identity": "cluster-1",
+        "company": "Acme",
+        "title": "Intern",
+        "location": "Dallas, TX",
+        "url": "https://example.test/p1",
+        "posted_date": "2026-09-10",
+        "fetched_at": "2026-09-12T10:00:00+00:00",
+        "source": "adzuna",
+        "target_role": role,
+        "is_dfw": True,
+        "raw_payload": {"description": "desc"},
+    }
+    row.update(overrides)
+    return row
+
+
+def test_fit_context_carries_role_postings_when_provider_returns_data():
+    student = sample_student()
+    student["career"]["target_roles"] = ["Business Analyst Intern"]
+    client = _FakePostingClient([_posting_row("Business Analyst Intern")])
+
+    context = FitRunner(
+        client=FakeClient("{}"), posting_client_factory=lambda: client
+    ).build_student_context(student)
+
+    role = context["role_postings"]["by_role"]["Business Analyst Intern"]
+    assert role["coverage"] == "available"
+    assert role["postings"][0]["posting_id"] == "p1"
+
+
+def test_fit_context_degrades_safely_when_posting_provider_raises():
+    student = sample_student()
+    student["career"]["target_roles"] = ["Business Analyst Intern"]
+
+    def _boom():
+        raise RuntimeError("supabase unreachable")
+
+    # build_student_context must not raise even though the posting provider does --
+    # that's the whole point of the try/except boundary in _get_role_postings.
+    context = FitRunner(
+        client=FakeClient("{}"), posting_client_factory=_boom
+    ).build_student_context(student)
+
+    assert context["role_postings"] == {
+        "status": "unavailable",
+        "reason": "supabase unreachable",
+    }
+    # Distinguishable from a completed query that found nothing.
+    assert "by_role" not in context["role_postings"]
+
+
+def test_fit_context_role_with_no_market_data_reaches_the_prompt_intact():
+    student = sample_student()
+    student["career"]["target_roles"] = ["Business Analyst Intern"]
+    client = _FakePostingClient([])  # no rows for any role
+
+    context = FitRunner(
+        client=FakeClient("{}"), posting_client_factory=lambda: client
+    ).build_student_context(student)
+
+    role = context["role_postings"]["by_role"]["Business Analyst Intern"]
+    assert role["coverage"] == "no_market_data"
+    assert role["no_market_data"] is True
+    assert role["postings"] == []
 
 
 # ------------------------------------------------------- O*NET catalog cache

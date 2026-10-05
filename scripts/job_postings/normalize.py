@@ -190,7 +190,7 @@ def normalize_listing(listing: dict, field_map: FieldMap, *, target_role: str) -
         )
 
     row["source_job_id"] = str(row["source_job_id"])
-    is_dfw, kind = classify_location(row["location"])
+    is_dfw, kind = classify_location(row["location"], row["raw_payload"])
     row["is_dfw"] = is_dfw
     row["location_kind"] = kind.value
 

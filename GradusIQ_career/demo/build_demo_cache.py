@@ -106,6 +106,11 @@ class _MockClient:
                     "rationale": "[MOCK] Aligns with declared major and interests.",
                     "supporting_signals": ["[MOCK] Relevant coursework"],
                     "missing_signals": ["[MOCK] Internship experience"],
+                    "hiring_signal": {
+                        "coverage": "unavailable",
+                        "employers": [],
+                        "posting_count": None,
+                    },
                 }
             ],
             "overall_fit_summary": "[MOCK] One realistic direction and one stretch.",

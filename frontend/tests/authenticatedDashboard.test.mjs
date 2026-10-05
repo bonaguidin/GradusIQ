@@ -32,9 +32,20 @@ test('authenticated dashboard covers canonical states, routing, themes, errors, 
   // real values.
   let requirementSatisfactionFixture = null
   const analysisCacheFixtures = {}
+  // Job Search fixtures keyed by role: undefined -> zero-coverage response
+  // (the honest "nothing cached for this role" state, not a 404 -- mirrors
+  // the real endpoint's 200-with-coverage-marker contract).
+  const jobSearchFixtures = {}
   const apiPlugin = { name: 'dashboard-api', configureServer(server) { server.middlewares.use((request, response, next) => {
     const path = request.url?.split('?')[0]
     if (planning.handle(path, request.method, request, response)) return undefined
+    if (path === '/api/v2/student/me/job-search') {
+      const role = new URL(request.url, 'http://127.0.0.1').searchParams.get('role')
+      response.setHeader('content-type', 'application/json')
+      response.statusCode = 200
+      response.end(JSON.stringify(jobSearchFixtures[role] ?? { role, coverage: 'no_market_data', postings: [] }))
+      return
+    }
     if (path === '/api/v2/student/me/requirement-satisfaction') {
       response.setHeader('content-type', 'application/json')
       if (requirementSatisfactionFixture) {
@@ -278,11 +289,33 @@ test('authenticated dashboard covers canonical states, routing, themes, errors, 
   // Clicking the parent always returns to its internal overview.
   await page.getByRole('heading', { name: 'Career Overview' }).waitFor()
 
-  // Job Search is intentionally honest until a production service exists.
+  // Job Search reads the cached postings endpoint for the selected target
+  // role -- no location input (the cache has no location axis). First, no
+  // fixture is set for this role: the endpoint's honest zero-coverage
+  // response renders as a clear, non-error empty state.
   await page.getByRole('button', { name: 'Job Search' }).click()
   await page.getByRole('heading', { name: 'Job Search', exact: true }).waitFor()
-  await page.getByText('Live job search is not connected yet').waitFor()
-  assert.equal(await page.getByRole('button', { name: 'Search Jobs' }).isDisabled(), true)
+  assert.equal(await page.getByRole('button', { name: 'Search Jobs' }).isDisabled(), false)
+  await page.getByRole('button', { name: 'Search Jobs' }).click()
+  await page.getByText('No postings found for this role recently').waitFor()
+
+  // Now a real cached posting exists for the same role -- re-running the
+  // search (role selection is unchanged) shows it.
+  jobSearchFixtures['Software Engineer'] = {
+    role: 'Software Engineer',
+    coverage: 'available',
+    postings: [
+      {
+        posting_id: 'posting-1', cluster_id: 'cluster-1', employer: 'Acme Corp',
+        title: 'Software Engineering Intern', location: 'Dallas, TX', url: 'https://example.com/jobs/1',
+        posted_date: '2026-09-30', fetched_at: '2026-09-30T12:00:00Z', source: 'adzuna',
+      },
+    ],
+  }
+  await page.getByRole('button', { name: 'Search Jobs' }).click()
+  await page.getByText('Software Engineering Intern').waitFor()
+  await page.getByText('Acme Corp', { exact: false }).waitFor()
+  await page.getByRole('link', { name: 'View posting' }).waitFor()
 
   // CASE 1b: same profile, but with a requirement-satisfaction tree and
   // cached GAP/FIT results now available -- the ring shows a real percentage

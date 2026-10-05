@@ -46,6 +46,17 @@ def test_gap_local_and_missing_evidence_inputs_are_real():
 
 
 def test_gap_research_fallback_reaches_mocked_established_path(monkeypatch):
+    # "Operations Intern" (13-1199.00) was this scenario's example of a role
+    # O*NET has no ratings AND no related occupations for -- the scenario's
+    # own label is "controlled role research fallback". A manual_override
+    # related-occupation entry (Logisticians, 13-1081.00, build_onet.py's
+    # MANUAL_RELATED_OVERRIDES) has since given it a rated neighbour too, so
+    # a live run of this scenario today would no longer actually reach the
+    # agent -- it borrows instead, same as Finance Intern. The market is
+    # built explicitly here (provenance forced to "none") so this unit test
+    # still exercises the fallback path on purpose, decoupled from which real
+    # role the live catalog happens to leave uncovered. The scenario's
+    # synthetic_input/purpose stand as realistic fixture data regardless.
     scenario = by_id("gap_research_fallback")
     calls = []
     monkeypatch.setattr(
@@ -59,7 +70,7 @@ def test_gap_research_fallback_reaches_mocked_established_path(monkeypatch):
         },
     )
     runner = GapRunner(client=object())
-    market = gap_module.get_market_requirements(scenario.synthetic_input.target_roles)
+    market = {"by_role": {"Operations Intern": {"provenance": "none"}}}
     result = runner.role_requirements_for(scenario.synthetic_input.target_roles, market)
     assert market["by_role"]["Operations Intern"]["provenance"] == "none"
     assert calls == ["Operations Intern"]

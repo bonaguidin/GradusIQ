@@ -25,6 +25,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from enum import Enum
+from typing import Any, Mapping
 from urllib.parse import urlsplit
 
 # ---------------------------------------------------------------------------
@@ -175,6 +176,39 @@ def normalize_employer(name: str | None) -> str:
     return " ".join(tokens)
 
 
+# The alias map normalize_employer's own docstring points to: curated,
+# hand-built, keyed by normalize_employer()'s output so it composes with
+# that function rather than duplicating its normalization. normalize_employer
+# only strips legal-form suffixes (inc/llc/corp/...) by design -- "Micron"
+# and "Micron Technology, Inc." normalize to different keys ("micron" vs
+# "micron technology") since "Technology" isn't a legal suffix, so the two
+# strings never collapse on their own. Confirmed live (FIT's hiring_signal
+# measurement, 2026-09-29/30): both variants appear for the same employer.
+#
+# Shared by every consumer that surfaces an employer name for display
+# (fit.py's hiring_signal, posting_provider.py's raw postings[].employer) so
+# they can't disagree with each other -- one map, not two kept in sync by
+# hand. Display-only: the DB `company` column, normalize.py, and
+# normalize_employer() itself are untouched.
+EMPLOYER_DISPLAY_ALIASES: dict[str, str] = {
+    normalize_employer("Micron"): "Micron Technology, Inc.",
+    normalize_employer("Micron Technology, Inc."): "Micron Technology, Inc.",
+}
+
+
+def employer_display_name(raw_employer: str | None) -> str | None:
+    """The canonical display form for a raw employer string, if
+    EMPLOYER_DISPLAY_ALIASES has one for it; otherwise the raw string
+    unchanged. None/empty input passes through unchanged -- "no employer
+    named" is a real, distinct case from "employer named, no alias applies,"
+    and this function only ever handles the second one.
+    """
+    if not raw_employer:
+        return raw_employer
+    key = normalize_employer(raw_employer)
+    return EMPLOYER_DISPLAY_ALIASES.get(key, raw_employer)
+
+
 def normalize_title(title: str | None) -> str:
     """Canonical title key: req numbers and trailing asides gone, seniority
     spellings unified, everything else preserved.
@@ -201,16 +235,22 @@ def normalize_title(title: str | None) -> str:
 
 # Matching is on the raw location string, but the RESULT is what clusters --
 # never the string itself, which syndicators rewrite freely.
+#
+# celina: measured 2026-09-30 against the live corpus (2017 rows) alongside
+# the other five names below -- zero rows in the corpus name it at all, so
+# there is no data to justify moving it to _DFW_LOCALITIES_TX_GATED or
+# leaving it here. Left bare deliberately, not an oversight. Re-measure if/
+# when Celina postings actually start showing up.
 _DFW_LOCALITIES = frozenset({
     "dallas", "fort worth", "ft worth", "dfw", "dallas fort worth",
     "metroplex", "arlington", "plano", "irving", "garland", "frisco",
     "mckinney", "grand prairie", "mesquite", "carrollton", "denton",
-    "richardson", "lewisville", "allen", "flower mound", "mansfield",
+    "richardson", "lewisville", "flower mound", "mansfield",
     "rowlett", "bedford", "euless", "grapevine", "cedar hill", "desoto",
     "coppell", "hurst", "duncanville", "the colony", "farmers branch",
     "southlake", "keller", "wylie", "little elm", "haltom city", "rockwall",
-    "addison", "prosper", "celina", "sachse", "murphy", "balch springs",
-    "lancaster", "waxahachie", "midlothian", "north richland hills",
+    "addison", "celina", "sachse", "balch springs",
+    "waxahachie", "north richland hills",
     # Added 2026-08-30 -- distinctive DFW-metro names, low collision risk.
     "trophy club", "colleyville", "northlake", "haslet", "double oak",
     "seagoville",
@@ -221,10 +261,23 @@ _DFW_LOCALITIES = frozenset({
 # Dallas (Justin, Melissa, Anna, Aubrey). Matched ONLY when the string also
 # names Texas -- which a real DFW posting effectively always does -- so a
 # national feed (Adzuna/JSearch) cannot misfire on the out-of-state namesakes.
+#
+# allen, midlothian, lancaster, murphy, prosper -- moved here 2026-09-30.
+# Measured against the live corpus (2017 rows, isolating cases where each
+# token was the SOLE reason for a DFW match): allen 78.3% false-positive
+# (Glen Allen VA, Allen Park MI, Woodhaven-Allen Rd MI), midlothian 90.9%
+# (Midlothian VA), lancaster 100% (Lancaster PA/CA/OH, and "Lancaster Ave"
+# as a street name in Villanova PA -- not even a place-name collision).
+# murphy and prosper were lower (40% and 0% FP respectively in the sample)
+# but real: Orillia, Ontario, Canada has its own "Murphy Rd". See
+# classify_location's bulletFields fallback below for why gating these two
+# needed more than the plain _TEXAS.search(location) check the other three
+# resolve cleanly with.
 _DFW_LOCALITIES_TX_GATED = frozenset({
     "westlake", "roanoke", "argyle", "justin", "melissa", "anna", "aubrey",
     "corinth", "fairview", "sunnyvale", "fate", "royse city", "forney",
     "highland village",
+    "allen", "midlothian", "lancaster", "murphy", "prosper",
 })
 
 _REMOTE = re.compile(r"\b(?:remote|work from home|wfh|anywhere|virtual)\b", re.IGNORECASE)
@@ -258,7 +311,35 @@ class LocationKind(str, Enum):
     UNKNOWN = "unknown"
 
 
-def classify_location(location: str | None) -> tuple[bool, LocationKind]:
+def _bulletfields_name_texas(raw_payload: Mapping[str, Any] | None) -> bool:
+    """Whether Workday's ``bulletFields`` (not the ``location`` string) names
+    Texas -- Michaels' Workday feed writes ``locationsText`` (this module's
+    ``location`` input) as just ``"<City>-<Street>"``, with no state at all;
+    the only place the real state shows up is a free-text descriptor buried
+    in ``bulletFields`` (e.g. ``"Texas ; United States; Country; Texas;
+    Murphy; Dallas-Fort Worth, TX"``). Confirmed accurate against real data
+    2026-09-30 (zero disagreements against ground truth in the sample) --
+    but it's a distinct signal from what ``_TEXAS.search(location)`` checks,
+    so gating on ``location`` alone would false-negative genuine Michaels-
+    sourced DFW postings for tokens like murphy/prosper whose only Texas
+    signal lives here. Absent/malformed ``raw_payload`` (a non-Workday
+    source, or none passed at all) is not Texas, not an error -- most callers
+    have no ``raw_payload`` to give at all.
+    """
+    if not isinstance(raw_payload, Mapping):
+        return False
+    bullet_fields = raw_payload.get("bulletFields")
+    if not isinstance(bullet_fields, list):
+        return False
+    # Only real strings -- stringifying a stray non-string item (a nested
+    # dict, say) could accidentally spell "texas" in its repr and misfire.
+    blob = " ".join(field for field in bullet_fields if isinstance(field, str))
+    return bool(_TEXAS.search(blob))
+
+
+def classify_location(
+    location: str | None, raw_payload: Mapping[str, Any] | None = None
+) -> tuple[bool, LocationKind]:
     """Return (is_dfw, kind). The verdict is always definite; kind says why.
 
     Presence wins over absence -- "Dallas, TX; New York, NY" is a real DFW
@@ -269,6 +350,13 @@ def classify_location(location: str | None) -> tuple[bool, LocationKind]:
     Remote with no DFW anchor is FALSE today, not undetermined. That is a
     deliberate call rather than a dodge: the kind records that it was remote,
     so flipping it later is a query rather than a re-pull.
+
+    ``raw_payload`` is optional and additive -- every caller that already
+    works with only ``location`` keeps working exactly as before. Pass the
+    ingest row's raw vendor payload when available so the
+    _DFW_LOCALITIES_TX_GATED check can also confirm Texas from
+    ``bulletFields`` (see ``_bulletfields_name_texas``), not just from a
+    token visible in ``location`` itself.
     """
     if not location or not location.strip():
         return False, LocationKind.UNKNOWN
@@ -278,8 +366,10 @@ def classify_location(location: str | None) -> tuple[bool, LocationKind]:
     has_dfw = any(f" {locality} " in padded for locality in _DFW_LOCALITIES)
 
     # Ambiguous exurb names only count when Texas is also named -- see the
-    # _DFW_LOCALITIES_TX_GATED comment.
-    if not has_dfw and _TEXAS.search(location):
+    # _DFW_LOCALITIES_TX_GATED comment. Texas can be named in `location`
+    # itself (_TEXAS.search) OR, for feeds that don't put state there,
+    # in the raw vendor payload's bulletFields -- either is sufficient.
+    if not has_dfw and (_TEXAS.search(location) or _bulletfields_name_texas(raw_payload)):
         has_dfw = any(
             f" {locality} " in padded for locality in _DFW_LOCALITIES_TX_GATED
         )
@@ -303,10 +393,10 @@ def classify_location(location: str | None) -> tuple[bool, LocationKind]:
     return False, LocationKind.NON_DFW
 
 
-def is_dfw(location: str | None) -> bool:
+def is_dfw(location: str | None, raw_payload: Mapping[str, Any] | None = None) -> bool:
     """Just the verdict. Callers that persist a row want classify_location(),
     so the reasoning reaches the location_kind column."""
-    verdict, _ = classify_location(location)
+    verdict, _ = classify_location(location, raw_payload)
     return verdict
 
 
@@ -384,7 +474,10 @@ def identity_keys(posting: dict[str, object]) -> tuple[str | None, str | None]:
     location = posting.get("location")
     dfw = posting.get("is_dfw")
     if dfw is None:
-        dfw = is_dfw(location if isinstance(location, str) else None)
+        dfw = is_dfw(
+            location if isinstance(location, str) else None,
+            posting.get("raw_payload"),
+        )
     exact = exact_key(url if isinstance(url, str) else None)
     fuzzy = fuzzy_key(
         posting.get("employer") or posting.get("company"),  # type: ignore[arg-type]

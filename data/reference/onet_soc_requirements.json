@@ -3,7 +3,7 @@
     "source": "O*NET 30.3 Database (canonical text release), Importance (IM) scale",
     "source_url": "https://www.onetcenter.org/database.html",
     "taxonomy": "O*NET-SOC 2019",
-    "generated": "2026-08-10",
+    "generated": "2026-09-30",
     "generated_by": "data/onet/build_onet.py -- do not hand-edit, re-run instead",
     "importance_scale": "0-100, rescaled from O*NET native 1-5 via (value-1)/4*100",
     "inclusion_rule": "skills: full Essential Skills set; knowledge & abilities: importance >= 50; each sorted descending. Transferable Skills are deliberately NOT merged into skills -- see occupation_skills.csv if they are needed.",
@@ -12,7 +12,13 @@
       "partial_onet_profile": "no ratings; software and/or tasks present",
       "no_data": "no ratings, software, or tasks in this release"
     },
-    "license": "O*NET data © under CC-BY 4.0 (US DOL/ETA)"
+    "license": "O*NET data © under CC-BY 4.0 (US DOL/ETA)",
+    "manual_related_overrides": {
+      "note": "SOC codes where O*NET's own Related Occupations.txt has zero rows (either direction) and a hand-picked neighbor was substituted so the app's borrow-nearest-rated-neighbor fallback has something to use. Not O*NET graph data -- see MANUAL_RELATED_OVERRIDES in build_onet.py for the per-SOC rationale. Each affected entry's related[] item carries \"manual_override\": true.",
+      "socs": [
+        "13-1199.00"
+      ]
+    }
   },
   "must_have_threshold": 70,
   "roles": {
@@ -18882,7 +18888,13 @@
       "hot_software": [],
       "in_demand_software": [],
       "core_tasks": [],
-      "related": [],
+      "related": [
+        {
+          "soc": "13-1081.00",
+          "title": "Logisticians",
+          "manual_override": true
+        }
+      ],
       "_data_status": "no_data"
     },
     "13-1199.04": {

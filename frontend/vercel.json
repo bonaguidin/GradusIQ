@@ -149,6 +149,51 @@
       "destination": "/api/proxy?target=me-planned-courses"
     },
     {
+      "source": "/api/v2/student/me/gpa",
+      "destination": "/api/proxy?target=me-gpa"
+    },
+    {
+      "source": "/api/v2/student/me/grading-schema",
+      "destination": "/api/proxy?target=me-grading-schema"
+    },
+    {
+      "source": "/api/v2/student/me/catalog/cross-listings",
+      "destination": "/api/proxy?target=me-catalog-cross-listings"
+    },
+    {
+      "source": "/api/v2/student/me/course-records/pending-final-grades",
+      "destination": "/api/proxy?target=me-course-records-pending-final-grades"
+    },
+    {
+      "source": "/api/v2/student/me/course-records/:id/finalize",
+      "destination": "/api/proxy?target=me-course-record-finalize&id=:id"
+    },
+    {
+      "source": "/api/v2/student/me/course-records/:id",
+      "destination": "/api/proxy?target=me-course-record&id=:id"
+    },
+    {
+      "source": "/api/v2/student/me/analysis-cache/:feature",
+      "destination": "/api/proxy?target=me-analysis-cache&feature=:feature"
+    },
+    {
+      "source": "/api/v2/student/me/career-role-options",
+      "destination": "/api/proxy?target=me-career-role-options"
+    },
+    {
+      "source": "/api/v2/student/me/job-search",
+      "destination": "/api/proxy?target=me-job-search&role=:role",
+      "has": [{ "type": "query", "key": "role" }]
+    },
+    {
+      "source": "/api/v2/student/me/schedule/choices",
+      "destination": "/api/proxy?target=me-schedule-choices"
+    },
+    {
+      "source": "/api/v2/student/me/schedule/exclusions",
+      "destination": "/api/proxy?target=me-schedule-exclusions"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

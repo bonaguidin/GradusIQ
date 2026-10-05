@@ -666,10 +666,9 @@ function DemoDashboardPage() {
                 <h2 className="career-section-heading">Job Search</h2>
                 <div className="job-search-shell">
                   <label>Target role<select defaultValue={dashboard.career.target_roles[0] ?? ''} disabled={dashboard.career.target_roles.length === 0}>{dashboard.career.target_roles.length === 0 && <option value="">No target role provided</option>}{dashboard.career.target_roles.map((role) => <option key={role}>{role}</option>)}</select></label>
-                  <label>Location<input value={dashboard.career.geographic_preference ?? ''} placeholder="No location preference provided" readOnly /></label>
                   <button type="button" className="btn btn-primary" disabled>Search Jobs</button>
                 </div>
-                <div className="real-empty"><h3>Live job search is not connected yet</h3><p>Your target role and location are ready, but this repository does not yet expose a production job-search service.</p></div>
+                <div className="real-empty"><h3>Job Search is not available in this demo</h3><p>This demo profile has no real account session, so it can't reach the cached postings this feature reads. Sign in with a real account to search.</p></div>
               </div>
             )}
 

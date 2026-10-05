@@ -869,7 +869,7 @@ def run_workday(*, live: bool, write: bool, store: Any = None) -> RunReport:
 
         rows: list[dict] = []
         for row in raw_rows:
-            in_dfw, kind = classify_location(row.get("location"))
+            in_dfw, kind = classify_location(row.get("location"), row.get("raw_payload"))
             if not in_dfw:
                 if not always_dfw:
                     continue  # CXS returns the whole national board; DFW only
