@@ -10,7 +10,7 @@ import './interaction.css';
 import { pressGeometry } from './lib/pressGeometry.mjs';
 import type { PressPoint } from './lib/pressGeometry.mjs';
 
-const PRESSABLE = '.btn, .rv-commit-button';
+const PRESSABLE = '.btn, .rv-commit-button, .chat-chip';
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 function pressableFrom(target: EventTarget | null): HTMLElement | null {
