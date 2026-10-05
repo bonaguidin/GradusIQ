@@ -16,6 +16,8 @@ export interface GapAnalysisRun {
    */
   refreshing?: boolean;
   refreshError?: string;
+  /** From useSequencedAnalysisRuns -- see AnalysisPanel's blockedReason. */
+  blockedReason?: string;
 }
 
 interface GapAnalysisPanelProps {
@@ -38,7 +40,7 @@ export function GapAnalysisPanel({ run: externalRun }: GapAnalysisPanelProps = {
   const internalRun = useCachedAnalysisRun('gap', () =>
     analyzeGap({ slug, accessToken: session?.access_token ?? null }),
   );
-  const { state, trigger, refreshing, refreshError } = externalRun ?? internalRun;
+  const { state, trigger, refreshing, refreshError, blockedReason } = externalRun ?? internalRun;
 
   const phase: AnalysisPhase =
     state.phase === 'idle'
@@ -65,6 +67,7 @@ export function GapAnalysisPanel({ run: externalRun }: GapAnalysisPanelProps = {
       failureMessage={analysisFailureMessage(state)}
       refreshing={refreshing}
       refreshError={refreshError}
+      blockedReason={blockedReason}
     >
       {state.phase === 'done' && state.result.status === 'success' && (
         <GapResult data={state.result.data} summary={state.result.summary} />

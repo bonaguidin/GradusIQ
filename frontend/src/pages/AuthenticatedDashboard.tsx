@@ -4,6 +4,7 @@ import { useAuth } from '../auth/useAuth';
 import { analyzeCourseDiscovery, analyzeFit, analyzeGap, analyzeShift } from '../api/analysis';
 import { useAnalysisRun } from '../hooks/useAnalysisRun';
 import { useCachedAnalysisRun } from '../hooks/useCachedAnalysisRun';
+import { useSequencedAnalysisRuns } from '../hooks/useSequencedAnalysisRuns';
 import { ChatPanel } from '../components/ChatPanel';
 import { GuidedTour } from '../components/GuidedTour';
 import { DashboardSuccessNotice } from '../components/DashboardSuccessNotice';
@@ -86,9 +87,15 @@ export function AuthenticatedDashboard() {
   // still owns its own internal useCachedAnalysisRun by default) so Career
   // Overview and Career Intelligence read the same independent run states.
   // useCachedAnalysisRun keeps the existing cache behavior for each feature.
-  const gapRun = useCachedAnalysisRun('gap', () => analyzeGap({ slug, accessToken }));
-  const fitRun = useCachedAnalysisRun('fit', () => analyzeFit({ slug, accessToken }));
-  const shiftRun = useCachedAnalysisRun('shift', () => analyzeShift({ slug, accessToken }));
+  const rawGapRun = useCachedAnalysisRun('gap', () => analyzeGap({ slug, accessToken }));
+  const rawFitRun = useCachedAnalysisRun('fit', () => analyzeFit({ slug, accessToken }));
+  const rawShiftRun = useCachedAnalysisRun('shift', () => analyzeShift({ slug, accessToken }));
+  // Gated to one live call at a time -- see useSequencedAnalysisRuns.
+  const { fit: fitRun, gap: gapRun, shift: shiftRun } = useSequencedAnalysisRuns({
+    fit: rawFitRun,
+    gap: rawGapRun,
+    shift: rawShiftRun,
+  });
   // Overview's degree-progress ring needs the same requirement-satisfaction
   // tree RequirementSatisfactionPanel renders under Academic -- lifted here
   // instead of duplicated inside the panel, same lifted-state shape as

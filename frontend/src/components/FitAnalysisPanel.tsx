@@ -12,6 +12,8 @@ export interface FitAnalysisRun {
   /** From useCachedAnalysisRun -- see GapAnalysisRun. */
   refreshing?: boolean;
   refreshError?: string;
+  /** From useSequencedAnalysisRuns -- see AnalysisPanel's blockedReason. */
+  blockedReason?: string;
 }
 
 interface FitAnalysisPanelProps {
@@ -31,7 +33,7 @@ export function FitAnalysisPanel({ run: externalRun }: FitAnalysisPanelProps = {
   const internalRun = useCachedAnalysisRun('fit', () =>
     analyzeFit({ slug, accessToken: session?.access_token ?? null }),
   );
-  const { state, trigger, refreshing, refreshError } = externalRun ?? internalRun;
+  const { state, trigger, refreshing, refreshError, blockedReason } = externalRun ?? internalRun;
 
   const phase: AnalysisPhase =
     state.phase === 'idle'
@@ -58,6 +60,7 @@ export function FitAnalysisPanel({ run: externalRun }: FitAnalysisPanelProps = {
       failureMessage={analysisFailureMessage(state)}
       refreshing={refreshing}
       refreshError={refreshError}
+      blockedReason={blockedReason}
     >
       {state.phase === 'done' && state.result.status === 'success' && (
         <FitResult data={state.result.data} summary={state.result.summary} />

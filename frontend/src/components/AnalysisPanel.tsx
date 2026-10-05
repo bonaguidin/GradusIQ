@@ -66,6 +66,15 @@ interface AnalysisPanelProps {
    * which only applies when there is no prior result to fall back to.
    */
   refreshError?: string;
+  /**
+   * Set when something other than this panel's own state should block the
+   * run button -- Career Intelligence gates FIT/GAP/SHIFT to one live call
+   * at a time, so a sibling panel already running disables this one and
+   * this reason takes the place of the idle invitation. Optional and
+   * additive: every other caller passes nothing and renders exactly as
+   * before.
+   */
+  blockedReason?: string;
   children?: ReactNode;
 }
 
@@ -84,6 +93,7 @@ export function AnalysisPanel({
   headerExtra,
   refreshing = false,
   refreshError,
+  blockedReason,
   children,
 }: AnalysisPanelProps) {
   const requestProfileField = useProfileFieldRequest();
@@ -105,7 +115,7 @@ export function AnalysisPanel({
             type="button"
             className="btn btn-ghost btn-sm"
             onClick={onRun}
-            disabled={phase === 'loading' || refreshing}
+            disabled={phase === 'loading' || refreshing || Boolean(blockedReason)}
             aria-busy={phase === 'loading' || refreshing}
           >
             {phase === 'loading' ? (
@@ -122,7 +132,11 @@ export function AnalysisPanel({
         </div>
       </div>
 
-      {phase === 'idle' && <p className="analysis-empty">{invitation}</p>}
+      {phase === 'idle' && <p className="analysis-empty">{blockedReason ?? invitation}</p>}
+
+      {blockedReason && phase !== 'idle' && phase !== 'loading' && !refreshing && (
+        <p className="analysis-blocked-note">{blockedReason}</p>
+      )}
 
       {phase === 'loading' && (
         <div className="analysis-loading" role="status" aria-live="polite">

@@ -17,6 +17,8 @@ export interface ShiftAnalysisRun {
   /** From useCachedAnalysisRun -- see GapAnalysisRun. */
   refreshing?: boolean;
   refreshError?: string;
+  /** From useSequencedAnalysisRuns -- see AnalysisPanel's blockedReason. */
+  blockedReason?: string;
 }
 
 interface ShiftAnalysisPanelProps {
@@ -37,7 +39,7 @@ export function ShiftAnalysisPanel({ run: externalRun }: ShiftAnalysisPanelProps
   const internalRun = useCachedAnalysisRun('shift', () =>
     analyzeShift({ slug, accessToken: session?.access_token ?? null }),
   );
-  const { state, trigger, refreshing, refreshError } = externalRun ?? internalRun;
+  const { state, trigger, refreshing, refreshError, blockedReason } = externalRun ?? internalRun;
 
   const phase: AnalysisPhase =
     state.phase === 'idle'
@@ -64,6 +66,7 @@ export function ShiftAnalysisPanel({ run: externalRun }: ShiftAnalysisPanelProps
       failureMessage={analysisFailureMessage(state)}
       refreshing={refreshing}
       refreshError={refreshError}
+      blockedReason={blockedReason}
     >
       {state.phase === 'done' && state.result.status === 'success' && (
         <ShiftResult data={state.result.data} summary={state.result.summary} />
