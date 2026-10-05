@@ -299,6 +299,13 @@ a {
     transition: none !important;
     animation: none !important;
   }
+
+  /* Indeterminate progress still has to read as "working," not "stuck" --
+     swap the spin for the same opacity pulse the skeletons already use. */
+  .spinner,
+  .spinner-small {
+    animation: skeleton-pulse var(--t-pulse) ease-in-out infinite !important;
+  }
 }
 
 /* ─── SHELL LAYOUT ───────────────────────────────────────────────────────── */
