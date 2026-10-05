@@ -522,8 +522,15 @@ class DryRunStore:
                 del self.clusters[k]
 
     def drop_clusters(self, cluster_ids: list[str]) -> None:
+        occupied = set(self._identity_by_key.values())
+        empty = {cluster_id for cluster_id in cluster_ids if cluster_id not in occupied}
+        for cluster_id in set(cluster_ids) - empty:
+            print(
+                f"drop_clusters: skipping {cluster_id}, it gained member postings",
+                file=sys.stderr,
+            )
         for k, v in list(self.clusters.items()):
-            if v in cluster_ids:
+            if v in empty:
                 del self.clusters[k]
 
     def merge_clusters(self, absorbed: str, surviving: str, *, match_rule: str,
@@ -717,17 +724,41 @@ class SupabaseStore:
                 del self._cluster_cache[k]
 
     def drop_clusters(self, cluster_ids: list[str]) -> None:
-        """Delete clusters that no posting points at any more, keys first.
+        """Delete clusters that have no member postings, after re-checking that.
 
-        Same ordering as gc_empty_clusters: a crash between the two deletes
-        leaves a cluster with no keys, never a key pointing at nothing.
+        The caller's count came from a snapshot taken before this batch. Re-read
+        the live membership here, and skip any cluster that has gained a member.
+
+        Clusters are deleted before their keys. The postings foreign key refuses
+        the cluster delete if a member appeared after the check, before any key is
+        touched, so a live cluster is never left without keys. The keys then go
+        with the cluster through the identity-key cascade. The explicit key delete
+        after it is a no-op in the database and keeps the fake store honest.
         """
         if not cluster_ids:
             return
-        self.client.table(KEYS_TABLE).delete().in_("cluster_id", cluster_ids).execute()
-        self.client.table(CLUSTERS_TABLE).delete().in_("id", cluster_ids).execute()
+        occupied = {
+            str(row["posting_identity"])
+            for row in self.client.table(POSTINGS_TABLE)
+            .select("posting_identity")
+            .in_("posting_identity", cluster_ids)
+            .execute()
+            .data
+            or []
+        }
+        for cluster_id in cluster_ids:
+            if cluster_id in occupied:
+                print(
+                    f"drop_clusters: skipping {cluster_id}, it gained member postings",
+                    file=sys.stderr,
+                )
+        empty = [cluster_id for cluster_id in cluster_ids if cluster_id not in occupied]
+        if not empty:
+            return
+        self.client.table(CLUSTERS_TABLE).delete().in_("id", empty).execute()
+        self.client.table(KEYS_TABLE).delete().in_("cluster_id", empty).execute()
         for k, v in list(self._cluster_cache.items()):
-            if v in cluster_ids:
+            if v in empty:
                 del self._cluster_cache[k]
 
     def merge_clusters(self, absorbed: str, surviving: str, *, match_rule: str,

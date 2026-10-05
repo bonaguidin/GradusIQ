@@ -1039,7 +1039,7 @@ def test_three_rows_rekeying_together_leave_no_orphan_cluster():
     _assert_no_orphan_clusters(store)
 
 
-def test_supabase_drop_clusters_deletes_keys_before_clusters_and_only_listed_ids():
+def test_supabase_drop_clusters_deletes_clusters_before_keys_and_only_listed_ids():
     clusters = [{"id": "c-vacated"}, {"id": "c-keep"}]
     keys = [
         {"key": "fuzzy:x", "cluster_id": "c-vacated"},
@@ -1052,7 +1052,7 @@ def test_supabase_drop_clusters_deletes_keys_before_clusters_and_only_listed_ids
 
     store.drop_clusters(["c-vacated"])
 
-    assert [d[0] for d in client.deletes] == [KEYS_TABLE, CLUSTERS_TABLE]
+    assert [d[0] for d in client.deletes] == [CLUSTERS_TABLE, KEYS_TABLE]
     assert client.clusters == [{"id": "c-keep"}]
     assert client.keys == [{"key": "fuzzy:y", "cluster_id": "c-keep"}]
     assert store._cluster_cache == {"fuzzy:y": "c-keep"}
@@ -1067,3 +1067,44 @@ def test_drop_clusters_with_nothing_vacated_touches_nothing():
     store.drop_clusters([])
 
     assert client.deletes == []
+
+
+def test_supabase_drop_clusters_skips_a_cluster_that_gained_a_member_and_keeps_its_keys():
+    clusters = [{"id": "c-gained"}, {"id": "c-empty"}]
+    postings = [{"id": "p9", "posting_identity": "c-gained"}]
+    keys = [
+        {"key": "fuzzy:x", "cluster_id": "c-gained"},
+        {"key": "fuzzy:y", "cluster_id": "c-empty"},
+    ]
+    client = _FakeGcClient(clusters=clusters, postings=postings, keys=keys)
+    store = SupabaseStore.__new__(SupabaseStore)
+    store.client = client
+    store._cluster_cache = {"fuzzy:x": "c-gained", "fuzzy:y": "c-empty"}
+
+    store.drop_clusters(["c-gained", "c-empty"])
+
+    assert client.clusters == [{"id": "c-gained"}]
+    assert client.keys == [{"key": "fuzzy:x", "cluster_id": "c-gained"}]
+    assert store._cluster_cache == {"fuzzy:x": "c-gained"}
+
+
+def test_drop_clusters_on_an_already_deleted_cluster_is_a_no_op():
+    client = _FakeGcClient(clusters=[{"id": "c-keep"}], postings=[], keys=[{"key": "k", "cluster_id": "c-keep"}])
+    store = SupabaseStore.__new__(SupabaseStore)
+    store.client = client
+    store._cluster_cache = {}
+
+    store.drop_clusters(["c-already-gone"])
+
+    assert client.clusters == [{"id": "c-keep"}]
+    assert client.keys == [{"key": "k", "cluster_id": "c-keep"}]
+
+
+def test_dry_run_drop_clusters_skips_a_cluster_with_a_member_and_ignores_missing_ones():
+    store = DryRunStore()
+    store.clusters = {"fuzzy:live": "c-live", "fuzzy:dead": "c-dead"}
+    store._identity_by_key = {("adzuna", "A1"): "c-live"}
+
+    store.drop_clusters(["c-live", "c-dead", "c-already-gone"])
+
+    assert store.clusters == {"fuzzy:live": "c-live"}
