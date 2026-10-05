@@ -4,6 +4,7 @@ import { analysisFailureMessage, type AnalysisRunState } from '../hooks/useAnaly
 import { useCachedAnalysisRun } from '../hooks/useCachedAnalysisRun';
 import type { FeatureResult, GapAnalysisData, GapMustHaveGap } from '../types/analysis';
 import { AnalysisPanel, type AnalysisPhase } from './AnalysisPanel';
+import { AnimatedNumber } from './AnimatedNumber';
 
 export interface GapAnalysisRun {
   state: AnalysisRunState<FeatureResult<GapAnalysisData>>;
@@ -89,7 +90,7 @@ function GapResult({ data, summary }: { data: GapAnalysisData; summary: string }
   return (
     <div>
       <div className="gap-score-row">
-        <span className="gap-score-value">{data.readiness_score}</span>
+        <span className="gap-score-value"><AnimatedNumber value={data.readiness_score} decimals={0} /></span>
         <span className="gap-score-max">/ 10</span>
         <span className="gap-score-label">Readiness</span>
       </div>
