@@ -189,6 +189,7 @@ class RunReport:
     clusters_matched_fuzzy: int = 0
     clusters_merged: int = 0
     clusters_adopted: int = 0
+    cluster_drop_failures: int = 0
 
     @property
     def quota_spent(self) -> int:
@@ -216,6 +217,7 @@ class RunReport:
             f"    new clusters              {self.clusters_created}",
             f"    clusters merged           {self.clusters_merged}",
             f"    clusters adopted          {self.clusters_adopted}",
+            f"    cluster drop failures     {self.cluster_drop_failures}",
         ]
         errors = sum(len(o.normalization_errors) for o in self.outcomes)
         if errors:
@@ -729,11 +731,12 @@ class SupabaseStore:
         The caller's count came from a snapshot taken before this batch. Re-read
         the live membership here, and skip any cluster that has gained a member.
 
-        Clusters are deleted before their keys. The postings foreign key refuses
-        the cluster delete if a member appeared after the check, before any key is
-        touched, so a live cluster is never left without keys. The keys then go
-        with the cluster through the identity-key cascade. The explicit key delete
-        after it is a no-op in the database and keeps the fake store honest.
+        Clusters are deleted before their keys, and the identity-key cascade
+        removes the keys with the cluster. A member that appears between the
+        check and the delete is NOT protected by a foreign key: on the live
+        database job_postings.posting_identity is ON DELETE SET NULL, so that
+        posting loses its cluster and null_posting_identity flags it nightly. The
+        re-check narrows that window; it does not close it.
         """
         if not cluster_ids:
             return
@@ -882,7 +885,15 @@ def run(
                 store.stage_postings(outcome.rows)
                 vacated = resolve_and_attach_identity(outcome.rows, store, report)
                 report.rows_upserted += store.upsert_postings(outcome.rows)
-                store.drop_clusters(vacated)
+                try:
+                    store.drop_clusters(vacated)
+                except Exception as exc:  # noqa: BLE001 -- cleanup must not abort the run
+                    report.cluster_drop_failures += 1
+                    print(
+                        f"drop_clusters failed for {source}/{role}: "
+                        f"{type(exc).__name__}: {exc}",
+                        file=sys.stderr,
+                    )
 
             if live:
                 store.write_log(outcome.log_row())

@@ -1108,3 +1108,41 @@ def test_dry_run_drop_clusters_skips_a_cluster_with_a_member_and_ignores_missing
     store.drop_clusters(["c-live", "c-dead", "c-already-gone"])
 
     assert store.clusters == {"fuzzy:live": "c-live"}
+
+
+def test_adzuna_drop_clusters_failure_is_counted_and_does_not_abort_remaining_roles(monkeypatch, capsys):
+    import ingest as ingest_module
+
+    roles = ["Software Engineering Intern", "Finance Intern", "Operations Intern"]
+
+    def fake_fetch_one(source, target_role, **_kwargs):
+        row = _collin_row(f"id-{target_role.split()[0]}", "Lab Assistant Science")
+        row["target_role"] = target_role
+        return ingest_module.FetchOutcome(
+            source=source, target_role=target_role, results_count=1, rows=[row]
+        )
+
+    class FailingDropStore(DryRunStore):
+        def drop_clusters(self, cluster_ids):
+            raise RuntimeError("simulated cluster delete failure")
+
+    monkeypatch.setattr(ingest_module, "fetch_one", fake_fetch_one)
+    monkeypatch.setattr(ingest_module, "DryRunStore", FailingDropStore)
+
+    report = ingest_module.run(
+        sources=("adzuna",),
+        roles=roles,
+        live=True,
+        write=False,
+        page_size=20,
+        where="",
+        dump_shape=False,
+    )
+
+    assert [o.target_role for o in report.outcomes] == roles
+    assert all(o.status == "success" for o in report.outcomes)
+    assert report.rows_upserted == len(roles)
+    assert report.cluster_drop_failures == len(roles)
+    err = capsys.readouterr().err
+    assert err.count("drop_clusters failed for adzuna/") == len(roles)
+    assert "simulated cluster delete failure" in err
