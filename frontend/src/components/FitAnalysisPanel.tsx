@@ -76,7 +76,10 @@ export const FIT_LEVEL_LABEL: Record<FitLevel, string> = {
 };
 
 function FitResult({ data, summary }: { data: FitAnalysisData; summary: string }) {
-  if (data.role_matches.length === 0) {
+  // A "success" status is a contract, not a guarantee -- a response cut
+  // short mid-OOM can still parse as JSON with a field missing.
+  const roleMatches = data.role_matches ?? [];
+  if (roleMatches.length === 0) {
     return <p className="empty-state">No role matches identified.</p>;
   }
 
@@ -85,7 +88,7 @@ function FitResult({ data, summary }: { data: FitAnalysisData; summary: string }
       <p className="gap-summary">{data.overall_fit_summary || summary}</p>
 
       <div className="theme-list">
-        {data.role_matches.map((match, idx) => (
+        {roleMatches.map((match, idx) => (
           <RoleMatchCard key={idx} match={match} />
         ))}
       </div>
@@ -94,6 +97,9 @@ function FitResult({ data, summary }: { data: FitAnalysisData; summary: string }
 }
 
 function RoleMatchCard({ match }: { match: FitRoleMatch }) {
+  const supportingSignals = match.supporting_signals ?? [];
+  const missingSignals = match.missing_signals ?? [];
+
   return (
     <div className="theme-card">
       <div className="theme-header">
@@ -108,9 +114,9 @@ function RoleMatchCard({ match }: { match: FitRoleMatch }) {
       <div className="gap-columns">
         <div>
           <div className="gap-column-title">Why this fits</div>
-          {match.supporting_signals.length > 0 ? (
+          {supportingSignals.length > 0 ? (
             <ul className="gap-list">
-              {match.supporting_signals.map((signal, idx) => (
+              {supportingSignals.map((signal, idx) => (
                 <li key={idx} className="gap-list-item gap-list-item--strength">
                   {signal}
                 </li>
@@ -123,9 +129,9 @@ function RoleMatchCard({ match }: { match: FitRoleMatch }) {
 
         <div>
           <div className="gap-column-title">What's missing</div>
-          {match.missing_signals.length > 0 ? (
+          {missingSignals.length > 0 ? (
             <ul className="gap-list">
-              {match.missing_signals.map((signal, idx) => (
+              {missingSignals.map((signal, idx) => (
                 <li key={idx} className="gap-list-item gap-list-item--must">
                   {signal}
                 </li>

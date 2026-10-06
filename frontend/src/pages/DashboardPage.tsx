@@ -26,6 +26,7 @@ import { buildDemoGradingSchema } from '../data/demoTermFixtures';
 import { demoGpaSummary } from '../lib/demoGpa.mjs';
 import type { ProfileCompleteness } from '../types/student';
 import { ChatPanel } from '../components/ChatPanel';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 import { GuidedTour } from '../components/GuidedTour';
 import { AuthenticatedDashboard } from './AuthenticatedDashboard';
 import { AnimatedNumber } from '../components/AnimatedNumber';
@@ -662,9 +663,9 @@ function DemoDashboardPage() {
               <div key="career-intelligence" className="stage-section career-subtab-panel career-intelligence">
                 <h2 className="career-section-heading">Career Intelligence</h2>
                 <p className="career-intelligence-role">Target role: <strong>{dashboard.career.target_roles[0] ?? 'Not provided'}</strong></p>
-                <section className="career-intelligence-section"><FitAnalysisPanel run={fitRun} /></section>
-                <section className="career-intelligence-section"><GapAnalysisPanel run={gapRun} /></section>
-                <section className="career-intelligence-section"><ShiftAnalysisPanel run={shiftRun} /></section>
+                <section className="career-intelligence-section"><ErrorBoundary><FitAnalysisPanel run={fitRun} /></ErrorBoundary></section>
+                <section className="career-intelligence-section"><ErrorBoundary><GapAnalysisPanel run={gapRun} /></ErrorBoundary></section>
+                <section className="career-intelligence-section"><ErrorBoundary><ShiftAnalysisPanel run={shiftRun} /></ErrorBoundary></section>
               </div>
             )}
 

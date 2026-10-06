@@ -19,9 +19,16 @@ export class ErrorBoundary extends Component<Props, State> {
     console.error('Uncaught render error:', error, info.componentStack);
   }
 
+  reset = () => this.setState({ hasError: false });
+
   render() {
     if (this.state.hasError) {
-      return <p>Something went wrong — check the console.</p>;
+      return (
+        <p>
+          Something went wrong — check the console.{' '}
+          <button type="button" className="btn btn-ghost btn-sm" onClick={this.reset}>Try again</button>
+        </p>
+      );
     }
     return this.props.children;
   }

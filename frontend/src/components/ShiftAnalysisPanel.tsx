@@ -76,6 +76,13 @@ export function ShiftAnalysisPanel({ run: externalRun }: ShiftAnalysisPanelProps
 }
 
 function ShiftResult({ data, summary }: { data: ShiftAnalysisData; summary: string }) {
+  // A "success" status is a contract, not a guarantee -- a response cut
+  // short mid-OOM can still parse as JSON with a field missing.
+  const taskShifts = data.task_shifts ?? [];
+  const durableSkills = data.durable_skills ?? [];
+  const adjacentPaths = data.adjacent_paths ?? [];
+  const aiFluencyGuidance = data.ai_fluency_guidance ?? [];
+
   return (
     <div>
       <p className="gap-summary">{data.role_evolution_summary || summary}</p>
@@ -83,9 +90,9 @@ function ShiftResult({ data, summary }: { data: ShiftAnalysisData; summary: stri
       <div className="gap-columns">
         <div>
           <div className="gap-column-title">What's Changing</div>
-          {data.task_shifts.length > 0 ? (
+          {taskShifts.length > 0 ? (
             <div className="theme-list">
-              {data.task_shifts.map((shift, idx) => (
+              {taskShifts.map((shift, idx) => (
                 <TaskShiftCard key={idx} shift={shift} />
               ))}
             </div>
@@ -96,9 +103,9 @@ function ShiftResult({ data, summary }: { data: ShiftAnalysisData; summary: stri
 
         <div>
           <div className="gap-column-title">Durable Skills</div>
-          {data.durable_skills.length > 0 ? (
+          {durableSkills.length > 0 ? (
             <div className="theme-list">
-              {data.durable_skills.map((skill, idx) => (
+              {durableSkills.map((skill, idx) => (
                 <DurableSkillCard key={idx} skill={skill} />
               ))}
             </div>
@@ -108,22 +115,22 @@ function ShiftResult({ data, summary }: { data: ShiftAnalysisData; summary: stri
         </div>
       </div>
 
-      {data.adjacent_paths.length > 0 && (
+      {adjacentPaths.length > 0 && (
         <div className="gap-section">
           <div className="gap-column-title">Adjacent Paths</div>
           <div className="theme-list">
-            {data.adjacent_paths.map((path, idx) => (
+            {adjacentPaths.map((path, idx) => (
               <AdjacentPathCard key={idx} path={path} />
             ))}
           </div>
         </div>
       )}
 
-      {data.ai_fluency_guidance.length > 0 && (
+      {aiFluencyGuidance.length > 0 && (
         <div>
           <div className="gap-column-title">AI Fluency Guidance</div>
           <ul className="gap-list">
-            {data.ai_fluency_guidance.map((guidance, idx) => (
+            {aiFluencyGuidance.map((guidance, idx) => (
               <li key={idx} className="gap-list-item">
                 {guidance}
               </li>

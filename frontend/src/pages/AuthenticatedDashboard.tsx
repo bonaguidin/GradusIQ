@@ -6,6 +6,7 @@ import { useAnalysisRun } from '../hooks/useAnalysisRun';
 import { useCachedAnalysisRun } from '../hooks/useCachedAnalysisRun';
 import { useSequencedAnalysisRuns } from '../hooks/useSequencedAnalysisRuns';
 import { ChatPanel } from '../components/ChatPanel';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 import { GuidedTour } from '../components/GuidedTour';
 import { DashboardSuccessNotice } from '../components/DashboardSuccessNotice';
 import { CourseDiscoveryPanel } from '../components/CourseDiscoveryPanel';
@@ -698,9 +699,9 @@ export function AuthenticatedDashboard() {
               <div className="stage-section career-subtab-panel career-intelligence">
                 <h2 className="career-section-heading">Career Intelligence</h2>
                 <p className="career-intelligence-role">Target role: <strong>{dashboard.career.target_roles[0] ?? 'Not provided'}</strong></p>
-                <section className="career-intelligence-section"><FitAnalysisPanel run={fitRun} /></section>
-                <section className="career-intelligence-section"><GapAnalysisPanel run={gapRun} /></section>
-                <section className="career-intelligence-section"><ShiftAnalysisPanel run={shiftRun} /></section>
+                <section className="career-intelligence-section"><ErrorBoundary><FitAnalysisPanel run={fitRun} /></ErrorBoundary></section>
+                <section className="career-intelligence-section"><ErrorBoundary><GapAnalysisPanel run={gapRun} /></ErrorBoundary></section>
+                <section className="career-intelligence-section"><ErrorBoundary><ShiftAnalysisPanel run={shiftRun} /></ErrorBoundary></section>
               </div>
             )}
 
