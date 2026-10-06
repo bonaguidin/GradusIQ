@@ -21,18 +21,26 @@ export interface CachedAnalysisRun<TResult> {
    * full failed-state view.
    */
   refreshError?: string;
+  /**
+   * Set by useSequencedAnalysisRuns when a sibling FIT/GAP/SHIFT run is
+   * already live -- this hook never sets it itself. See AnalysisPanel's
+   * blockedReason.
+   */
+  blockedReason?: string;
 }
 
 /**
  * GAP/FIT/SHIFT run state, backed by the persistent analysis cache instead of
  * always requiring a fresh live call.
  *
- * - Demo identity (`identity.slug` truthy): the demo analyze endpoint is
- *   already cache-first (data/demo_cache/*.json via load_cached_feature_result),
- *   so this calls `trigger()` unconditionally on mount -- cheap on a hit,
- *   correct on a miss. Each panel's own mount effect firing independently is
- *   what makes "all three run simultaneously for demo" fall out naturally,
- *   with no extra coordination needed here.
+ * - Demo identity (`identity.slug` truthy): no cache read exists for a demo
+ *   session (getCachedAnalysis requires an accessToken, which demo identities
+ *   never have), so this leaves state at 'idle' same as a real student's
+ *   cache miss. It used to call `trigger()` unconditionally on mount, which
+ *   made all three of Career Intelligence's panels fire a live analysis call
+ *   at once on every page load -- a burst the backend's free-tier memory
+ *   limit couldn't always absorb. The "Run analysis" invitation now requires
+ *   the same manual click a real student already gets.
  * - Real identity (`identity.slug` falsy): GET .../analysis-cache/{feature} is
  *   called on mount instead. A hit sets state straight to 'done' -- no live
  *   run, no loading flash. A miss (404) leaves state at 'idle', which renders
@@ -99,11 +107,7 @@ export function useCachedAnalysisRun<TData>(
     if (attemptedRef.current) return;
     attemptedRef.current = true;
 
-    if (slug) {
-      trigger();
-      return;
-    }
-    if (!accessToken) return;
+    if (slug || !accessToken) return;
 
     // No cancellation flag here: attemptedRef above already guarantees this
     // body runs at most once per hook instance, ever -- including under

@@ -4,7 +4,9 @@ import { useAuth } from '../auth/useAuth';
 import { analyzeCourseDiscovery, analyzeFit, analyzeGap, analyzeShift } from '../api/analysis';
 import { useAnalysisRun } from '../hooks/useAnalysisRun';
 import { useCachedAnalysisRun } from '../hooks/useCachedAnalysisRun';
+import { useSequencedAnalysisRuns } from '../hooks/useSequencedAnalysisRuns';
 import { ChatPanel } from '../components/ChatPanel';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 import { GuidedTour } from '../components/GuidedTour';
 import { DashboardSuccessNotice } from '../components/DashboardSuccessNotice';
 import { CourseDiscoveryPanel } from '../components/CourseDiscoveryPanel';
@@ -86,9 +88,15 @@ export function AuthenticatedDashboard() {
   // still owns its own internal useCachedAnalysisRun by default) so Career
   // Overview and Career Intelligence read the same independent run states.
   // useCachedAnalysisRun keeps the existing cache behavior for each feature.
-  const gapRun = useCachedAnalysisRun('gap', () => analyzeGap({ slug, accessToken }));
-  const fitRun = useCachedAnalysisRun('fit', () => analyzeFit({ slug, accessToken }));
-  const shiftRun = useCachedAnalysisRun('shift', () => analyzeShift({ slug, accessToken }));
+  const rawGapRun = useCachedAnalysisRun('gap', () => analyzeGap({ slug, accessToken }));
+  const rawFitRun = useCachedAnalysisRun('fit', () => analyzeFit({ slug, accessToken }));
+  const rawShiftRun = useCachedAnalysisRun('shift', () => analyzeShift({ slug, accessToken }));
+  // Gated to one live call at a time -- see useSequencedAnalysisRuns.
+  const { fit: fitRun, gap: gapRun, shift: shiftRun } = useSequencedAnalysisRuns({
+    fit: rawFitRun,
+    gap: rawGapRun,
+    shift: rawShiftRun,
+  });
   // Overview's degree-progress ring needs the same requirement-satisfaction
   // tree RequirementSatisfactionPanel renders under Academic -- lifted here
   // instead of duplicated inside the panel, same lifted-state shape as
@@ -691,9 +699,9 @@ export function AuthenticatedDashboard() {
               <div className="stage-section career-subtab-panel career-intelligence">
                 <h2 className="career-section-heading">Career Intelligence</h2>
                 <p className="career-intelligence-role">Target role: <strong>{dashboard.career.target_roles[0] ?? 'Not provided'}</strong></p>
-                <section className="career-intelligence-section"><FitAnalysisPanel run={fitRun} /></section>
-                <section className="career-intelligence-section"><GapAnalysisPanel run={gapRun} /></section>
-                <section className="career-intelligence-section"><ShiftAnalysisPanel run={shiftRun} /></section>
+                <section className="career-intelligence-section"><ErrorBoundary><FitAnalysisPanel run={fitRun} /></ErrorBoundary></section>
+                <section className="career-intelligence-section"><ErrorBoundary><GapAnalysisPanel run={gapRun} /></ErrorBoundary></section>
+                <section className="career-intelligence-section"><ErrorBoundary><ShiftAnalysisPanel run={shiftRun} /></ErrorBoundary></section>
               </div>
             )}
 

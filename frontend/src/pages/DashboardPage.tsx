@@ -17,6 +17,7 @@ import { ProfileChecklist } from '../components/career/ProfileChecklist';
 import { ProfileCompletionContext, type ProfileFieldRequest } from '../components/profile/ProfileCompletionContext';
 import { analyzeFit, analyzeGap, analyzeShift } from '../api/analysis';
 import { useCachedAnalysisRun } from '../hooks/useCachedAnalysisRun';
+import { useSequencedAnalysisRuns } from '../hooks/useSequencedAnalysisRuns';
 import { buildDashboardViewModel } from '../data/dashboardViewModel';
 import { missingChecklistFields } from '../lib/profileChecklist';
 import { applyDemoProfileChanges, buildDemoIntelligenceProfile } from '../data/demoIntelligenceProfile';
@@ -25,6 +26,7 @@ import { buildDemoGradingSchema } from '../data/demoTermFixtures';
 import { demoGpaSummary } from '../lib/demoGpa.mjs';
 import type { ProfileCompleteness } from '../types/student';
 import { ChatPanel } from '../components/ChatPanel';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 import { GuidedTour } from '../components/GuidedTour';
 import { AuthenticatedDashboard } from './AuthenticatedDashboard';
 import { AnimatedNumber } from '../components/AnimatedNumber';
@@ -339,9 +341,15 @@ function DemoDashboardPage() {
   // Same lifted-run pattern AuthenticatedDashboard.tsx uses: one run per
   // feature, read both by the compact Career Overview summary and by the
   // full panel on Career Intelligence, instead of two independent fetches.
-  const gapRun = useCachedAnalysisRun('gap', () => analyzeGap(identity));
-  const fitRun = useCachedAnalysisRun('fit', () => analyzeFit(identity));
-  const shiftRun = useCachedAnalysisRun('shift', () => analyzeShift(identity));
+  const rawGapRun = useCachedAnalysisRun('gap', () => analyzeGap(identity));
+  const rawFitRun = useCachedAnalysisRun('fit', () => analyzeFit(identity));
+  const rawShiftRun = useCachedAnalysisRun('shift', () => analyzeShift(identity));
+  // Gated to one live call at a time -- see useSequencedAnalysisRuns.
+  const { fit: fitRun, gap: gapRun, shift: shiftRun } = useSequencedAnalysisRuns({
+    fit: rawFitRun,
+    gap: rawGapRun,
+    shift: rawShiftRun,
+  });
 
   const requestField = useCallback((request: ProfileFieldRequest) => {
     setActiveSection('career');
@@ -655,9 +663,9 @@ function DemoDashboardPage() {
               <div key="career-intelligence" className="stage-section career-subtab-panel career-intelligence">
                 <h2 className="career-section-heading">Career Intelligence</h2>
                 <p className="career-intelligence-role">Target role: <strong>{dashboard.career.target_roles[0] ?? 'Not provided'}</strong></p>
-                <section className="career-intelligence-section"><FitAnalysisPanel run={fitRun} /></section>
-                <section className="career-intelligence-section"><GapAnalysisPanel run={gapRun} /></section>
-                <section className="career-intelligence-section"><ShiftAnalysisPanel run={shiftRun} /></section>
+                <section className="career-intelligence-section"><ErrorBoundary><FitAnalysisPanel run={fitRun} /></ErrorBoundary></section>
+                <section className="career-intelligence-section"><ErrorBoundary><GapAnalysisPanel run={gapRun} /></ErrorBoundary></section>
+                <section className="career-intelligence-section"><ErrorBoundary><ShiftAnalysisPanel run={shiftRun} /></ErrorBoundary></section>
               </div>
             )}
 

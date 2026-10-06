@@ -1894,6 +1894,16 @@ a {
   color: var(--error);
 }
 
+/* Career Intelligence gates FIT/GAP/SHIFT to one live call at a time; this
+   names which one a blocked panel is waiting on. Neutral, not an error --
+   sits alongside whatever this panel's own phase already rendered. */
+.analysis-blocked-note {
+  margin-top: var(--sp-2);
+  font-size: var(--text-xs);
+  color: var(--muted);
+  font-style: italic;
+}
+
 /* GAP score */
 .gap-score-row {
   display: flex;

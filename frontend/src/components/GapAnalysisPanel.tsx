@@ -16,6 +16,8 @@ export interface GapAnalysisRun {
    */
   refreshing?: boolean;
   refreshError?: string;
+  /** From useSequencedAnalysisRuns -- see AnalysisPanel's blockedReason. */
+  blockedReason?: string;
 }
 
 interface GapAnalysisPanelProps {
@@ -38,7 +40,7 @@ export function GapAnalysisPanel({ run: externalRun }: GapAnalysisPanelProps = {
   const internalRun = useCachedAnalysisRun('gap', () =>
     analyzeGap({ slug, accessToken: session?.access_token ?? null }),
   );
-  const { state, trigger, refreshing, refreshError } = externalRun ?? internalRun;
+  const { state, trigger, refreshing, refreshError, blockedReason } = externalRun ?? internalRun;
 
   const phase: AnalysisPhase =
     state.phase === 'idle'
@@ -65,6 +67,7 @@ export function GapAnalysisPanel({ run: externalRun }: GapAnalysisPanelProps = {
       failureMessage={analysisFailureMessage(state)}
       refreshing={refreshing}
       refreshError={refreshError}
+      blockedReason={blockedReason}
     >
       {state.phase === 'done' && state.result.status === 'success' && (
         <GapResult data={state.result.data} summary={state.result.summary} />
@@ -87,6 +90,15 @@ function GapItemDetail({ item }: { item: GapMustHaveGap }) {
 }
 
 function GapResult({ data, summary }: { data: GapAnalysisData; summary: string }) {
+  // A "success" status is a contract, not a guarantee -- a response cut
+  // short mid-OOM can still parse as JSON with a field missing. Defaulting
+  // here, once, keeps every read below a plain array read instead of each
+  // repeating its own null check (or skipping one).
+  const mustHaveGaps = data.must_have_gaps ?? [];
+  const niceToHaveGaps = data.nice_to_have_gaps ?? [];
+  const strengths = data.strengths ?? [];
+  const nextSteps = data.recommended_next_steps ?? [];
+
   return (
     <div>
       <div className="gap-score-row">
@@ -100,9 +112,9 @@ function GapResult({ data, summary }: { data: GapAnalysisData; summary: string }
       <div className="gap-columns">
         <div>
           <div className="gap-column-title">Must-Have Gaps</div>
-          {data.must_have_gaps.length > 0 ? (
+          {mustHaveGaps.length > 0 ? (
             <ul className="gap-list">
-              {data.must_have_gaps.map((item, idx) => (
+              {mustHaveGaps.map((item, idx) => (
                 <li key={idx} className="gap-list-item gap-list-item--must">
                   <GapItemDetail item={item} />
                 </li>
@@ -115,9 +127,9 @@ function GapResult({ data, summary }: { data: GapAnalysisData; summary: string }
 
         <div>
           <div className="gap-column-title">Nice-to-Have Gaps</div>
-          {data.nice_to_have_gaps.length > 0 ? (
+          {niceToHaveGaps.length > 0 ? (
             <ul className="gap-list">
-              {data.nice_to_have_gaps.map((item, idx) => (
+              {niceToHaveGaps.map((item, idx) => (
                 <li key={idx} className="gap-list-item gap-list-item--nice">
                   <GapItemDetail item={item} />
                 </li>
@@ -129,11 +141,11 @@ function GapResult({ data, summary }: { data: GapAnalysisData; summary: string }
         </div>
       </div>
 
-      {data.strengths.length > 0 && (
+      {strengths.length > 0 && (
         <div className="gap-section">
           <div className="gap-column-title">Strengths</div>
           <ul className="gap-list">
-            {data.strengths.map((strength, idx) => (
+            {strengths.map((strength, idx) => (
               <li key={idx} className="gap-list-item gap-list-item--strength">
                 {strength}
               </li>
@@ -142,11 +154,11 @@ function GapResult({ data, summary }: { data: GapAnalysisData; summary: string }
         </div>
       )}
 
-      {data.recommended_next_steps.length > 0 && (
+      {nextSteps.length > 0 && (
         <div>
           <div className="gap-column-title">Recommended Next Steps</div>
           <ol className="gap-steps">
-            {data.recommended_next_steps.map((step, idx) => (
+            {nextSteps.map((step, idx) => (
               <li key={idx}>{step}</li>
             ))}
           </ol>
