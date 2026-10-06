@@ -2,7 +2,7 @@
 
 _Running list: bugs, gaps, and feature ideas. Update as items close._
 
-_Last updated 2026-09-30. O*NET coverage corrected (14/14 target roles now resolve; Operations Intern's prior "no data, no neighbor" gap closed via a disclosed manual-override borrow), FIT/SHIFT O*NET-disclosure behavior measured live at n=10 each, and two more stale entries in this file corrected. Before that: 2026-09-15 — Adzuna ingestion enabled, three write-path bugs fixed, the posting corpus repaired, a post-ingest integrity check added, and FIT grounded on role-labeled postings. Several long-standing entries in an earlier version were found to be false — see "Corrected claims" at the bottom before trusting older notes._
+_Last updated 2026-10-06. Career Intelligence's FIT/GAP/SHIFT concurrent-analysis OOM crash diagnosed and the frontend side fixed (demo auto-run removed, one-live-call-at-a-time gate added, partial-response render crash guarded); the backend memory capacity that actually caused it is still open — see the new 🔴 entry below. Before that: 2026-09-30 — O*NET coverage corrected (14/14 target roles now resolve; Operations Intern's prior "no data, no neighbor" gap closed via a disclosed manual-override borrow), FIT/SHIFT O*NET-disclosure behavior measured live at n=10 each, and two more stale entries in this file corrected. Before that: 2026-09-15 — Adzuna ingestion enabled, three write-path bugs fixed, the posting corpus repaired, a post-ingest integrity check added, and FIT grounded on role-labeled postings. Several long-standing entries in an earlier version were found to be false — see "Corrected claims" at the bottom before trusting older notes._
 
 ---
 
@@ -18,6 +18,12 @@ _Last updated 2026-09-30. O*NET coverage corrected (14/14 target roles now resol
   - **(c) Raise the Vercel timeout ceiling.** Cheapest if the plan supports it (unverified — needs checking in the Vercel dashboard, not assumed); even 800s isn't a full fix for a student with multiple uncovered roles.
 
   **Next step:** (a) is the real fix — scope the background-job/status-column design. (c) is worth a 5-minute check of the actual Vercel plan tier before ruling it out as a stopgap.
+
+- [ ] **Render backend (`GradusIQ` service, free tier, hard 512MB memory limit) has no real headroom for concurrent FIT/GAP/SHIFT calls, and was OOM-killed by exactly that.** Confirmed via Render's own metrics and event log: memory climbed 163MB → 530MB in under two minutes on 2026-10-05 ~21:00–21:03 UTC while a demo profile's three analysis calls landed close together, then `server_failed` / `oomKilled: {memoryLimit: "512Mi"}` at 21:03:06. Idle baseline alone already sits at 120–210MB before any request work. Instance churn in the hour around the crash (3 different instance IDs) suggests this wasn't a one-off.
+
+  **Frontend mitigated, not fixed — the capacity problem itself is unchanged.** Shipped on `dev` (`7d42969`, `e60d29d`, originated on `claude/app-demo-evaluation-0tnh26`): `useCachedAnalysisRun.ts` no longer auto-triggers a live run for demo identities on mount (they now land on the same manual "Run analysis" invitation a real student's cache miss already gets), and a new `useSequencedAnalysisRuns` hook caps FIT/GAP/SHIFT to one live call at a time regardless of identity, disabling the other two with a visible reason while one is in flight. Each panel's result renderer also now defaults its array fields instead of assuming a "success" response is always fully populated, and Career Intelligence's three panels each sit behind their own `ErrorBoundary` — a partial/malformed response (the kind an OOM-interrupted response produces) can no longer crash the whole app the way it did on 2026-10-05, requiring a refresh and re-login to recover.
+
+  None of this raises the actual memory ceiling. A real student clicking "Run analysis" across FIT/GAP/SHIFT in three separate browser tabs, or any other path that lands three live calls close together, can still approach the same limit. **Next step:** a plan-tier decision (upgrade Render's memory allocation) or reducing idle/per-call footprint — whichever the team decides, this is a capacity question, not a code bug, and the one-at-a-time gate only lowers how often it gets triggered, not what happens if it still is.
 
 
 ## 🔴 Open correctness risks
