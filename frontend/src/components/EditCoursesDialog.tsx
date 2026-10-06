@@ -10,6 +10,7 @@ import type {
   DegreeScheduleSuggestedCourse,
 } from '../lib/degreeScheduleYears.mjs';
 import { CourseSearchAdd } from './CourseSearchAdd';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 
 /**
  * The per-term "Edit courses" popup for a future term card.
@@ -20,8 +21,9 @@ import { CourseSearchAdd } from './CourseSearchAdd';
  * dialog -- not a design-system primitive -- that follows the visual
  * convention both of those share (a fixed inset-0 scrim over a centered
  * --surface panel) and the a11y pattern GuidedTour already proved out:
- * role="dialog" + aria-modal, focus moved into the panel on open, Escape to
- * close. Focus is returned to the trigger by the caller's onClose.
+ * role="dialog" + aria-modal, focus moved into the panel on open, Tab
+ * trapped inside (useFocusTrap), Escape to close. Focus is returned to the
+ * trigger by the caller's onClose.
  *
  * WRITES ARE STILL IMMEDIATE. onAdd / onRemove call the parent's existing
  * planned-course handlers, which write to the API on the spot and refetch --
@@ -56,7 +58,7 @@ export function EditCoursesDialog({
   existingCourseIndex: Map<string, ExistingCourseStatus>;
   busyCode: string | null;
   onAdd: (result: CatalogSearchResult) => void;
-  onRemove: (id: string) => void;
+  onRemove: (id: string, courseLabel: string) => void;
   onClose: () => void;
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -66,6 +68,10 @@ export function EditCoursesDialog({
   useEffect(() => {
     dialogRef.current?.focus();
   }, []);
+
+  // Keeps Tab/Shift+Tab from walking focus out into the page behind the
+  // overlay -- see useFocusTrap.
+  useFocusTrap(dialogRef);
 
   // Escape closes the dialog -- same window-level listener pattern as
   // GuidedTour. onClose (from the parent) is what returns focus to the trigger.
@@ -107,7 +113,7 @@ export function EditCoursesDialog({
                   <button
                     type="button"
                     className="btn btn-ghost btn-sm"
-                    onClick={() => onRemove(course.id)}
+                    onClick={() => onRemove(course.id, course.course_code)}
                     aria-label={`Remove ${course.course_code} from your plan`}
                   >
                     Remove
