@@ -217,6 +217,7 @@ test('authenticated dashboard covers canonical states, routing, themes, errors, 
   await page.locator('#course-search').fill('CSCE 22')
   await page.getByRole('button', { name: 'Planned' }).first().waitFor()
 
+  page.once('dialog', (dialog) => dialog.accept())
   await plannedRow.getByRole('button', { name: /Remove CSCE 221/ }).click()
   await page.locator('.real-course-row--planned').waitFor({ state: 'detached' })
   assert.equal(planning.state.planned.length, 0)
@@ -238,6 +239,7 @@ test('authenticated dashboard covers canonical states, routing, themes, errors, 
   const futureRow = page.locator('.term-courses--planned .real-course-row--planned').first()
   await futureRow.locator('.planned-badge').waitFor()
   await futureRow.getByRole('button', { name: /Remove CSCE 221/ }).waitFor()
+  page.once('dialog', (dialog) => dialog.accept())
   await futureRow.getByRole('button', { name: /Remove CSCE 221/ }).click()
   await page.locator('.real-course-row--planned').waitFor({ state: 'detached' })
   assert.equal(planning.state.planned.length, 0)
