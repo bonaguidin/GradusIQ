@@ -878,10 +878,11 @@ def run(
             report.outcomes.append(outcome)
 
             if outcome.rows:
-                # Put the source rows in place before identity resolution mutates
-                # clusters or keys. If this boundary fails, there is nothing to
-                # roll back and no identity orphan can be created. The second
-                # upsert persists posting_identity after resolution.
+                # Stage the source rows, resolve identity, then upsert again to
+                # persist posting_identity. A failure in the middle, or a job
+                # cancelled between resolve and the second upsert, can leave
+                # clusters with no postings and postings with NULL identity.
+                # Atomicity is an open item in outstanding-fixes.md.
                 store.stage_postings(outcome.rows)
                 vacated = resolve_and_attach_identity(outcome.rows, store, report)
                 report.rows_upserted += store.upsert_postings(outcome.rows)
@@ -977,9 +978,10 @@ def run_workday(*, live: bool, write: bool, store: Any = None) -> RunReport:
                 # drop the employers still queued -- same posture as the
                 # fetch_board failure branch above. Fixes A and B remove the
                 # known cause (source_job_id='Texas' -> 21000); this is the
-                # backstop. The initial posting upsert runs before identity
-                # mutation, so a posting-write failure cannot leave orphaned
-                # cluster/key rows for this employer.
+                # backstop. Identity is resolved between the two upserts, so a
+                # failure after resolve and before the second upsert can still
+                # leave empty clusters and NULL posting_identity rows. See
+                # outstanding-fixes.md (atomicity under cancellation).
                 outcome.status = "error"
                 outcome.error_detail = f"store: {type(exc).__name__}: {exc}"
 
