@@ -7,6 +7,7 @@ import { useCachedAnalysisRun } from '../hooks/useCachedAnalysisRun';
 import { useSequencedAnalysisRuns } from '../hooks/useSequencedAnalysisRuns';
 import { ChatPanel } from '../components/ChatPanel';
 import { ErrorBoundary } from '../components/ErrorBoundary';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import { GuidedTour } from '../components/GuidedTour';
 import { DashboardSuccessNotice } from '../components/DashboardSuccessNotice';
 import { CourseDiscoveryPanel } from '../components/CourseDiscoveryPanel';
@@ -81,6 +82,37 @@ export function AuthenticatedDashboard() {
   const [careerSubTab, setCareerSubTab] = useState<CareerSubTab>('overview');
   const [academicSubTab, setAcademicSubTab] = useState<AcademicSubTab>('overview');
   const [railOpen, setRailOpen] = useState(false);
+  const railRef = useRef<HTMLElement>(null);
+  const railTriggerRef = useRef<HTMLButtonElement>(null);
+
+  // Mobile nav rail: a drawer below 768px (see index.css's mobile media
+  // query), an ordinary always-visible sidebar above it. The overlay click
+  // already closed it; keyboard users had no way to, since nothing handled
+  // Escape and Tab could walk straight past the rail's own last button into
+  // the (visually hidden-behind-the-scrim) main content.
+  const closeRail = useCallback(() => {
+    setRailOpen(false);
+    railTriggerRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    if (railOpen) railRef.current?.focus();
+  }, [railOpen]);
+
+  useEffect(() => {
+    if (!railOpen) return undefined;
+    function onKey(event: KeyboardEvent) {
+      if (event.key === 'Escape') closeRail();
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [railOpen, closeRail]);
+
+  // Only traps Tab while the rail is actually acting as a drawer (open, at
+  // mobile widths) -- see useFocusTrap's own note on why `active` matters
+  // for an always-mounted element like this one.
+  useFocusTrap(railRef, railOpen);
+
   const [fieldFocus, setFieldFocus] = useState<CareerFieldFocus | null>(null);
   const [profileSaved, setProfileSaved] = useState(false);
   const [degreeScheduleResult, setDegreeScheduleResult] = useState<DegreeScheduleResponse | null>(null);
@@ -258,8 +290,8 @@ export function AuthenticatedDashboard() {
           endActions={tourEndActions}
         />
       )}
-      {railOpen && <div className="rail-overlay" onClick={() => setRailOpen(false)} aria-hidden="true" />}
-      <aside className={`rail${railOpen ? ' rail--open' : ''}`} aria-label="Dashboard navigation">
+      {railOpen && <div className="rail-overlay" onClick={closeRail} aria-hidden="true" />}
+      <aside ref={railRef} tabIndex={-1} className={`rail${railOpen ? ' rail--open' : ''}`} aria-label="Dashboard navigation">
         <div className="rail-identity">
           <div className="rail-monogram" aria-hidden="true">{dashboard.initials || 'ST'}</div>
           <div className="rail-name">{displayName}</div>
@@ -339,7 +371,7 @@ export function AuthenticatedDashboard() {
 
       <div className="stage">
         <header className="topbar">
-          <button type="button" className="topbar-menu" onClick={() => setRailOpen(true)} aria-label="Open navigation" aria-expanded={railOpen}>
+          <button ref={railTriggerRef} type="button" className="topbar-menu" onClick={() => setRailOpen(true)} aria-label="Open navigation" aria-expanded={railOpen}>
             <span className="topbar-menu-icon" aria-hidden="true"><span /></span>
           </button>
           <h2 className="topbar-title">{NAV_ITEMS.find((item) => item.key === activeSection)?.label}</h2>
