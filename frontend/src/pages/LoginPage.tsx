@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
+import { useErrorFocus } from '../hooks/useErrorFocus';
 
 const DEMO_STUDENTS = [
   { name: 'Jordan Reyes',  slug: 'jordanReyes'  },
@@ -20,11 +21,15 @@ export function LoginPage() {
 
   const [selectedSlug, setSelectedSlug] = useState<string>(DEMO_STUDENTS[0].slug);
   const [error, setError] = useState<string | null>(null);
+  const errorRef = useRef<HTMLParagraphElement>(null);
+  useErrorFocus(error, errorRef);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [credLoading, setCredLoading] = useState(false);
   const [credError, setCredError] = useState<string | null>(null);
+  const credErrorRef = useRef<HTMLParagraphElement>(null);
+  useErrorFocus(credError, credErrorRef);
 
   // Wait for React to flush the profile state before navigating
   useEffect(() => {
@@ -116,7 +121,7 @@ export function LoginPage() {
           </p>
 
           {credError && (
-            <p className="login-error" role="alert">
+            <p className="login-error" role="alert" tabIndex={-1} ref={credErrorRef}>
               {credError}
             </p>
           )}
@@ -169,7 +174,7 @@ export function LoginPage() {
           </div>
 
           {error && (
-            <p className="login-error" role="alert">
+            <p className="login-error" role="alert" tabIndex={-1} ref={errorRef}>
               {error}
             </p>
           )}

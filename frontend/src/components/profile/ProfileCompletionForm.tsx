@@ -1,5 +1,6 @@
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useErrorFocus } from '../../hooks/useErrorFocus';
 import { updateProfile, type ProfileChanges } from '../../api/profile';
 import type { MissingField } from '../../types/analysis';
 import type { StudentIntelligenceProfile } from '../../types/studentIntelligenceProfile';
@@ -78,6 +79,27 @@ export function ProfileCompletionForm({ profile, accessToken, missingFields = []
   const [failure, setFailure] = useState<string | null>(null);
   const missing = new Set(missingFields.map((field) => field.path));
 
+  // One ref per field that validate() can fail, in the same order they
+  // appear in the form. On a failed validate(), focus goes to whichever
+  // of these is first with an error -- there is no single error message
+  // to point to here the way the other auth/onboarding forms have, since
+  // several fields can be invalid independently.
+  const majorRef = useRef<HTMLDivElement>(null);
+  const graduationRef = useRef<HTMLDivElement>(null);
+  const targetRolesRef = useRef<HTMLDivElement>(null);
+  const interestsRef = useRef<HTMLDivElement>(null);
+  const failureRef = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    const order: Array<[string, typeof majorRef]> = [
+      ['student.major_intended', majorRef],
+      ['student.expected_graduation', graduationRef],
+      ['career.target_roles', targetRolesRef],
+      ['career.interests', interestsRef],
+    ];
+    order.find(([path]) => errors[path])?.[1].current?.focus();
+  }, [errors]);
+  useErrorFocus(failure, failureRef);
+
   function validate() {
     const next: Record<string, string> = {};
     // The field components own their own rules; the form only decides which of
@@ -131,10 +153,10 @@ export function ProfileCompletionForm({ profile, accessToken, missingFields = []
           <label>Classification<input value={classification} onChange={(e) => setClassification(e.target.value)} /></label>
           <label>Current major<input value={majorCurrent} onChange={(e) => setMajorCurrent(e.target.value)} /></label>
         </div>
-        <div className={missing.has('student.major_intended') ? 'profile-form-field--needed' : undefined}>
+        <div className={missing.has('student.major_intended') ? 'profile-form-field--needed' : undefined} tabIndex={-1} ref={majorRef}>
           <MajorInputs value={major} onChange={setMajor} helper={helper('student.major_intended')} idPrefix="form-major" />
         </div>
-        <div className={fieldClass('student.expected_graduation')}>
+        <div className={fieldClass('student.expected_graduation')} tabIndex={-1} ref={graduationRef}>
           <span className="form-label">Expected graduation</span>
           <GraduationInputs value={graduation} onChange={setGraduation} />
           {helper('student.expected_graduation') && <small>{helper('student.expected_graduation')}</small>}
@@ -143,8 +165,8 @@ export function ProfileCompletionForm({ profile, accessToken, missingFields = []
 
       <section className="profile-form-section">
         <h3 className="editable-section-title">Career direction</h3>
-        <div className={fieldClass('career.target_roles')}><TargetRolesEditor roles={targetRoles} isEditing onChange={setTargetRoles} />{helper('career.target_roles') && <small>{helper('career.target_roles')}</small>}</div>
-        <div className={fieldClass('career.interests')}><TagInput label="Career interests" value={interests} onChange={setInterests} placeholder="Add interest" />{helper('career.interests') && <small>{helper('career.interests')}</small>}</div>
+        <div className={fieldClass('career.target_roles')} tabIndex={-1} ref={targetRolesRef}><TargetRolesEditor roles={targetRoles} isEditing onChange={setTargetRoles} />{helper('career.target_roles') && <small>{helper('career.target_roles')}</small>}</div>
+        <div className={fieldClass('career.interests')} tabIndex={-1} ref={interestsRef}><TagInput label="Career interests" value={interests} onChange={setInterests} placeholder="Add interest" />{helper('career.interests') && <small>{helper('career.interests')}</small>}</div>
       </section>
 
       <section className="profile-form-section">
@@ -157,7 +179,7 @@ export function ProfileCompletionForm({ profile, accessToken, missingFields = []
           second, competing place to type them; it now says where they live. */}
       <p className="profile-form-note"><span className="profile-form-note-icon" aria-hidden="true">ⓘ</span><span>Skills and work experience are edited in <Link to="/resume">resume review</Link>.</span></p>
 
-      {failure && <p className="profile-form-error" role="alert">{failure}</p>}
+      {failure && <p className="profile-form-error" role="alert" tabIndex={-1} ref={failureRef}>{failure}</p>}
       <div className="profile-form-actions"><button type="button" className="btn btn-ghost" onClick={onCancel} disabled={saving}>Cancel</button><button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Save changes'}</button></div>
     </form>
   );

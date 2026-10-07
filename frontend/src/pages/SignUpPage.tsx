@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
+import { useErrorFocus } from '../hooks/useErrorFocus';
 import { INSTITUTIONS, todayIso, validateSignupForm } from '../lib/signupRules.mjs';
 
 /**
@@ -40,6 +41,8 @@ export function SignUpPage() {
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const errorRef = useRef<HTMLParagraphElement>(null);
+  useErrorFocus(error, errorRef);
   const [sentTo, setSentTo] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -212,7 +215,7 @@ export function SignUpPage() {
           </div>
 
           {error && (
-            <p className="login-error" role="alert">
+            <p className="login-error" role="alert" tabIndex={-1} ref={errorRef}>
               {error}
             </p>
           )}

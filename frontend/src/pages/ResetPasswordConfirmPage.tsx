@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
+import { useErrorFocus } from '../hooks/useErrorFocus';
 import { Spinner } from '../auth/AccountStateScreens';
 
 /**
@@ -27,6 +28,8 @@ export function ResetPasswordConfirmPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const errorRef = useRef<HTMLParagraphElement>(null);
+  useErrorFocus(error, errorRef);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -127,7 +130,7 @@ export function ResetPasswordConfirmPage() {
           </div>
 
           {error && (
-            <p className="login-error" role="alert">
+            <p className="login-error" role="alert" tabIndex={-1} ref={errorRef}>
               {error}
             </p>
           )}
