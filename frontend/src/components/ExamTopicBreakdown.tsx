@@ -20,7 +20,7 @@ function TopicBar({ tag }: { tag: ExamTopicTag }) {
       >
         <div
           className="topic-bar-fill"
-          style={{ width: `${pct}%` }}
+          style={{ transform: `scaleX(${pct / 100})` }}
         />
       </div>
       <span className="topic-score">

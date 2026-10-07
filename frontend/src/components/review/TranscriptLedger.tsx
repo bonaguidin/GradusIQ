@@ -69,7 +69,7 @@ export function TranscriptLedger({
         aria-valuenow={Math.round(matchedRatio * 100)}
         aria-label="Courses matched to the catalog"
       >
-        <div className="rv-progress-fill" style={{ width: `${String(matchedRatio * 100)}%` }} />
+        <div className="rv-progress-fill" style={{ transform: `scaleX(${String(matchedRatio)})` }} />
       </div>
     </div>
   );

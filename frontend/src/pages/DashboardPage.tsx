@@ -115,7 +115,7 @@ function ReadinessRail({ completeness }: { completeness: ProfileCompleteness }) 
               aria-valuemax={100}
               aria-label={`${label} completeness: ${pct}%`}
             >
-              <div className="readiness-bar-fill" style={{ width: `${pct}%` }} />
+              <div className="readiness-bar-fill" style={{ transform: `scaleX(${pct / 100})` }} />
             </div>
           </div>
         ))}
@@ -240,7 +240,7 @@ return (
                   >
                     <div
                       className="overview-progress-fill"
-                      style={{ width: `${pct}%` }}
+                      style={{ transform: `scaleX(${pct / 100})` }}
                     />
                   </div>
                 </div>

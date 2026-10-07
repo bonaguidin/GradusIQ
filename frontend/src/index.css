@@ -650,9 +650,11 @@ a {
 
 .readiness-bar-fill {
   height: 100%;
+  width: 100%;
+  transform-origin: left;
   background: var(--rail-indicator);
   border-radius: 1px;
-  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform var(--t-fill) var(--ease-out);
 }
 
 /* Rail — footer */
@@ -1046,9 +1048,11 @@ a {
 
 .overview-progress-fill {
   height: 100%;
+  width: 100%;
+  transform-origin: left;
   background: var(--accent);
   border-radius: 2px;
-  transition: width 0.6s ease;
+  transition: transform var(--t-fill) var(--ease-out);
 }
 
 /* Demo reset block */
@@ -1795,9 +1799,11 @@ a {
 
 .topic-bar-fill {
   height: 100%;
+  width: 100%;
+  transform-origin: left;
   background: var(--accent);
   border-radius: 2px;
-  transition: width 0.4s ease;
+  transition: transform var(--t-fill) var(--ease-out);
 }
 
 .topic-score {
@@ -5756,8 +5762,10 @@ a {
 }
 .rv-progress-fill {
   height: 100%;
+  width: 100%;
+  transform-origin: left;
   background: var(--accent);
-  transition: width var(--t-fill) var(--ease-out);
+  transition: transform var(--t-fill) var(--ease-out);
 }
 
 /* ── sections ─────────────────────────────────────────────────────────── */
