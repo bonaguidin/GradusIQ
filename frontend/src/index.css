@@ -6434,22 +6434,51 @@ a {
   border-bottom: 1px solid var(--line);
 }
 
-.term-select-label {
-  font-size: 0.75rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
+/* Second tier, under the academic-year tabs: a pill row rather than another
+   underline, so the two levels read as outer/inner instead of competing.
+   The travelling highlight reuses interaction.ts's generic tablist sync
+   (--tab-x/--tab-w/[data-tab-indicator], the same mechanism the underline
+   above consumes differently) -- no extra JS for this component. */
+.term-season-tabs {
+  position: relative;
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--paper);
+  border-radius: 999px;
 }
 
-.term-select {
+.term-season-tab {
+  position: relative;
+  z-index: 1;
+  background: none;
+  border: none;
+  border-radius: 999px;
+  padding: var(--sp-2) var(--sp-4);
   font-family: var(--font-ui);
-  font-size: 1rem;
-  padding: var(--sp-2) var(--sp-3);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--surface);
-  color: var(--ink);
-  max-width: 100%;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color var(--t-quick) var(--ease-out);
+}
+
+.term-season-tab--active {
+  color: var(--on-accent);
+}
+
+.term-season-tabs[data-tab-indicator]::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  top: 3px;
+  left: 0;
+  height: calc(100% - 6px);
+  width: var(--tab-w, 0px);
+  border-radius: 999px;
+  background: var(--accent);
+  transform: translateX(var(--tab-x, 0px));
+  transition: transform var(--t-move) var(--ease-out), width var(--t-move) var(--ease-out);
 }
 
 .term-meta {

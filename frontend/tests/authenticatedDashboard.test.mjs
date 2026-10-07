@@ -178,19 +178,33 @@ test('authenticated dashboard covers canonical states, routing, themes, errors, 
   )
   await page.getByRole('heading', { name: 'GPA Calculator' }).waitFor()
 
+  // Term selection is a year tab + a season tab (TermPlanner's academic-tabs
+  // / term-season-tabs), not the old dropdown -- each season tab's id
+  // carries the term key directly (term-season-tab-<key>).
+  const activeTermKey = async () => {
+    const id = await page.locator('.term-season-tabs [aria-selected="true"]').getAttribute('id')
+    return id ? id.replace('term-season-tab-', '') : null
+  }
+  const selectTerm = async (yearLabel, season) => {
+    await page.getByRole('tab', { name: yearLabel }).click()
+    await page.getByRole('tab', { name: season, exact: true }).click()
+  }
+
   // The term view opens on the UPCOMING term, not on the term holding the
   // student's coursework -- planning happens in the term that has not started.
-  await page.locator('#term-select').waitFor()
-  assert.equal(await page.locator('#term-select').inputValue(), '2026-Fall')
+  await page.locator('.term-season-tabs').waitFor()
+  assert.equal(await activeTermKey(), '2026-Fall')
   await page.getByText('Aug 24, 2026').waitFor()
   await page.locator('.term-badge--upcoming').waitFor()
 
-  // Selecting the term that does hold coursework shows it.
-  await page.locator('#term-select').selectOption('2025-Fall')
+  // Selecting the term that does hold coursework shows it. 2025-Fall sits in
+  // a different academic-year tab (2025–26) than the default 2026-Fall
+  // (2026–27).
+  await selectTerm('2025–26', 'Fall')
   await page.getByText('CS 101').waitFor()
 
   // Planning: search, add, see it listed as distinctly PLANNED, remove it.
-  await page.locator('#term-select').selectOption('2026-Fall')
+  await selectTerm('2026–27', 'Fall')
   await page.locator('#course-search').fill('CSCE 2')
   await page.getByText('Data Structures and Algorithms').waitFor()
   await page.getByRole('button', { name: 'Add' }).first().click()
@@ -225,7 +239,7 @@ test('authenticated dashboard covers canonical states, routing, themes, errors, 
   // A term FURTHER OUT than the upcoming one keeps the two sections apart: it
   // has no confirmed coursework to interleave with, so a merged list would
   // present a wholly speculative term as though it were a settled one.
-  await page.locator('#term-select').selectOption('2027-Spring')
+  await selectTerm('2026–27', 'Spring')
   await page.locator('#course-search').fill('CSCE 2')
   await page.getByText('Data Structures and Algorithms').waitFor()
   await page.getByRole('button', { name: 'Add' }).first().click()
@@ -286,7 +300,7 @@ test('authenticated dashboard covers canonical states, routing, themes, errors, 
   await page.getByRole('button', { name: 'Academic', exact: true }).click()
   await page.getByRole('heading', { name: 'Academic Overview' }).waitFor()
   await page.getByRole('button', { name: 'GPA Calculator' }).click()
-  await page.locator('#term-select').waitFor()
+  await page.locator('.term-season-tabs').waitFor()
   await page.getByRole('button', { name: 'Career' }).click()
   // Clicking the parent always returns to its internal overview.
   await page.getByRole('heading', { name: 'Career Overview' }).waitFor()

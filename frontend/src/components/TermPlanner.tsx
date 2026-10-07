@@ -8,6 +8,8 @@ import {
   isTermActivated,
   pickDefaultTermKey,
   plannedCodes,
+  termAcademicYearKey,
+  termAcademicYearLabel,
   termCourseGroups,
   termStatus,
 } from '../lib/termPlanning.mjs';
@@ -255,6 +257,42 @@ export function TermPlanner({ slug, accessToken, courses, onCourseRecordsChanged
     [terms, selectedKey],
   );
 
+  // Years, then the terms inside the active one -- replaces the flat
+  // dropdown with the same year-tab pattern Degree Schedule already uses.
+  // `terms` arrives pre-sorted (normalizeTermsPayload), so each bucket's own
+  // term order, and the Map's key order, both come out chronological for
+  // free.
+  const termsByYear = useMemo(() => {
+    const map = new Map<number, PlanningTerm[]>();
+    for (const term of terms) {
+      const yearKey = termAcademicYearKey(term.year, term.season);
+      const bucket = map.get(yearKey);
+      if (bucket) bucket.push(term);
+      else map.set(yearKey, [term]);
+    }
+    return map;
+  }, [terms]);
+
+  const yearKeys = useMemo(
+    () => [...termsByYear.keys()].sort((a, b) => a - b),
+    [termsByYear],
+  );
+
+  const activeYearKey = selectedTerm
+    ? termAcademicYearKey(selectedTerm.year, selectedTerm.season)
+    : yearKeys[yearKeys.length - 1];
+
+  const termsInActiveYear = termsByYear.get(activeYearKey) ?? [];
+
+  // Switching years keeps the same season when the new year has it (Fall ->
+  // Fall), rather than always landing on whichever term sorts first.
+  function selectYear(yearKey: number) {
+    const bucket = termsByYear.get(yearKey) ?? [];
+    const sameSeason = selectedTerm ? bucket.find((term) => term.season === selectedTerm.season) : undefined;
+    const next = sameSeason ?? bucket[0];
+    if (next) setSelectedKey(next.key);
+  }
+
   const status = selectedTerm ? termStatus(selectedTerm, today) : 'unknown';
   // Planning is offered for a term that has not started. A term already
   // underway or finished shows its coursework and no search box -- adding a
@@ -489,20 +527,40 @@ export function TermPlanner({ slug, accessToken, courses, onCourseRecordsChanged
       )}
 
       <div className="term-planner-header">
-        <label className="term-select-label" htmlFor="term-select">Term</label>
-        <select
-          id="term-select"
-          className="term-select"
-          value={selectedKey ?? ''}
-          onChange={(event) => setSelectedKey(event.target.value)}
-        >
-          {terms.map((term) => (
-            <option key={term.key} value={term.key}>
-              {term.label}
-              {term.enrolled ? '' : ' (no coursework yet)'}
-            </option>
+        <div className="academic-tabs" role="tablist" aria-label="Academic years">
+          {yearKeys.map((yearKey) => (
+            <button
+              key={yearKey}
+              type="button"
+              role="tab"
+              id={`term-year-tab-${yearKey}`}
+              aria-selected={activeYearKey === yearKey}
+              aria-controls="term-detail-panel"
+              className={`academic-tab${activeYearKey === yearKey ? ' academic-tab--active' : ''}`}
+              onClick={() => selectYear(yearKey)}
+            >
+              {termAcademicYearLabel(yearKey)}
+            </button>
           ))}
-        </select>
+        </div>
+
+        <div className="term-season-tabs" role="tablist" aria-label={`Terms in ${termAcademicYearLabel(activeYearKey)}`}>
+          {termsInActiveYear.map((term) => (
+            <button
+              key={term.key}
+              type="button"
+              role="tab"
+              id={`term-season-tab-${term.key}`}
+              aria-selected={selectedKey === term.key}
+              aria-controls="term-detail-panel"
+              className={`term-season-tab${selectedKey === term.key ? ' term-season-tab--active' : ''}`}
+              onClick={() => setSelectedKey(term.key)}
+            >
+              {term.season}
+            </button>
+          ))}
+        </div>
+
         <div className="term-meta">
           {statusLabel && <span className={`term-badge term-badge--${status}`}>{statusLabel}</span>}
           {dateRange
@@ -513,60 +571,72 @@ export function TermPlanner({ slug, accessToken, courses, onCourseRecordsChanged
 
       {error && <p className="term-planner-error" role="alert">{error}</p>}
 
-      <section className="term-courses">
-        <h3 className="term-courses-heading">
-          Coursework
-          {/* The section header goes away when planned rows move in here, but
-              the caveat it carried does not: it is a disclosure about the rows
-              themselves, and it matters more, not less, once they sit beside
-              graded ones. */}
-          {inlinePlanned.length > 0 && (
-            <span className="term-courses-note">
-              Planned courses are not yet taken &middot; not counted in GPA or hours
-            </span>
-          )}
-        </h3>
-        {records.length === 0 && inlinePlanned.length === 0 ? (
-          <p className="empty-state">No confirmed coursework in this term.</p>
-        ) : (
-          <div className="real-course-table" role="table" aria-label="Coursework in this term">
-            {records.map(renderConfirmedRow)}
-            {inlinePlanned.map(renderPlannedRow)}
-          </div>
-        )}
-      </section>
-
-      {separatePlanned.length > 0 && (
-        <section className="term-courses term-courses--planned">
+      <div
+        role="tabpanel"
+        id="term-detail-panel"
+        aria-labelledby={selectedKey ? `term-season-tab-${selectedKey}` : undefined}
+      >
+        <section className="term-courses">
           <h3 className="term-courses-heading">
-            Planned
-            <span className="term-courses-note">Not yet taken &middot; not counted in GPA or hours</span>
+            Coursework
+            {/* The section header goes away when planned rows move in here, but
+                the caveat it carried does not: it is a disclosure about the rows
+                themselves, and it matters more, not less, once they sit beside
+                graded ones. */}
+            {inlinePlanned.length > 0 && (
+              <span className="term-courses-note">
+                Planned courses are not yet taken &middot; not counted in GPA or hours
+              </span>
+            )}
           </h3>
-          <div className="real-course-table" role="table" aria-label="Planned courses in this term">
-            {separatePlanned.map(renderPlannedRow)}
-          </div>
+          {records.length === 0 && inlinePlanned.length === 0 ? (
+            <p className="empty-state">
+              {/* A past term with nothing on record is not the same claim as a
+                  future one with nothing planned yet -- the old copy ("no
+                  coursework yet") used one sentence for both and read as
+                  something still to do, even for a term that already ended. */}
+              {status === 'past' ? 'No courses on record for this term.' : 'No confirmed coursework in this term.'}
+            </p>
+          ) : (
+            <div className="real-course-table" role="table" aria-label="Coursework in this term">
+              {records.map(renderConfirmedRow)}
+              {inlinePlanned.map(renderPlannedRow)}
+            </div>
+          )}
         </section>
-      )}
 
-      {canPlan && (
-        <section className="term-search">
-          <h3 className="term-courses-heading">Plan a course</h3>
-          <CourseSearchAdd
-            identity={identity}
-            alreadyAddedCodes={alreadyPlanned}
-            crossListings={crossListings}
-            existingCourseIndex={existingCourseIndex}
-            onAdd={(result) => { void handleAdd(result); }}
-            busyCode={busyCode}
-            hint={willActivateOnAdd ? (
-              <p className="term-search-hint term-search-hint--activation">
-                {selectedTerm?.label} starts soon &mdash; courses you add here will be treated as
-                current (in progress), not planned.
-              </p>
-            ) : null}
-          />
-        </section>
-      )}
+        {separatePlanned.length > 0 && (
+          <section className="term-courses term-courses--planned">
+            <h3 className="term-courses-heading">
+              Planned
+              <span className="term-courses-note">Not yet taken &middot; not counted in GPA or hours</span>
+            </h3>
+            <div className="real-course-table" role="table" aria-label="Planned courses in this term">
+              {separatePlanned.map(renderPlannedRow)}
+            </div>
+          </section>
+        )}
+
+        {canPlan && (
+          <section className="term-search">
+            <h3 className="term-courses-heading">Plan a course</h3>
+            <CourseSearchAdd
+              identity={identity}
+              alreadyAddedCodes={alreadyPlanned}
+              crossListings={crossListings}
+              existingCourseIndex={existingCourseIndex}
+              onAdd={(result) => { void handleAdd(result); }}
+              busyCode={busyCode}
+              hint={willActivateOnAdd ? (
+                <p className="term-search-hint term-search-hint--activation">
+                  {selectedTerm?.label} starts soon &mdash; courses you add here will be treated as
+                  current (in progress), not planned.
+                </p>
+              ) : null}
+            />
+          </section>
+        )}
+      </div>
     </div>
   );
 }
