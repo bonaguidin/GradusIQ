@@ -18,6 +18,8 @@ Read as context against origin/dev (worktree at scratchpad/dev-audit).
 
 **Round 6 shipped 2026-10-07, on `dev` (commit `2dca786`):** web-guidelines #5 (new `lib/format.mjs` wraps `Intl.NumberFormat` as `formatFixed()`, replacing every hardcoded `.toFixed()` GPA/score call -- `AnimatedNumber`, both dashboards' GPA figures, `CourseGradeTable`'s score column -- plus `TermPlanner`'s `formatTermDates` drops its hardcoded `'en-US'` locale for `toLocaleDateString`'s own default; readiness-score and GPA figures also gain `font-variant-numeric: tabular-nums` so counting digits don't jitter in width) — #5 fully closed.
 
+**Round 7 shipped 2026-10-07, on `dev` (commit `d9b627d`):** motion #3 (every hand-typed duration/easing in the finding's location list -- nav rail/mobile drawer, both guided-tour entrance animations plus its dots and help button, academic tab, degree progress ring, processing status's fade/pulse/rail, form inputs, ledger bar -- now references `--t-quick`/`--t-move`/`--t-fill`/`--t-pulse` + `--ease-out`) and the also-confirmed items that share the same root cause (`.cp-project .cp-more::after`'s chevron, `revealField.ts`'s flag lifetime + `.cp-field-flag`, `.dp-rail-travel`'s curve corrected to `linear` for constant motion) -- #3 fully closed. Also added a new `--t-spin` token for the three genuinely-identical-but-untokenized `0.7s` spin animations (`.spinner`, `.spinner-small`, `.rv-commit-spin`), and extended `motionContinuity.test.mjs`'s existing JS-vs-CSS timing guard to cover `revealField.ts`'s new `FLAG_MS` constant, per the audit's own suggestion of "a lint/test guard like the repo's existing no-color-literal test." `.spinner`'s 700ms itself was left as a literal -- no token fits it alone, and it was only worth tokenizing once the sweep found it repeated three times verbatim.
+
 **Still open, see #10:** the original user-reported TermPlanner dropdown bug ("no coursework yet" on past terms) — it predates this audit and was dropped when the formal findings table got built; flagged back in by the user, needs a scoping decision before it gets a demo.
 
 ## Motion audit — consolidated findings (by leverage)
@@ -26,7 +28,7 @@ Read as context against origin/dev (worktree at scratchpad/dev-audit).
 |---|---|---|---|---|
 | 1 | HIGH | ✅ **SHIPPED** — Global `prefers-reduced-motion` rule (`index.css:297-302`, `*,*::before,*::after{transition:none!important;animation:none!important;}`) kills every loading spinner app-wide under reduced motion — looks hung, not in-progress. | AnalysisPanel, CareerOptimizationPanel, DegreeSchedulePanel, RequirementSatisfactionPanel, GradeCalculatorPanel, CourseDiscoveryPanel spinners | Tiny — one CSS rule |
 | 2 | HIGH | ✅ **SHIPPED** — GAP readiness score renders as plain text, teleports on every run, despite `AnimatedNumber` component already existing and used elsewhere. | `GapAnalysisPanel.tsx:92`; duplicate at `CareerSnapshotPanel.tsx:152` still open | Small — wire in existing component |
-| 3 | MEDIUM | Systemic token fragmentation: hand-typed durations/easings duplicating `--t-*`/`--ease-*` tokens instead of referencing them (incl. two reinventions of `--t-pulse`: chat typing dots, `dp-marker`). | Nav rail, mobile drawer, guided tour (x2), chat typing indicator, academic tab, degree progress ring, processing status, form inputs, ledger bar | Medium, mechanical — good candidate for one sweep + a lint/test guard like the repo's existing no-color-literal test |
+| 3 | MEDIUM | ✅ **SHIPPED** — Systemic token fragmentation: hand-typed durations/easings duplicating `--t-*`/`--ease-*` tokens instead of referencing them (incl. two reinventions of `--t-pulse`: chat typing dots, `dp-marker`). | Nav rail, mobile drawer, guided tour (x2), chat typing indicator, academic tab, degree progress ring, processing status, form inputs, ledger bar | Medium, mechanical — good candidate for one sweep + a lint/test guard like the repo's existing no-color-literal test |
 | 4 | MEDIUM | Fill bars animate `width` (layout-triggering) instead of `transform: scaleX()`. | Readiness bar, overview progress bar, exam topic bar, resume/transcript ledger progress | Small-medium |
 | 5 | MEDIUM | Real, frequently-clicked buttons don't carry `.btn`/`.rv-commit-button`, so they get hover color but no press feedback from the shared interaction layer. | Ledger "jump to gap," gap pills, dashboard success-notice dismiss | Small |
 | 6 | MEDIUM | Chat auto-scroll (`behavior:'smooth'`) has no reduced-motion check, unlike `revealField.ts`'s correct pattern next door. | `ChatPanel.tsx:25-28` | Trivial |
@@ -34,24 +36,24 @@ Read as context against origin/dev (worktree at scratchpad/dev-audit).
 | 8 | MEDIUM | Modals/overlays snap in/out with no fade. | `EditCoursesDialog`, `ConfirmingOverlay` | Medium |
 
 ### Also confirmed (lower severity, from the 4 sub-audits — roll into the sweep for #3/#4 above rather than fixing ad hoc)
-- `.cp-project .cp-more::after` 120ms bare `ease` instead of `--t-quick`+`--ease-out` (career panels)
-- `revealField.ts` 500ms flag lifetime / `.cp-field-flag` 180ms — near-token values not referencing tokens (career panels)
+- ✅ **SHIPPED (Round 7)** — `.cp-project .cp-more::after` 120ms bare `ease` instead of `--t-quick`+`--ease-out` (career panels)
+- ✅ **SHIPPED (Round 7)** — `revealField.ts` 500ms flag lifetime / `.cp-field-flag` 180ms — near-token values not referencing tokens (career panels)
 - `CareerOptimizationPanel` academic/optimized schedule toggle swaps instantly, no crossfade (career panels)
 - Tag/row add-remove (TagInput, ExperienceList, ProjectsList, CertificationsList, SkillsEditor, TargetRolesEditor, InterestsEditor) — no transition on add/remove (career panels)
 - `EditableSection` view/edit body swap — no transition (career panels)
 - Badge/list group entrances have no stagger (career panels)
-- `.degree-progress-ring-fill` ad hoc `0.3s ease` instead of `--t-fill`+`--ease-out` (academic)
+- ✅ **SHIPPED (Round 7)** — `.degree-progress-ring-fill` ad hoc `0.3s ease` instead of `--t-fill`+`--ease-out` (academic)
 - `.topic-bar-fill` animates width not transform (academic)
 - `.grade-card:hover` / `.degree-schedule-candidate-path.is-selected` — color flips with no transition at all (academic)
-- `.academic-tab` 120ms hand-typed next to `--t-quick` token (academic)
-- `.spinner` 700ms ad hoc duration, no token (academic — linear easing itself is correct)
+- ✅ **SHIPPED (Round 7)** — `.academic-tab` 120ms hand-typed next to `--t-quick` token (academic)
+- `.spinner` 700ms ad hoc duration, no token (academic — linear easing itself is correct) — **left as-is in Round 7**: still no token fits a single consumer, but a new `--t-spin` (700ms) was added and wired into this plus two other spinners (`.spinner-small`, `.rv-commit-spin`) that shared the exact same value verbatim
 - `GradeCard`'s ring has no fill-in animation at all, unlike DegreeProgressRing which at least attempts one (academic)
 - `CourseDiscoveryPanel`'s ActionPlanResultView appears with a hard cut after a user-initiated action (academic)
-- `.dp-rail-travel` indeterminate rail uses ease-in-out curve instead of `linear` for constant motion — reads as hesitating (onboarding)
+- ✅ **SHIPPED (Round 7)** — `.dp-rail-travel` indeterminate rail uses ease-in-out curve instead of `linear` for constant motion — reads as hesitating (onboarding)
 - `.rv-gap-pill-flag` highlight has no transition at all despite being a timed JS effect (onboarding)
 - `.rv-jump`, `.rv-gap-pill`, `.dash-notice-dismiss` buttons missing `.btn` class (same root cause as #5 above)
 - `JobSearchPanel`'s postings list has no stagger (onboarding)
-- `.form-input`/`.form-select`/`.form-textarea` focus transition — ad hoc 120ms (onboarding)
+- ✅ **SHIPPED (Round 7)** — `.form-input`/`.form-select`/`.form-textarea` focus transition — ad hoc 120ms (onboarding)
 
 ## Missed opportunities (additive, not bugs)
 
