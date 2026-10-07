@@ -22,8 +22,9 @@ interface TourStep {
   kind: 'info' | 'cta';
   /** Small mono eyebrow — the tab / context label. */
   eyebrow: string;
-  /** Serif display headline. */
-  title: string;
+  /** Serif display headline. Plain string for every step but one -- see
+   *  that step's own comment for why. */
+  title: ReactNode;
   /** Body copy explaining what lives on this tab. */
   body: ReactNode;
 }
@@ -38,7 +39,10 @@ const TOUR_STEPS: TourStep[] = [
     section: 'overview',
     kind: 'info',
     eyebrow: 'Welcome',
-    title: 'Welcome to GradusIQ',
+    // JSX, not a plain string like every other step's title, so the brand
+    // name can be marked translate="no" without pulling the rest of the
+    // heading out of auto-translation with it.
+    title: <>Welcome to <span translate="no">GradusIQ</span></>,
     body: (
       <>
         Your AI career and academic companion. This quick tour shows the three
@@ -84,7 +88,7 @@ const TOUR_STEPS: TourStep[] = [
     title: 'Add your resume to unlock GAP, FIT & SHIFT',
     body: (
       <>
-        The heart of GradusIQ. Add your <strong>resume</strong> and it fills in
+        The heart of <span translate="no">GradusIQ</span>. Add your <strong>resume</strong> and it fills in
         your experience, projects and target roles — unlocking{' '}
         <strong>GAP</strong> (a readiness check against your target roles),{' '}
         <strong>FIT</strong> (how well you match each role and why), and{' '}

@@ -713,7 +713,7 @@ function DemoDashboardPage() {
                   <label>Target role<select defaultValue={dashboard.career.target_roles[0] ?? ''} disabled={dashboard.career.target_roles.length === 0}>{dashboard.career.target_roles.length === 0 && <option value="">No target role provided</option>}{dashboard.career.target_roles.map((role) => <option key={role}>{role}</option>)}</select></label>
                   <button type="button" className="btn btn-primary" disabled>Search Jobs</button>
                 </div>
-                <div className="real-empty"><h3>Job Search is not available in this demo</h3><p>This demo profile has no real account session, so it can't reach the cached postings this feature reads. Sign in with a real account to search.</p></div>
+                <div className="real-empty"><h3>Job Search is not available in this demo</h3><p>This demo profile has no real account session, so it can’t reach the cached postings this feature reads. Sign in with a real account to search.</p></div>
               </div>
             )}
 

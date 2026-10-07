@@ -328,7 +328,7 @@ function renderEditor({ field, id, text, setText, inputRef, closeAndSave, cancel
       inputMode={field.type === 'number' ? 'decimal' : undefined}
       step={field.type === 'number' ? 'any' : undefined}
       value={text}
-      placeholder={field.type === 'list' ? 'Comma separated' : undefined}
+      placeholder={field.type === 'list' ? `Comma separated ${field.label.toLowerCase()}…` : undefined}
       onChange={(event) => setText(event.target.value)}
       onBlur={commit}
       onKeyDown={onKeyDown}

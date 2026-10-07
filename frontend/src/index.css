@@ -660,6 +660,10 @@ a {
 /* Rail — footer */
 .rail-footer {
   padding: var(--sp-4) var(--sp-5);
+  /* On the mobile drawer (height: 100vh), this sits at the physical bottom
+     edge -- a phone's home-indicator bar must not sit on top of it. A no-op
+     on desktop, where the rail is a static sidebar, not a full-height drawer. */
+  padding-bottom: calc(var(--sp-4) + env(safe-area-inset-bottom, 0px));
   margin-top: auto;
   border-top: 1px solid var(--rail-line);
 }
@@ -923,7 +927,7 @@ a {
   margin-top: var(--sp-4);
 }
 
-/* "View full schedule" -- a button styled as a text link (same reset as
+/* "View Full Schedule" -- a button styled as a text link (same reset as
    .missing-field-link:is(button)) rather than a react-router <Link>, since
    it switches Academic's sub-tab in place, not the URL route. */
 .overview-schedule-link {

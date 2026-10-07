@@ -12,6 +12,9 @@
   align-items: center;
   justify-content: center;
   padding: var(--sp-6);
+  /* A drag gesture over the overlay must not scroll the dashboard behind
+     it on mobile. */
+  overscroll-behavior: contain;
   /* Darken toward the bottom so the card reads, top stays legible */
   background: linear-gradient(
     to bottom,
@@ -177,6 +180,11 @@
 
   .tour-card {
     padding: var(--sp-5);
+    /* The card is anchored to the bottom edge at this width (see
+       .tour-overlay above) -- on a phone with a home-indicator bar, its
+       own padding must not be the only thing standing between it and
+       that bar. */
+    padding-bottom: calc(var(--sp-5) + env(safe-area-inset-bottom, 0px));
   }
 
   .tour-footer {

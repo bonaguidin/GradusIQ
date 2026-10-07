@@ -415,10 +415,10 @@ test('authenticated dashboard covers canonical states, routing, themes, errors, 
   assert.equal(await currentTermCard.getByText('In progress').count(), 2)
   assert.equal(await currentTermCard.getByText('CS 101').count(), 0)
 
-  // "View full schedule" lands on Academic -> Course Discovery, where the
+  // "View Full Schedule" lands on Academic -> Course Discovery, where the
   // full DegreeScheduleYears view lives (it auto-selects the in-progress
   // term's year tab itself -- no deep link needed here).
-  await currentTermCard.getByRole('button', { name: 'View full schedule →' }).click()
+  await currentTermCard.getByRole('button', { name: 'View Full Schedule →' }).click()
   await page.getByRole('heading', { name: 'Course Discovery' }).waitFor()
   assert.equal(
     await page.getByRole('button', { name: 'Academic', exact: true }).getAttribute('aria-current'),

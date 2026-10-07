@@ -444,7 +444,7 @@ export function AuthenticatedDashboard() {
                               className="overview-schedule-link"
                               onClick={() => navigateToAcademicSubTab('course-discovery')}
                             >
-                              View full schedule →
+                              View Full Schedule →
                             </button>
                           </div>
                         ) : (

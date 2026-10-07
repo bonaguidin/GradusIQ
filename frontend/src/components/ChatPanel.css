@@ -139,7 +139,7 @@
   padding: var(--sp-3) var(--sp-4);
 }
 
-.chat-input:focus {
+.chat-input:focus-visible {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-tint);

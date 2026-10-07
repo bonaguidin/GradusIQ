@@ -57,13 +57,13 @@ export function ChatPanel() {
   return (
     <section className="chat-panel" aria-label="Ask GradusIQ">
       <div className="chat-header">
-        <span className="chat-title">Ask GradusIQ</span>
+        <span className="chat-title">Ask <span translate="no">GradusIQ</span></span>
         <span className="chat-sub">
           Chat about your academics &amp; career — grounded in your profile and analysis.
         </span>
       </div>
 
-      <div className="chat-messages" ref={listRef}>
+      <div className="chat-messages" ref={listRef} aria-live="polite">
         {messages.length === 0 && (
           <div className="chat-empty">
             <p className="chat-empty-lead">
@@ -87,14 +87,14 @@ export function ChatPanel() {
 
         {messages.map((m, i) => (
           <div key={i} className={`chat-msg chat-msg--${m.role}`}>
-            <span className="chat-msg-role">{m.role === 'user' ? 'You' : 'GradusIQ'}</span>
+            <span className="chat-msg-role">{m.role === 'user' ? 'You' : <span translate="no">GradusIQ</span>}</span>
             <div className="chat-msg-body">{m.content}</div>
           </div>
         ))}
 
         {sending && (
           <div className="chat-msg chat-msg--assistant">
-            <span className="chat-msg-role">GradusIQ</span>
+            <span className="chat-msg-role" translate="no">GradusIQ</span>
             <div className="chat-msg-body chat-typing" aria-label="Thinking">
               <span />
               <span />
