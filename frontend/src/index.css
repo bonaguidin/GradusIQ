@@ -404,6 +404,7 @@ a {
   opacity: 0.85;
   letter-spacing: 0;
   text-transform: none;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Rail — nav */
@@ -854,6 +855,7 @@ a {
   color: var(--ink);
   line-height: 1;
   letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
 }
 
 .overview-stat-label {
@@ -1277,6 +1279,7 @@ a {
   font-size: var(--text-lg);
   font-weight: 500;
   color: var(--ink);
+  font-variant-numeric: tabular-nums;
 }
 
 /* Separates the profile record from the analysis runners stacked above it.

@@ -409,6 +409,7 @@ button.topbar-help:active {
 
 :where(.figure-count) {
   position: relative;
+  font-variant-numeric: tabular-nums;
 }
 
 .figure-count[data-count] {

@@ -31,6 +31,7 @@ import { updateProfile } from '../api/profile';
 import { ProfileChecklist } from '../components/career/ProfileChecklist';
 import { ProfileCompletionContext, type ProfileFieldRequest } from '../components/profile/ProfileCompletionContext';
 import { AnimatedNumber } from '../components/AnimatedNumber';
+import { formatFixed } from '../lib/format.mjs';
 import { countLabel } from '../lib/countLabel.mjs';
 import { buildDashboardViewModel } from '../data/dashboardViewModel';
 import { missingChecklistFields } from '../lib/profileChecklist';
@@ -298,7 +299,7 @@ export function AuthenticatedDashboard() {
           <div className="rail-meta">
             <span>{dashboard.classification ?? 'Student'}</span>
             <span className="rail-dot" aria-hidden="true">·</span>
-            <span className="rail-gpa">{dashboard.officialGpa?.toFixed(2) ?? '—'}</span>
+            <span className="rail-gpa">{dashboard.officialGpa !== null ? formatFixed(dashboard.officialGpa, 2) : '—'}</span>
           </div>
         </div>
         <nav className="rail-nav" aria-label="Dashboard sections">
@@ -405,7 +406,7 @@ export function AuthenticatedDashboard() {
                   </div>
                 </div>
                 <div className="overview-stats">
-                  <div className="overview-stat"><span className="overview-stat-value">{dashboard.officialGpa?.toFixed(2) ?? '—'}</span><span className="overview-stat-label">Official GPA</span></div>
+                  <div className="overview-stat"><span className="overview-stat-value">{dashboard.officialGpa !== null ? formatFixed(dashboard.officialGpa, 2) : '—'}</span><span className="overview-stat-label">Official GPA</span></div>
                   <div className="overview-stat"><span className="overview-stat-value">{dashboard.courses.length}</span><span className="overview-stat-label">Confirmed Courses</span></div>
                   <div className="overview-stat"><span className="overview-stat-value readiness-state">{readiness}</span><span className="overview-stat-label">Profile Status</span></div>
                   <DegreeProgressRing satisfied={degreeProgress.satisfied} total={degreeProgress.total} />
@@ -505,7 +506,7 @@ export function AuthenticatedDashboard() {
                 ) : (
                   <>
                     <div className="overview-stats">
-                      <div className="overview-stat"><span className="overview-stat-value">{dashboard.officialGpa?.toFixed(2) ?? '—'}</span><span className="overview-stat-label">Official GPA</span></div>
+                      <div className="overview-stat"><span className="overview-stat-value">{dashboard.officialGpa !== null ? formatFixed(dashboard.officialGpa, 2) : '—'}</span><span className="overview-stat-label">Official GPA</span></div>
                       <div className="overview-stat"><span className="overview-stat-value"><AnimatedNumber value={dashboard.projectedGpa} decimals={2} showDelta /></span><span className="overview-stat-label">Projected GPA</span></div>
                       <div className="overview-stat"><span className="overview-stat-value">{dashboard.earnedHours}</span><span className="overview-stat-label">Earned Hours</span></div>
                     </div>
@@ -608,7 +609,7 @@ export function AuthenticatedDashboard() {
                 ) : (
                   <>
                     <div className="overview-stats">
-                      <div className="overview-stat"><span className="overview-stat-value">{dashboard.officialGpa?.toFixed(2) ?? '—'}</span><span className="overview-stat-label">Official GPA</span></div>
+                      <div className="overview-stat"><span className="overview-stat-value">{dashboard.officialGpa !== null ? formatFixed(dashboard.officialGpa, 2) : '—'}</span><span className="overview-stat-label">Official GPA</span></div>
                       <div className="overview-stat"><span className="overview-stat-value"><AnimatedNumber value={dashboard.projectedGpa} decimals={2} showDelta /></span><span className="overview-stat-label">Projected GPA</span></div>
                       <div className="overview-stat"><span className="overview-stat-value">{dashboard.earnedHours}</span><span className="overview-stat-label">Earned Hours</span></div>
                     </div>

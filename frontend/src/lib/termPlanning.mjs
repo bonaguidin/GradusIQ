@@ -265,12 +265,18 @@ export function parseDate(value) {
 
 const DATE_FORMAT = { month: 'short', day: 'numeric', year: 'numeric' }
 
-/** "Aug 24, 2026 – Dec 10, 2026", or null when the term has no calendar row. */
+/**
+ * "Aug 24, 2026 – Dec 10, 2026", or null when the term has no calendar row.
+ *
+ * Locale left undefined (not 'en-US') so the browser's own locale decides
+ * digit/month order and separators, rather than this always reading as US
+ * English regardless of who's viewing it.
+ */
 export function formatTermDates(term) {
   const start = parseDate(term?.start_date)
   const end = parseDate(term?.end_date)
   if (!start || !end) return null
-  const fmt = (date) => date.toLocaleDateString('en-US', DATE_FORMAT)
+  const fmt = (date) => date.toLocaleDateString(undefined, DATE_FORMAT)
   return `${fmt(start)} – ${fmt(end)}`
 }
 

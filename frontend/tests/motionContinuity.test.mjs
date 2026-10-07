@@ -43,7 +43,7 @@ test('the text of a counting figure is always its final value; the moving digits
   // Tests, copy-paste, and the Grade Calculator's aria-live region all read
   // text. Writing each frame into it would expose mid-count values to them.
   const component = await read('components/AnimatedNumber.tsx')
-  assert.match(component, /\{target === null \? fallback : `\$\{target\.toFixed\(places\)\}\$\{suffix\}`\}/)
+  assert.match(component, /\{target === null \? fallback : `\$\{formatFixed\(target, places\)\}\$\{suffix\}`\}/)
   assert.match(component, /setAttribute\('data-count'/)
   assert.doesNotMatch(component, /textContent\s*=|innerText\s*=|useState/, 'no per-frame text writes or re-renders')
   const layer = stripComments(await read('interaction.css'))
