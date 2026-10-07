@@ -12,6 +12,8 @@ Read as context against origin/dev (worktree at scratchpad/dev-audit).
 
 **Round 3 shipped 2026-10-07, on `dev` (commit `c2c8866`):** #10 (TermPlanner's term dropdown redesigned into year/season tabs, past-term empty-state language fixed).
 
+**Round 4 shipped 2026-10-07, on `dev` (commit `6267bb8`):** the onboarding-delight missed opportunity below, items 2-4 of 4 (item 1 superseded by item 4 per user's own call) — step transitions in TranscriptPage/ResumePage now fade+rise via the existing `stage-section` class instead of hard-cutting; `EntryCard` rows cascade in with a per-index stagger; `CommitBar`'s confirm button gained a real spinner → check/cross morph with a slam+ring flourish on success, replacing the `ConfirmingOverlay` hard pop as the thing that softens the up-to-50s confirm wait.
+
 **Still open, see #10:** the original user-reported TermPlanner dropdown bug ("no coursework yet" on past terms) — it predates this audit and was dropped when the formal findings table got built; flagged back in by the user, needs a scoping decision before it gets a demo.
 
 ## Motion audit — consolidated findings (by leverage)
@@ -49,10 +51,10 @@ Read as context against origin/dev (worktree at scratchpad/dev-audit).
 
 ## Missed opportunities (additive, not bugs)
 
-- **Onboarding has zero delight at its highest-emotion moments** — account creation, resume/transcript confirmation all land on `DashboardSuccessNotice` with no entrance animation; upload→review step changes teleport; parsed resume/transcript entries all appear at once with no stagger. Richest single opportunity found in the whole audit — first impressions getting the least polish of anywhere in the app.
+- **Onboarding has zero delight at its highest-emotion moments** — ✅ **SHIPPED (Round 4, commit `6267bb8`)**, 3 of the original 4 points: upload→review step changes no longer teleport (`stage-section` fade+rise); parsed resume/transcript entries now cascade in instead of appearing all at once; and the confirm button itself (`CommitBar`) now carries the in-flight feedback — spinner morphs to a check/cross, with a slam+ring flourish on success — which stood in for the original `DashboardSuccessNotice`-entrance idea once the user pointed at a button-morph reference instead. `DashboardSuccessNotice`'s own entrance animation is accordingly dropped from scope, superseded by the button-morph treatment.
 - Readiness dots (FIT/GAP/SHIFT) don't animate on state change, while the bar right next to them does.
 - Guided tour step-to-step content swap has no transition, despite the app having a tab-panel pattern that would fit.
-- `ConfirmingOverlay` pops in/out with a hard cut despite dimming the screen for up to ~50s.
+- `ConfirmingOverlay` pops in/out with a hard cut despite dimming the screen for up to ~50s — the in-flight feedback problem this was meant to flag is now addressed by the button-morph treatment above instead of the overlay itself; the overlay's own pop in/out is unchanged and still open if it's ever worth a separate fix.
 
 ## What's already right (confirmed by-design, do not touch)
 - `Reveal` component's grow-from-trigger behavior (interaction.css:328-361)
