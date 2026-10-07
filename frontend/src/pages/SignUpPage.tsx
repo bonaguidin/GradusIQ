@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
+import { useErrorFocus } from '../hooks/useErrorFocus';
 import { INSTITUTIONS, todayIso, validateSignupForm } from '../lib/signupRules.mjs';
 
 /**
@@ -40,6 +41,8 @@ export function SignUpPage() {
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const errorRef = useRef<HTMLParagraphElement>(null);
+  useErrorFocus(error, errorRef);
   const [sentTo, setSentTo] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -127,6 +130,7 @@ export function SignUpPage() {
             </label>
             <input
               id="signup-name"
+              name="name"
               type="text"
               className="form-input"
               value={name}
@@ -143,12 +147,14 @@ export function SignUpPage() {
             </label>
             <input
               id="signup-email"
+              name="email"
               type="email"
               className="form-input"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={submitting}
               autoComplete="email"
+              spellCheck={false}
               required
             />
           </div>
@@ -159,6 +165,7 @@ export function SignUpPage() {
             </label>
             <input
               id="signup-password"
+              name="new-password"
               type="password"
               className="form-input"
               value={password}
@@ -175,6 +182,7 @@ export function SignUpPage() {
             </label>
             <input
               id="signup-dob"
+              name="bday"
               type="date"
               className="form-input"
               value={dateOfBirth}
@@ -192,6 +200,7 @@ export function SignUpPage() {
             </label>
             <select
               id="signup-institution"
+              name="institution"
               className="form-select"
               value={institutionId}
               onChange={(e) => setInstitutionId(e.target.value)}
@@ -206,7 +215,7 @@ export function SignUpPage() {
           </div>
 
           {error && (
-            <p className="login-error" role="alert">
+            <p className="login-error" role="alert" tabIndex={-1} ref={errorRef}>
               {error}
             </p>
           )}

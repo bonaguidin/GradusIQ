@@ -12,13 +12,16 @@
   align-items: center;
   justify-content: center;
   padding: var(--sp-6);
+  /* A drag gesture over the overlay must not scroll the dashboard behind
+     it on mobile. */
+  overscroll-behavior: contain;
   /* Darken toward the bottom so the card reads, top stays legible */
   background: linear-gradient(
     to bottom,
     var(--scrim-top) 0%,
     var(--scrim-bottom) 100%
   );
-  animation: tour-fade 0.2s ease forwards;
+  animation: tour-fade var(--t-move) var(--ease-out) forwards;
 }
 
 @keyframes tour-fade {
@@ -37,7 +40,7 @@
   box-shadow: 0 18px 48px var(--shadow-ink);
   padding: var(--sp-6);
   outline: none;
-  animation: tour-rise 0.24s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  animation: tour-rise var(--t-move) var(--ease-out) forwards;
 }
 
 @keyframes tour-rise {
@@ -106,7 +109,7 @@
   height: 6px;
   border-radius: 50%;
   background: var(--line);
-  transition: background 0.15s ease, transform 0.15s ease;
+  transition: background var(--t-quick) var(--ease-out), transform var(--t-quick) var(--ease-out);
 }
 
 .tour-dot--active {
@@ -159,7 +162,7 @@
   font-size: var(--text-base);
   line-height: 1;
   cursor: pointer;
-  transition: color 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+  transition: color var(--t-quick) var(--ease-out), border-color var(--t-quick) var(--ease-out), background var(--t-quick) var(--ease-out);
 }
 
 .topbar-help:hover {
@@ -177,6 +180,11 @@
 
   .tour-card {
     padding: var(--sp-5);
+    /* The card is anchored to the bottom edge at this width (see
+       .tour-overlay above) -- on a phone with a home-indicator bar, its
+       own padding must not be the only thing standing between it and
+       that bar. */
+    padding-bottom: calc(var(--sp-5) + env(safe-area-inset-bottom, 0px));
   }
 
   .tour-footer {

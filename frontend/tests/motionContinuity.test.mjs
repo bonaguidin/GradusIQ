@@ -43,7 +43,7 @@ test('the text of a counting figure is always its final value; the moving digits
   // Tests, copy-paste, and the Grade Calculator's aria-live region all read
   // text. Writing each frame into it would expose mid-count values to them.
   const component = await read('components/AnimatedNumber.tsx')
-  assert.match(component, /\{target === null \? fallback : `\$\{target\.toFixed\(places\)\}\$\{suffix\}`\}/)
+  assert.match(component, /\{target === null \? fallback : `\$\{formatFixed\(target, places\)\}\$\{suffix\}`\}/)
   assert.match(component, /setAttribute\('data-count'/)
   assert.doesNotMatch(component, /textContent\s*=|innerText\s*=|useState/, 'no per-frame text writes or re-renders')
   const layer = stripComments(await read('interaction.css'))
@@ -54,8 +54,10 @@ test('JS timings agree with the CSS timing set', async () => {
   const layer = await read('interaction.css')
   const count = Number((await read('components/AnimatedNumber.tsx')).match(/COUNT_MS = (\d+)/)[1])
   const settle = Number((await read('components/Reveal.tsx')).match(/SETTLE_MS = (\d+)/)[1])
+  const flag = Number((await read('lib/revealField.ts')).match(/FLAG_MS = (\d+)/)[1])
   assert.equal(count, msOf(layer, '--t-data'), 'the count lasts --t-data')
   assert.ok(settle >= msOf(layer, '--t-move'), 'Reveal waits at least as long as the grow')
+  assert.equal(flag, msOf(layer, '--t-fill'), 'the field flag lasts --t-fill, same as the CSS that draws it')
 })
 
 test('a tab only gives up its own underline once the travelling one is in place', async () => {

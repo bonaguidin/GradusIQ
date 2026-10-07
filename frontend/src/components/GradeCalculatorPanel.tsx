@@ -1060,6 +1060,7 @@ export function GradeCalculatorPanel({ accessToken, courses, institutionName }: 
                           <input
                             id={`actual-${key}`}
                             type="number"
+                            inputMode="decimal"
                             min={0}
                             max={100}
                             className="form-input"
@@ -1071,6 +1072,7 @@ export function GradeCalculatorPanel({ accessToken, courses, institutionName }: 
                           <input
                             id={`hypo-${key}`}
                             type="number"
+                            inputMode="decimal"
                             min={0}
                             max={100}
                             className="form-input grade-entry-hypothetical"

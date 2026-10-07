@@ -82,10 +82,12 @@ export function ProjectsList({ projects, isEditing, onChange }: ProjectsListProp
               </label>
               <input
                 id={`proj-name-${idx}`}
+                name={`proj-name-${idx}`}
                 type="text"
                 className="form-input"
                 value={proj.name}
                 onChange={(e) => updateAt(idx, { name: e.target.value })}
+                autoComplete="off"
               />
             </div>
             <div className="form-group">
@@ -94,10 +96,12 @@ export function ProjectsList({ projects, isEditing, onChange }: ProjectsListProp
               </label>
               <input
                 id={`proj-timeframe-${idx}`}
+                name={`proj-timeframe-${idx}`}
                 type="text"
                 className="form-input"
                 value={proj.timeframe}
                 onChange={(e) => updateAt(idx, { timeframe: e.target.value })}
+                autoComplete="off"
               />
             </div>
           </div>
@@ -107,10 +111,12 @@ export function ProjectsList({ projects, isEditing, onChange }: ProjectsListProp
             </label>
             <textarea
               id={`proj-desc-${idx}`}
+              name={`proj-desc-${idx}`}
               className="form-textarea"
               value={proj.description}
               onChange={(e) => updateAt(idx, { description: e.target.value })}
               rows={3}
+              autoComplete="off"
             />
           </div>
           <TagInput

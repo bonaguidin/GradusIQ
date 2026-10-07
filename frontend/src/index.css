@@ -404,6 +404,7 @@ a {
   opacity: 0.85;
   letter-spacing: 0;
   text-transform: none;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Rail — nav */
@@ -649,14 +650,20 @@ a {
 
 .readiness-bar-fill {
   height: 100%;
+  width: 100%;
+  transform-origin: left;
   background: var(--rail-indicator);
   border-radius: 1px;
-  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform var(--t-fill) var(--ease-out);
 }
 
 /* Rail — footer */
 .rail-footer {
   padding: var(--sp-4) var(--sp-5);
+  /* On the mobile drawer (height: 100vh), this sits at the physical bottom
+     edge -- a phone's home-indicator bar must not sit on top of it. A no-op
+     on desktop, where the rail is a static sidebar, not a full-height drawer. */
+  padding-bottom: calc(var(--sp-4) + env(safe-area-inset-bottom, 0px));
   margin-top: auto;
   border-top: 1px solid var(--rail-line);
 }
@@ -854,6 +861,7 @@ a {
   color: var(--ink);
   line-height: 1;
   letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
 }
 
 .overview-stat-label {
@@ -891,7 +899,7 @@ a {
 
 .degree-progress-ring-fill {
   stroke: var(--accent);
-  transition: stroke-dashoffset 0.3s ease;
+  transition: stroke-dashoffset var(--t-fill) var(--ease-out);
 }
 
 .degree-progress-ring-pct {
@@ -919,7 +927,7 @@ a {
   margin-top: var(--sp-4);
 }
 
-/* "View full schedule" -- a button styled as a text link (same reset as
+/* "View Full Schedule" -- a button styled as a text link (same reset as
    .missing-field-link:is(button)) rather than a react-router <Link>, since
    it switches Academic's sub-tab in place, not the URL route. */
 .overview-schedule-link {
@@ -1044,9 +1052,11 @@ a {
 
 .overview-progress-fill {
   height: 100%;
+  width: 100%;
+  transform-origin: left;
   background: var(--accent);
   border-radius: 2px;
-  transition: width 0.6s ease;
+  transition: transform var(--t-fill) var(--ease-out);
 }
 
 /* Demo reset block */
@@ -1104,7 +1114,7 @@ a {
   font-weight: 500;
   color: var(--muted);
   cursor: pointer;
-  transition: color 0.12s ease, border-color 0.12s ease;
+  transition: color var(--t-quick) var(--ease-out), border-color var(--t-quick) var(--ease-out);
   white-space: nowrap;
   letter-spacing: 0.01em;
 }
@@ -1277,6 +1287,7 @@ a {
   font-size: var(--text-lg);
   font-weight: 500;
   color: var(--ink);
+  font-variant-numeric: tabular-nums;
 }
 
 /* Separates the profile record from the analysis runners stacked above it.
@@ -1552,12 +1563,12 @@ a {
 .pc-dock--complete .pc-dock-count { color: var(--ready); }
 
 /* The brief highlight on a field the page has just jumped to. Removed after
-   500ms in revealField -- it answers "which one?", so it must not linger and
-   become a permanent-looking state. */
+   --t-fill in revealField -- it answers "which one?", so it must not linger
+   and become a permanent-looking state. */
 .cp-field-flag {
   border-radius: var(--radius-sm);
   box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.16);
-  transition: box-shadow 180ms ease;
+  transition: box-shadow var(--t-quick) var(--ease-out);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1792,9 +1803,11 @@ a {
 
 .topic-bar-fill {
   height: 100%;
+  width: 100%;
+  transform-origin: left;
   background: var(--accent);
   border-radius: 2px;
-  transition: width 0.4s ease;
+  transition: transform var(--t-fill) var(--ease-out);
 }
 
 .topic-score {
@@ -4074,7 +4087,7 @@ a {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+  transition: border-color var(--t-quick) var(--ease-out), box-shadow var(--t-quick) var(--ease-out);
   line-height: 1.4;
   -webkit-appearance: none;
   appearance: none;
@@ -4162,7 +4175,7 @@ a {
   font-size: var(--text-base);
   line-height: 1.45;
   color: var(--ink);
-  animation: dp-stage-in 0.28s ease both;
+  animation: dp-stage-in var(--t-move) var(--ease-out) both;
 }
 
 .dp-stage-detail {
@@ -4184,7 +4197,7 @@ a {
   height: 6px;
   border-radius: 50%;
   background: var(--accent-text);
-  animation: dp-pulse 1.6s ease-in-out infinite;
+  animation: dp-pulse var(--t-pulse) ease-in-out infinite;
 }
 
 @keyframes dp-pulse {
@@ -4210,7 +4223,9 @@ a {
   width: 38%;
   border-radius: inherit;
   background: var(--accent-text);
-  animation: dp-rail-travel 1.65s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  /* linear, not an ease curve -- the segment never rests, so easing it would
+     read as speeding up and slowing down for no reason. */
+  animation: dp-rail-travel 1.65s linear infinite;
 }
 
 @keyframes dp-rail-travel {
@@ -4261,7 +4276,7 @@ a {
   border: 2px solid var(--line);
   border-top-color: var(--accent);
   border-radius: 50%;
-  animation: spin 0.7s linear infinite;
+  animation: spin var(--t-spin) linear infinite;
 }
 
 /* ─── SKELETONS ───────────────────────────────────────────────────────────
@@ -4321,7 +4336,7 @@ a {
   border: 1.5px solid var(--on-accent-border);
   border-top-color: var(--on-accent);
   border-radius: 50%;
-  animation: spin 0.7s linear infinite;
+  animation: spin var(--t-spin) linear infinite;
   vertical-align: middle;
   margin-right: 4px;
 }
@@ -5119,7 +5134,7 @@ a {
   background-color: currentColor;
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 6l6 6-6 6'/%3E%3C/svg%3E") center / contain no-repeat;
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 6l6 6-6 6'/%3E%3C/svg%3E") center / contain no-repeat;
-  transition: transform 120ms ease;
+  transition: transform var(--t-quick) var(--ease-out);
 }
 
 .cp-project .cp-more[aria-expanded='true']::after { transform: rotate(90deg); }
@@ -5332,7 +5347,7 @@ a {
     top: 0;
     height: 100vh;
     transform: translateX(-100%);
-    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: transform var(--t-move) var(--ease-out);
     z-index: 50;
   }
 
@@ -5751,8 +5766,10 @@ a {
 }
 .rv-progress-fill {
   height: 100%;
+  width: 100%;
+  transform-origin: left;
   background: var(--accent);
-  transition: width 0.35s ease-out;
+  transition: transform var(--t-fill) var(--ease-out);
 }
 
 /* ── sections ─────────────────────────────────────────────────────────── */
@@ -5807,6 +5824,27 @@ a {
   border: 1px solid var(--line);
   padding: 1.25rem 1.4rem;
   margin-bottom: 0.9rem;
+}
+
+/* Cards cascade in on first mount, one per parsed row, instead of landing in
+   one frame -- reads as "we went through your whole transcript/resume," not
+   a table dump. Each card's own animation-delay (set inline, from its index)
+   is what staggers them; this just defines the entrance itself. A plain
+   CSS animation on an element React never remounts (stable `key`) only ever
+   plays once, on real insertion -- an edit afterward re-renders the same
+   node and does not replay it. */
+.rv-card-enter {
+  opacity: 0;
+  transform: translateY(8px);
+  animation: rv-card-in var(--t-move) var(--ease-out) forwards;
+}
+
+@keyframes rv-card-in {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rv-card-enter { animation: none; opacity: 1; transform: none; }
 }
 
 .rv-card-head { margin-bottom: 0.9rem; }
@@ -6049,6 +6087,137 @@ a {
 }
 .rv-commit-button:disabled { opacity: 0.75; cursor: default; }
 .rv-commit-button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+/* ── commit button states: spinner / check / cross ───────────────────────
+   No width-shrink here, unlike the first sketch of this: the real wait
+   (ConfirmingOverlay's own docs -- 20-50s against a cold-started backend)
+   is too long to leave the button looking collapsed, and it sits inline
+   next to the status line rather than alone, so a shrink would also shove
+   that text around for the whole wait. The label stays the real text (and
+   the button's accessible name) throughout; is-loading/is-success/is-error
+   only swap what's visible on top of it.
+
+   No success colour exists anywhere in this app (only --error does), so
+   the "oomph" on success is physical -- an overshoot and a ring -- rather
+   than a colour change, and the icons render in --on-accent, the button's
+   own existing text colour. ::before/::after are already the hover-fill and
+   the ripple (interaction.css); every new element here is a real child,
+   not a pseudo-element, so it never has to compete with those for the
+   same box. */
+.rv-commit-label {
+  transition: opacity 0.15s var(--ease-out);
+}
+.rv-commit-button.is-loading .rv-commit-label,
+.rv-commit-button.is-success .rv-commit-label,
+.rv-commit-button.is-error .rv-commit-label {
+  opacity: 0;
+}
+
+/* Rotation lives on its own ::before, separate from the span's own
+   appear/disappear scale -- a plain `transform: scale()` and a
+   `transform`-animating keyframe sharing one element is what made an
+   earlier version of this spinner look static instead of spinning. */
+.rv-commit-spinner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 16px;
+  height: 16px;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.4);
+  transition: opacity 0.15s var(--ease-out), transform 0.25s var(--ease-spring);
+}
+.rv-commit-spinner::before {
+  content: "";
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 2px solid rgb(var(--on-accent-rgb) / 0.35);
+  border-top-color: var(--on-accent);
+  animation: rv-commit-spin var(--t-spin) linear infinite;
+}
+.rv-commit-button.is-loading .rv-commit-spinner { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+@keyframes rv-commit-spin { to { transform: rotate(360deg); } }
+
+.rv-commit-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--on-accent);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+}
+.rv-commit-check { stroke-dasharray: 20; stroke-dashoffset: 20; transform: translate(-50%, -50%) scale(0.4); }
+.rv-commit-button.is-success .rv-commit-check {
+  opacity: 1;
+  animation: rv-commit-check-draw 0.3s var(--ease-out) forwards, rv-commit-icon-pop 0.45s var(--ease-spring) forwards;
+}
+@keyframes rv-commit-check-draw { to { stroke-dashoffset: 0; } }
+@keyframes rv-commit-icon-pop {
+  0% { transform: translate(-50%, -50%) scale(0.4); }
+  55% { transform: translate(-50%, -50%) scale(1.3); }
+  100% { transform: translate(-50%, -50%) scale(1); }
+}
+.rv-commit-cross { transform: translate(-50%, -50%) scale(0.4); }
+.rv-commit-button.is-error .rv-commit-cross { opacity: 1; animation: rv-commit-icon-pop 0.3s var(--ease-spring) forwards; }
+
+/* The "oomph": success isn't just an icon swap, it's an impact -- the whole
+   button overshoots on landing and a ring shockwaves outward from it once,
+   both settling almost immediately. */
+.rv-commit-button.is-success { animation: rv-commit-slam 0.5s var(--ease-out); }
+@keyframes rv-commit-slam {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.1); }
+  62% { transform: scale(0.94); }
+  100% { transform: scale(1); }
+}
+.rv-commit-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 2px solid var(--on-accent);
+  opacity: 0;
+  pointer-events: none;
+}
+.rv-commit-button.is-success .rv-commit-ring { animation: rv-commit-ring 0.6s var(--ease-out); }
+@keyframes rv-commit-ring {
+  0% { opacity: 0.7; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.4); }
+}
+
+.rv-commit-button.is-error {
+  animation: rv-commit-shake 0.4s var(--ease-out);
+  background: var(--error);
+  border-color: var(--error);
+}
+@keyframes rv-commit-shake {
+  20% { transform: translateX(-5px); }
+  40% { transform: translateX(4px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(2px); }
+  100% { transform: translateX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rv-commit-button.is-success,
+  .rv-commit-button.is-error,
+  .rv-commit-ring,
+  .rv-commit-spinner::before {
+    animation: none !important;
+  }
+  .rv-commit-check,
+  .rv-commit-cross {
+    animation: none !important;
+    transform: translate(-50%, -50%) scale(1) !important;
+    stroke-dashoffset: 0 !important;
+  }
+}
 
 /* ── confirming overlay ───────────────────────────────────────────────────
    Dims the review content while a confirm is in flight. z-index 35 is
@@ -6434,22 +6603,51 @@ a {
   border-bottom: 1px solid var(--line);
 }
 
-.term-select-label {
-  font-size: 0.75rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
+/* Second tier, under the academic-year tabs: a pill row rather than another
+   underline, so the two levels read as outer/inner instead of competing.
+   The travelling highlight reuses interaction.ts's generic tablist sync
+   (--tab-x/--tab-w/[data-tab-indicator], the same mechanism the underline
+   above consumes differently) -- no extra JS for this component. */
+.term-season-tabs {
+  position: relative;
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--paper);
+  border-radius: 999px;
 }
 
-.term-select {
+.term-season-tab {
+  position: relative;
+  z-index: 1;
+  background: none;
+  border: none;
+  border-radius: 999px;
+  padding: var(--sp-2) var(--sp-4);
   font-family: var(--font-ui);
-  font-size: 1rem;
-  padding: var(--sp-2) var(--sp-3);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--surface);
-  color: var(--ink);
-  max-width: 100%;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color var(--t-quick) var(--ease-out);
+}
+
+.term-season-tab--active {
+  color: var(--on-accent);
+}
+
+.term-season-tabs[data-tab-indicator]::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  top: 3px;
+  left: 0;
+  height: calc(100% - 6px);
+  width: var(--tab-w, 0px);
+  border-radius: 999px;
+  background: var(--accent);
+  transform: translateX(var(--tab-x, 0px));
+  transition: transform var(--t-move) var(--ease-out), width var(--t-move) var(--ease-out);
 }
 
 .term-meta {

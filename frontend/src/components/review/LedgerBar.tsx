@@ -86,7 +86,7 @@ export function LedgerBar({ counters, onJumpToGap }: LedgerBarProps) {
         aria-valuenow={Math.round(filledRatio * 100)}
         aria-label="Fields with a value"
       >
-        <div className="rv-progress-fill" style={{ width: `${String(filledRatio * 100)}%` }} />
+        <div className="rv-progress-fill" style={{ transform: `scaleX(${String(filledRatio)})` }} />
       </div>
     </div>
   );

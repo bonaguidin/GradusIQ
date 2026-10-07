@@ -93,6 +93,27 @@ export function seasonOrdinal(season) {
     : UNKNOWN_SEASON_ORDINAL
 }
 
+/**
+ * The academic-year bucket ANY term belongs to, all seasons included -- not
+ * just Fall/Spring. Keyed by the Fall term's calendar year, the same US
+ * convention degreeScheduleYears.mjs's academicYearKey uses, generalized:
+ * that function is deliberately narrowed to its own Fall/Spring-only
+ * two-column view and returns null for anything else (Winter, May, Summer,
+ * August are explicitly out of scope there -- see YEAR_SEMESTER_SEASONS's
+ * own comment). The term dropdown this replaces showed every season a
+ * student could have on record, intersessions included, so this bucketing
+ * has to as well: Winter/Spring/May/Summer/August of year Y finish the
+ * academic year that Fall Y - 1 started.
+ */
+export function termAcademicYearKey(year, season) {
+  return season === 'Fall' ? year : year - 1
+}
+
+/** "2024–25" from the Fall-anchored academic-year key 2024. */
+export function termAcademicYearLabel(yearKey) {
+  return `${yearKey}–${String(yearKey + 1).slice(-2)}`
+}
+
 export function plannedRemoveUrl(id) {
   return `${PLANNED_COURSES_URL}/${encodeURIComponent(id)}`
 }
@@ -244,12 +265,18 @@ export function parseDate(value) {
 
 const DATE_FORMAT = { month: 'short', day: 'numeric', year: 'numeric' }
 
-/** "Aug 24, 2026 – Dec 10, 2026", or null when the term has no calendar row. */
+/**
+ * "Aug 24, 2026 – Dec 10, 2026", or null when the term has no calendar row.
+ *
+ * Locale left undefined (not 'en-US') so the browser's own locale decides
+ * digit/month order and separators, rather than this always reading as US
+ * English regardless of who's viewing it.
+ */
 export function formatTermDates(term) {
   const start = parseDate(term?.start_date)
   const end = parseDate(term?.end_date)
   if (!start || !end) return null
-  const fmt = (date) => date.toLocaleDateString('en-US', DATE_FORMAT)
+  const fmt = (date) => date.toLocaleDateString(undefined, DATE_FORMAT)
   return `${fmt(start)} – ${fmt(end)}`
 }
 

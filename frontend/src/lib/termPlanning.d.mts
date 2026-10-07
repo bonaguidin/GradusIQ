@@ -103,6 +103,8 @@ export declare function finalizeCourseUrl(id: string): string;
 export declare function isTermActivated(term: PlanningTerm | null | undefined, today: Date): boolean;
 
 export declare function seasonOrdinal(season: string): number;
+export declare function termAcademicYearKey(year: number, season: string): number;
+export declare function termAcademicYearLabel(yearKey: number): string;
 export declare function plannedRemoveUrl(id: string): string;
 export declare function plannedListUrl(termId: string | null | undefined): string;
 export declare function catalogSearchUrl(query: string): string;

@@ -124,7 +124,13 @@ export function EntryCard({
   }
 
   return (
-    <article className="rv-card">
+    <article
+      className="rv-card rv-card-enter"
+      // Capped so a long list's last few rows don't wait seconds to appear --
+      // the cascade is for reading as "going through the list," not for
+      // literally timing every row in it.
+      style={{ animationDelay: `${Math.min(index, 10) * 45}ms` }}
+    >
       <header className="rv-card-head">
         <h3 className="rv-card-title">{titleFor(section, draft, index)}</h3>
         {subtitleFor(section, draft) && (

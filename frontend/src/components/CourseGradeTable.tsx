@@ -1,4 +1,5 @@
 import type { Course, Enrollment } from '../types/student';
+import { formatFixed } from '../lib/format.mjs';
 
 interface CourseGradeTableProps {
   courses: Course[];
@@ -55,7 +56,7 @@ export function CourseGradeTable({ courses, enrollments }: CourseGradeTableProps
                 </td>
                 <td>
                   {score !== null ? (
-                    <span>{score.toFixed(1)}%</span>
+                    <span>{formatFixed(score, 1)}%</span>
                   ) : (
                     <span className="text-muted">—</span>
                   )}

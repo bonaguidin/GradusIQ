@@ -31,6 +31,7 @@ import { useFocusTrap } from '../hooks/useFocusTrap';
 import { GuidedTour } from '../components/GuidedTour';
 import { AuthenticatedDashboard } from './AuthenticatedDashboard';
 import { AnimatedNumber } from '../components/AnimatedNumber';
+import { formatFixed } from '../lib/format.mjs';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -114,7 +115,7 @@ function ReadinessRail({ completeness }: { completeness: ProfileCompleteness }) 
               aria-valuemax={100}
               aria-label={`${label} completeness: ${pct}%`}
             >
-              <div className="readiness-bar-fill" style={{ width: `${pct}%` }} />
+              <div className="readiness-bar-fill" style={{ transform: `scaleX(${pct / 100})` }} />
             </div>
           </div>
         ))}
@@ -170,7 +171,7 @@ return (
       <div className="overview-stats">
         <div className="overview-stat">
           <span className="overview-stat-value">
-            {student.gpa_current !== null ? student.gpa_current.toFixed(2) : '—'}
+            {student.gpa_current !== null ? formatFixed(student.gpa_current, 2) : '—'}
           </span>
           <span className="overview-stat-label">GPA</span>
         </div>
@@ -239,7 +240,7 @@ return (
                   >
                     <div
                       className="overview-progress-fill"
-                      style={{ width: `${pct}%` }}
+                      style={{ transform: `scaleX(${pct / 100})` }}
                     />
                   </div>
                 </div>
@@ -503,7 +504,7 @@ function DemoDashboardPage() {
             <span>{student.classification}</span>
             <span className="rail-dot" aria-hidden="true">·</span>
             <span className="rail-gpa">
-              {student.gpa_current !== null ? student.gpa_current.toFixed(2) : '—'}
+              {student.gpa_current !== null ? formatFixed(student.gpa_current, 2) : '—'}
             </span>
           </div>
         </div>
@@ -623,7 +624,7 @@ function DemoDashboardPage() {
               <div key="academic-gpa" className="stage-section">
                 <h2 className="academic-section-heading">GPA Calculator</h2>
                 <div className="overview-stats">
-                  <div className="overview-stat"><span className="overview-stat-value">{dashboard.officialGpa?.toFixed(2) ?? '—'}</span><span className="overview-stat-label">Official GPA</span></div>
+                  <div className="overview-stat"><span className="overview-stat-value">{dashboard.officialGpa !== null ? formatFixed(dashboard.officialGpa, 2) : '—'}</span><span className="overview-stat-label">Official GPA</span></div>
                   <div className="overview-stat"><span className="overview-stat-value"><AnimatedNumber value={dashboard.projectedGpa} decimals={2} showDelta /></span><span className="overview-stat-label">Projected GPA</span></div>
                   <div className="overview-stat"><span className="overview-stat-value">{dashboard.earnedHours}</span><span className="overview-stat-label">Earned Hours</span></div>
                 </div>
@@ -712,7 +713,7 @@ function DemoDashboardPage() {
                   <label>Target role<select defaultValue={dashboard.career.target_roles[0] ?? ''} disabled={dashboard.career.target_roles.length === 0}>{dashboard.career.target_roles.length === 0 && <option value="">No target role provided</option>}{dashboard.career.target_roles.map((role) => <option key={role}>{role}</option>)}</select></label>
                   <button type="button" className="btn btn-primary" disabled>Search Jobs</button>
                 </div>
-                <div className="real-empty"><h3>Job Search is not available in this demo</h3><p>This demo profile has no real account session, so it can't reach the cached postings this feature reads. Sign in with a real account to search.</p></div>
+                <div className="real-empty"><h3>Job Search is not available in this demo</h3><p>This demo profile has no real account session, so it can’t reach the cached postings this feature reads. Sign in with a real account to search.</p></div>
               </div>
             )}
 

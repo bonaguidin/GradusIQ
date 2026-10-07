@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import type { ReviewCounters } from '../../lib/resumeApi.mjs';
 import { ConfirmingOverlay } from './ConfirmingOverlay';
 
@@ -48,6 +49,25 @@ export function CommitBar({
 }: CommitBarProps) {
   const { gaps, total, edited } = counters;
 
+  // A brief, one-shot flourish on the button itself right as a confirm
+  // attempt concludes in error -- distinct from `error`, which stays set
+  // (and keeps rendering as the status line above) long after this settles.
+  // Keyed on confirming's own true -> false transition, not on the error
+  // string's identity, so a second attempt failing with the exact same
+  // message still replays it.
+  const [justFailed, setJustFailed] = useState(false);
+  const wasConfirming = useRef(confirming);
+  useEffect(() => {
+    if (wasConfirming.current && !confirming && error) {
+      setJustFailed(true);
+      const timer = window.setTimeout(() => setJustFailed(false), 500);
+      wasConfirming.current = confirming;
+      return () => window.clearTimeout(timer);
+    }
+    wasConfirming.current = confirming;
+    return undefined;
+  }, [confirming, error]);
+
   const status =
     statusOverride ??
     (gaps > 0
@@ -76,17 +96,32 @@ export function CommitBar({
           </p>
           <button
             type="button"
-            className="rv-commit-button"
+            className={`rv-commit-button${confirming ? ' is-loading' : ''}${justSaved ? ' is-success' : ''}${justFailed ? ' is-error' : ''}`}
             onClick={onConfirm}
             disabled={confirming || justSaved || blocked !== null}
           >
-            {justSaved
-              ? 'Saved ✓'
-              : confirming
-                ? 'Saving…'
-                : blocked
-                  ? 'Verification pending'
-                  : confirmLabel}
+            {/* Text stays the real content (and the button's accessible name)
+                in every state -- is-loading/is-success/is-error only hide it
+                visually, replacing it with the spinner/check/cross below, so
+                a screen reader still hears "Saving…"/"Saved ✓" exactly as it
+                did before this existed. */}
+            <span className="rv-commit-label">
+              {justSaved
+                ? 'Saved ✓'
+                : confirming
+                  ? 'Saving…'
+                  : blocked
+                    ? 'Verification pending'
+                    : confirmLabel}
+            </span>
+            <span className="rv-commit-spinner" aria-hidden="true" />
+            <svg className="rv-commit-icon rv-commit-check" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M5 13l4 4L19 7" />
+            </svg>
+            <svg className="rv-commit-icon rv-commit-cross" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+            <span className="rv-commit-ring" aria-hidden="true" />
           </button>
         </div>
       </div>

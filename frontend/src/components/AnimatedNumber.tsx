@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { decimalsOf, formatDelta, interpolate } from '../lib/animatedNumber.mjs';
+import { formatFixed } from '../lib/format.mjs';
 
 // --t-data in interaction.css; interactionLayer.test.mjs keeps the two in step.
 const COUNT_MS = 600;
@@ -71,20 +72,20 @@ export function AnimatedNumber({ value, decimals, suffix = '', fallback = '—',
       const progress = Math.min(1, (now - start) / COUNT_MS);
       drawn.current = interpolate(from, target, progress);
       if (progress < 1) {
-        el.setAttribute('data-count', `${drawn.current.toFixed(places)}${suffix}`);
+        el.setAttribute('data-count', `${formatFixed(drawn.current, places)}${suffix}`);
         frame = requestAnimationFrame(step);
       } else {
         el.removeAttribute('data-count');
       }
     };
-    el.setAttribute('data-count', `${from.toFixed(places)}${suffix}`);
+    el.setAttribute('data-count', `${formatFixed(from, places)}${suffix}`);
     frame = requestAnimationFrame(step);
     return () => cancelAnimationFrame(frame);
   }, [target, places, suffix, showDelta]);
 
   return (
     <span ref={ref} className="figure-count">
-      {target === null ? fallback : `${target.toFixed(places)}${suffix}`}
+      {target === null ? fallback : `${formatFixed(target, places)}${suffix}`}
     </span>
   );
 }

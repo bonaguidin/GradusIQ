@@ -244,7 +244,11 @@ export function CareerReview({
       setJustSaved(true);
       // `confirming` stays true on success on purpose -- see TranscriptReview's
       // handleConfirm for the reasoning. It clears when this screen unmounts.
-      window.setTimeout(() => onConfirmed(result), 450);
+      //
+      // 650ms, not 450: CommitBar's success state (the button's own slam +
+      // ring) runs up to 600ms, and the point of adding it was for the
+      // student to actually see it before the screen moves on.
+      window.setTimeout(() => onConfirmed(result), 650);
       return;
     }
     // API failure, timeout and validation all land here: the screen stays put
@@ -409,6 +413,7 @@ export function CareerReview({
                     <span className="form-label">Current major</span>
                     <input
                       className="form-input"
+                      name="academic-major-current"
                       value={academicDraft.major_current ?? ''}
                       onChange={(event) =>
                         setAcademicDraft((current) => ({
@@ -416,6 +421,7 @@ export function CareerReview({
                           major_current: event.target.value || null,
                         }))
                       }
+                      autoComplete="off"
                     />
                   </label>
                 )}
@@ -424,6 +430,7 @@ export function CareerReview({
                     <span className="form-label">Expected graduation</span>
                     <input
                       className="form-input"
+                      name="academic-expected-graduation"
                       value={academicDraft.expected_graduation ?? ''}
                       onChange={(event) =>
                         setAcademicDraft((current) => ({
@@ -431,6 +438,7 @@ export function CareerReview({
                           expected_graduation: event.target.value || null,
                         }))
                       }
+                      autoComplete="off"
                     />
                     <small>Use Spring YYYY or Fall YYYY.</small>
                   </label>

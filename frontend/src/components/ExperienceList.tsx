@@ -86,10 +86,12 @@ export function ExperienceList({ experiences, isEditing, onChange }: ExperienceL
               </label>
               <input
                 id={`exp-employer-${idx}`}
+                name={`exp-employer-${idx}`}
                 type="text"
                 className="form-input"
                 value={exp.employer}
                 onChange={(e) => updateAt(idx, { employer: e.target.value })}
+                autoComplete="organization"
               />
             </div>
             <div className="form-group">
@@ -98,10 +100,12 @@ export function ExperienceList({ experiences, isEditing, onChange }: ExperienceL
               </label>
               <input
                 id={`exp-role-${idx}`}
+                name={`exp-role-${idx}`}
                 type="text"
                 className="form-input"
                 value={exp.role}
                 onChange={(e) => updateAt(idx, { role: e.target.value })}
+                autoComplete="off"
               />
             </div>
           </div>
@@ -112,10 +116,12 @@ export function ExperienceList({ experiences, isEditing, onChange }: ExperienceL
               </label>
               <input
                 id={`exp-duration-${idx}`}
+                name={`exp-duration-${idx}`}
                 type="text"
                 className="form-input"
                 value={exp.duration}
                 onChange={(e) => updateAt(idx, { duration: e.target.value })}
+                autoComplete="off"
               />
             </div>
             <div className="form-group">
@@ -124,10 +130,12 @@ export function ExperienceList({ experiences, isEditing, onChange }: ExperienceL
               </label>
               <input
                 id={`exp-location-${idx}`}
+                name={`exp-location-${idx}`}
                 type="text"
                 className="form-input"
                 value={exp.location}
                 onChange={(e) => updateAt(idx, { location: e.target.value })}
+                autoComplete="off"
               />
             </div>
           </div>
@@ -137,10 +145,12 @@ export function ExperienceList({ experiences, isEditing, onChange }: ExperienceL
             </label>
             <textarea
               id={`exp-desc-${idx}`}
+              name={`exp-desc-${idx}`}
               className="form-textarea"
               value={exp.description}
               onChange={(e) => updateAt(idx, { description: e.target.value })}
               rows={3}
+              autoComplete="off"
             />
           </div>
           <TagInput

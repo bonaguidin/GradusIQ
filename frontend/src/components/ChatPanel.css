@@ -139,7 +139,7 @@
   padding: var(--sp-3) var(--sp-4);
 }
 
-.chat-input:focus {
+.chat-input:focus-visible {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-tint);
@@ -162,7 +162,7 @@
   height: 6px;
   border-radius: 50%;
   background: var(--pending);
-  animation: chat-blink 1.2s infinite ease-in-out;
+  animation: chat-blink var(--t-pulse) infinite ease-in-out;
 }
 
 .chat-typing span:nth-child(2) {

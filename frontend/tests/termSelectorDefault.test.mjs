@@ -144,7 +144,19 @@ test('GPA Calculator term selector defaults to the in-progress term and survives
     route.fulfill({ status: 200, headers: { 'content-type': 'application/vnd.pgrst.object+json' }, body: JSON.stringify(null) }),
   )
 
-  const termSelect = page.locator('#term-select')
+  // The dropdown this test was written against is gone -- term selection is
+  // now a year tab + a season tab (see TermPlanner's academic-tabs /
+  // term-season-tabs). Each season tab's id carries the term key directly
+  // (term-season-tab-<key>), so reading/driving "which term is selected" is
+  // still a single stable lookup, just not .inputValue()/.selectOption().
+  const activeTermKey = async () => {
+    const id = await page.locator('.term-season-tabs [aria-selected="true"]').getAttribute('id')
+    return id ? id.replace('term-season-tab-', '') : null
+  }
+  const selectTerm = async (yearLabel, season) => {
+    await page.getByRole('tab', { name: yearLabel }).click()
+    await page.getByRole('tab', { name: season, exact: true }).click()
+  }
   const projectedGpa = page
     .locator('.overview-stat', { hasText: 'Projected GPA' })
     .locator('.overview-stat-value')
@@ -174,11 +186,13 @@ test('GPA Calculator term selector defaults to the in-progress term and survives
   await page.goto(`${origin}/transcript-preview.html#/dashboard`)
   await page.getByRole('button', { name: 'Academic' }).click()
   await page.getByRole('button', { name: 'GPA Calculator' }).click()
-  await termSelect.waitFor()
+  await page.locator('.term-season-tabs').waitFor()
 
   // 1. Opens on the in-progress term, not the upcoming one, with the right
-  //    badge and calendar range.
-  assert.equal(await termSelect.inputValue(), '2026-Fall')
+  //    badge and calendar range. Fall 2026 and Spring 2027 share the same
+  //    academic-year tab (2026–27, Fall-anchored -- see termAcademicYearKey),
+  //    so the year tab alone can't distinguish them; the season tab can.
+  assert.equal(await activeTermKey(), '2026-Fall')
   await page.locator('.term-badge--in_progress').waitFor()
   await page.getByText('Aug 24, 2026 – Dec 10, 2026').waitFor()
 
@@ -187,22 +201,22 @@ test('GPA Calculator term selector defaults to the in-progress term and survives
     await page.locator('[aria-label="Coursework in this term"]').getByText(code).waitFor()
   }
 
-  // 3. Editing one of them leaves the dropdown on Fall 2026 and moves the
+  // 3. Editing one of them leaves the selector on Fall 2026 and moves the
   //    projected GPA -- the original regression.
   const projBeforeEdit = await projectedGpa.textContent()
   await editGrade('CSCE 222', 'C')
-  assert.equal(await termSelect.inputValue(), '2026-Fall')
+  assert.equal(await activeTermKey(), '2026-Fall')
   assert.notEqual(await projectedGpa.textContent(), projBeforeEdit)
 
   // 4. An explicit pick of a different term is not clobbered by a later grade
   //    edit's reload, nor by TermPlanner re-rendering when a planned course is
   //    added.
-  await termSelect.selectOption('2027-Spring')
-  assert.equal(await termSelect.inputValue(), '2027-Spring')
-  await termSelect.selectOption('2026-Fall')
+  await selectTerm('2026–27', 'Spring')
+  assert.equal(await activeTermKey(), '2027-Spring')
+  await selectTerm('2026–27', 'Fall')
   await editGrade('ECEN 248', 'B')
-  await termSelect.selectOption('2027-Spring')
-  assert.equal(await termSelect.inputValue(), '2027-Spring')
+  await selectTerm('2026–27', 'Spring')
+  assert.equal(await activeTermKey(), '2027-Spring')
 
   // 5. Planning still works on the upcoming term; the planned row keeps its
   //    badge and its "not counted" caveat, and the selector stays put.
@@ -212,5 +226,5 @@ test('GPA Calculator term selector defaults to the in-progress term and survives
   await page.locator('.real-course-row--planned').first().waitFor()
   await page.locator('.real-course-row--planned .planned-badge').first().waitFor()
   await page.getByText(/not counted in GPA or hours/i).waitFor()
-  assert.equal(await termSelect.inputValue(), '2027-Spring')
+  assert.equal(await activeTermKey(), '2027-Spring')
 })

@@ -128,9 +128,15 @@ test('transcript flow covers upload, recovery, edits, repeats, failures, confirm
   // course's own term first.
   await page.getByRole('button', { name: 'Academic' }).click()
   await page.getByRole('button', { name: 'GPA Calculator' }).click()
-  await page.locator('#term-select').waitFor()
-  assert.equal(await page.locator('#term-select').inputValue(), '2026-Fall')
-  await page.locator('#term-select').selectOption('2025-Fall')
+  // Term selection is a year tab + a season tab (TermPlanner's academic-tabs
+  // / term-season-tabs), not the old dropdown. 2025-Fall sits in a
+  // different academic-year tab (2025–26) than the default 2026-Fall
+  // (2026–27).
+  await page.locator('.term-season-tabs').waitFor()
+  const activeId = await page.locator('.term-season-tabs [aria-selected="true"]').getAttribute('id')
+  assert.equal(activeId, 'term-season-tab-2026-Fall')
+  await page.getByRole('tab', { name: '2025–26' }).click()
+  await page.getByRole('tab', { name: 'Fall', exact: true }).click()
   await page.getByText('MATH 251').waitFor()
   assert.equal(await page.getByRole('link', { name: 'Upload transcript' }).count(), 0)
 
