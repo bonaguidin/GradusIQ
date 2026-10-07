@@ -34,10 +34,12 @@ export function CareerSummaryRow({ career, isEditing, onChange }: CareerSummaryR
         </label>
         <textarea
           id="career-goals"
+          name="career-goals"
           className="form-textarea"
           value={career.career_goals}
           onChange={(e) => onChange({ career_goals: e.target.value })}
           rows={3}
+          autoComplete="off"
         />
       </div>
       <div className="form-group">
@@ -46,10 +48,12 @@ export function CareerSummaryRow({ career, isEditing, onChange }: CareerSummaryR
         </label>
         <input
           id="geo-pref"
+          name="geo-pref"
           type="text"
           className="form-input"
           value={career.geographic_preference}
           onChange={(e) => onChange({ geographic_preference: e.target.value })}
+          autoComplete="off"
         />
       </div>
       <div className="form-group">
@@ -58,10 +62,12 @@ export function CareerSummaryRow({ career, isEditing, onChange }: CareerSummaryR
         </label>
         <textarea
           id="ai-anxiety"
+          name="ai-anxiety"
           className="form-textarea"
           value={career.ai_anxiety_level}
           onChange={(e) => onChange({ ai_anxiety_level: e.target.value })}
           rows={2}
+          autoComplete="off"
         />
       </div>
     </div>

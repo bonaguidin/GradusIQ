@@ -67,10 +67,12 @@ export function SkillsEditor({ skills, isEditing, onChange }: SkillsEditorProps)
         </label>
         <textarea
           id="ai-exposure"
+          name="ai-exposure"
           className="form-textarea"
           value={skills.ai_exposure}
           onChange={(e) => onChange({ ...skills, ai_exposure: e.target.value })}
           rows={2}
+          autoComplete="off"
         />
       </div>
     </div>

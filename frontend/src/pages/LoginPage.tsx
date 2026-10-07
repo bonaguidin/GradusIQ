@@ -82,12 +82,14 @@ export function LoginPage() {
             </label>
             <input
               id="login-email"
+              name="email"
               type="email"
               className="form-input"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={credLoading}
               autoComplete="email"
+              spellCheck={false}
               required
             />
           </div>
@@ -98,6 +100,7 @@ export function LoginPage() {
             </label>
             <input
               id="login-password"
+              name="current-password"
               type="password"
               className="form-input"
               value={password}
@@ -151,6 +154,7 @@ export function LoginPage() {
             </label>
             <select
               id="student-select"
+              name="student-select"
               className="form-select"
               value={selectedSlug}
               onChange={(e) => setSelectedSlug(e.target.value)}

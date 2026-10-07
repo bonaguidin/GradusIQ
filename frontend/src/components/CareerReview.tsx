@@ -413,6 +413,7 @@ export function CareerReview({
                     <span className="form-label">Current major</span>
                     <input
                       className="form-input"
+                      name="academic-major-current"
                       value={academicDraft.major_current ?? ''}
                       onChange={(event) =>
                         setAcademicDraft((current) => ({
@@ -420,6 +421,7 @@ export function CareerReview({
                           major_current: event.target.value || null,
                         }))
                       }
+                      autoComplete="off"
                     />
                   </label>
                 )}
@@ -428,6 +430,7 @@ export function CareerReview({
                     <span className="form-label">Expected graduation</span>
                     <input
                       className="form-input"
+                      name="academic-expected-graduation"
                       value={academicDraft.expected_graduation ?? ''}
                       onChange={(event) =>
                         setAcademicDraft((current) => ({
@@ -435,6 +438,7 @@ export function CareerReview({
                           expected_graduation: event.target.value || null,
                         }))
                       }
+                      autoComplete="off"
                     />
                     <small>Use Spring YYYY or Fall YYYY.</small>
                   </label>

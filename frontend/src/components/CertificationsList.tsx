@@ -72,10 +72,12 @@ export function CertificationsList({ certifications, isEditing, onChange }: Cert
               </label>
               <input
                 id={`cert-name-${idx}`}
+                name={`cert-name-${idx}`}
                 type="text"
                 className="form-input"
                 value={cert.name}
                 onChange={(e) => updateAt(idx, { name: e.target.value })}
+                autoComplete="off"
               />
             </div>
             <div className="form-group">
@@ -84,10 +86,12 @@ export function CertificationsList({ certifications, isEditing, onChange }: Cert
               </label>
               <input
                 id={`cert-issuer-${idx}`}
+                name={`cert-issuer-${idx}`}
                 type="text"
                 className="form-input"
                 value={cert.issuer}
                 onChange={(e) => updateAt(idx, { issuer: e.target.value })}
+                autoComplete="organization"
               />
             </div>
           </div>
@@ -98,10 +102,12 @@ export function CertificationsList({ certifications, isEditing, onChange }: Cert
               </label>
               <input
                 id={`cert-status-${idx}`}
+                name={`cert-status-${idx}`}
                 type="text"
                 className="form-input"
                 value={cert.status}
                 onChange={(e) => updateAt(idx, { status: e.target.value })}
+                autoComplete="off"
               />
             </div>
             <div className="form-group">
@@ -110,10 +116,16 @@ export function CertificationsList({ certifications, isEditing, onChange }: Cert
               </label>
               <input
                 id={`cert-date-${idx}`}
+                name={`cert-date-${idx}`}
                 type="text"
                 className="form-input"
                 value={cert.date ?? ''}
                 onChange={(e) => updateAt(idx, { date: e.target.value })}
+                autoComplete="off"
+                // No inputMode="numeric" -- values like "Spring 2024" or
+                // "Expected 2025" are valid here, and a numeric keypad would
+                // make those harder to type, not easier.
+                placeholder="e.g. May 2024"
               />
             </div>
           </div>

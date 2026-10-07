@@ -114,11 +114,13 @@ export function ChatPanel() {
         <input
           className="chat-input"
           type="text"
+          name="chat-message"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Ask about your grades, gaps, roles…"
           disabled={sending || !canSend}
           aria-label="Message GradusIQ"
+          autoComplete="off"
         />
         <button
           type="submit"

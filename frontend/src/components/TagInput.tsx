@@ -76,6 +76,7 @@ export function TagInput({ label, value, onChange, placeholder = 'Add…', disab
           <input
             ref={inputRef}
             id={inputId}
+            name={inputId}
             type="text"
             className="tag-text-input"
             value={inputVal}
@@ -84,6 +85,7 @@ export function TagInput({ label, value, onChange, placeholder = 'Add…', disab
             onBlur={handleBlur}
             placeholder={value.length === 0 ? placeholder : ''}
             aria-label={label}
+            autoComplete="off"
           />
         )}
       </div>

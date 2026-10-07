@@ -69,12 +69,14 @@ export function ResetPasswordRequestPage() {
             </label>
             <input
               id="reset-email"
+              name="email"
               type="email"
               className="form-input"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={submitting}
               autoComplete="email"
+              spellCheck={false}
               required
             />
           </div>
