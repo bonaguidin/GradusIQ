@@ -162,7 +162,7 @@
   height: 6px;
   border-radius: 50%;
   background: var(--pending);
-  animation: chat-blink 1.2s infinite ease-in-out;
+  animation: chat-blink var(--t-pulse) infinite ease-in-out;
 }
 
 .chat-typing span:nth-child(2) {

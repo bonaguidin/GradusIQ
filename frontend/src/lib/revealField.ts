@@ -1,3 +1,6 @@
+// --t-fill in interaction.css; motionContinuity.test.mjs keeps the two in step.
+const FLAG_MS = 520;
+
 /**
  * Bring a field into view, flag it, then focus it.
  *
@@ -7,7 +10,7 @@
  *
  *   - the scroll respects prefers-reduced-motion, because a page that jumps
  *     under someone who asked it not to is worse than no animation at all;
- *   - the flag is a brief highlight, removed after 500ms, so the student can
+ *   - the flag is a brief highlight, removed after FLAG_MS, so the student can
  *     see WHICH thing the page just moved to rather than having to work it out
  *     from the scroll position;
  *   - focus happens LAST and on a delay, so the browser does not fight its own
@@ -24,6 +27,6 @@ export function revealField(node: HTMLElement, focusTarget?: () => HTMLElement |
   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   node.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
   node.classList.add('cp-field-flag');
-  window.setTimeout(() => { node.classList.remove('cp-field-flag'); }, 500);
+  window.setTimeout(() => { node.classList.remove('cp-field-flag'); }, FLAG_MS);
   window.setTimeout(() => { focusTarget?.()?.focus(); }, reduce ? 0 : 320);
 }

@@ -893,7 +893,7 @@ a {
 
 .degree-progress-ring-fill {
   stroke: var(--accent);
-  transition: stroke-dashoffset 0.3s ease;
+  transition: stroke-dashoffset var(--t-fill) var(--ease-out);
 }
 
 .degree-progress-ring-pct {
@@ -1106,7 +1106,7 @@ a {
   font-weight: 500;
   color: var(--muted);
   cursor: pointer;
-  transition: color 0.12s ease, border-color 0.12s ease;
+  transition: color var(--t-quick) var(--ease-out), border-color var(--t-quick) var(--ease-out);
   white-space: nowrap;
   letter-spacing: 0.01em;
 }
@@ -1555,12 +1555,12 @@ a {
 .pc-dock--complete .pc-dock-count { color: var(--ready); }
 
 /* The brief highlight on a field the page has just jumped to. Removed after
-   500ms in revealField -- it answers "which one?", so it must not linger and
-   become a permanent-looking state. */
+   --t-fill in revealField -- it answers "which one?", so it must not linger
+   and become a permanent-looking state. */
 .cp-field-flag {
   border-radius: var(--radius-sm);
   box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.16);
-  transition: box-shadow 180ms ease;
+  transition: box-shadow var(--t-quick) var(--ease-out);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -4077,7 +4077,7 @@ a {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+  transition: border-color var(--t-quick) var(--ease-out), box-shadow var(--t-quick) var(--ease-out);
   line-height: 1.4;
   -webkit-appearance: none;
   appearance: none;
@@ -4165,7 +4165,7 @@ a {
   font-size: var(--text-base);
   line-height: 1.45;
   color: var(--ink);
-  animation: dp-stage-in 0.28s ease both;
+  animation: dp-stage-in var(--t-move) var(--ease-out) both;
 }
 
 .dp-stage-detail {
@@ -4187,7 +4187,7 @@ a {
   height: 6px;
   border-radius: 50%;
   background: var(--accent-text);
-  animation: dp-pulse 1.6s ease-in-out infinite;
+  animation: dp-pulse var(--t-pulse) ease-in-out infinite;
 }
 
 @keyframes dp-pulse {
@@ -4213,7 +4213,9 @@ a {
   width: 38%;
   border-radius: inherit;
   background: var(--accent-text);
-  animation: dp-rail-travel 1.65s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  /* linear, not an ease curve -- the segment never rests, so easing it would
+     read as speeding up and slowing down for no reason. */
+  animation: dp-rail-travel 1.65s linear infinite;
 }
 
 @keyframes dp-rail-travel {
@@ -4264,7 +4266,7 @@ a {
   border: 2px solid var(--line);
   border-top-color: var(--accent);
   border-radius: 50%;
-  animation: spin 0.7s linear infinite;
+  animation: spin var(--t-spin) linear infinite;
 }
 
 /* ─── SKELETONS ───────────────────────────────────────────────────────────
@@ -4324,7 +4326,7 @@ a {
   border: 1.5px solid var(--on-accent-border);
   border-top-color: var(--on-accent);
   border-radius: 50%;
-  animation: spin 0.7s linear infinite;
+  animation: spin var(--t-spin) linear infinite;
   vertical-align: middle;
   margin-right: 4px;
 }
@@ -5122,7 +5124,7 @@ a {
   background-color: currentColor;
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 6l6 6-6 6'/%3E%3C/svg%3E") center / contain no-repeat;
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 6l6 6-6 6'/%3E%3C/svg%3E") center / contain no-repeat;
-  transition: transform 120ms ease;
+  transition: transform var(--t-quick) var(--ease-out);
 }
 
 .cp-project .cp-more[aria-expanded='true']::after { transform: rotate(90deg); }
@@ -5335,7 +5337,7 @@ a {
     top: 0;
     height: 100vh;
     transform: translateX(-100%);
-    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: transform var(--t-move) var(--ease-out);
     z-index: 50;
   }
 
@@ -5755,7 +5757,7 @@ a {
 .rv-progress-fill {
   height: 100%;
   background: var(--accent);
-  transition: width 0.35s ease-out;
+  transition: width var(--t-fill) var(--ease-out);
 }
 
 /* ── sections ─────────────────────────────────────────────────────────── */
@@ -6121,7 +6123,7 @@ a {
   border-radius: 50%;
   border: 2px solid rgb(var(--on-accent-rgb) / 0.35);
   border-top-color: var(--on-accent);
-  animation: rv-commit-spin 0.7s linear infinite;
+  animation: rv-commit-spin var(--t-spin) linear infinite;
 }
 .rv-commit-button.is-loading .rv-commit-spinner { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 @keyframes rv-commit-spin { to { transform: rotate(360deg); } }
