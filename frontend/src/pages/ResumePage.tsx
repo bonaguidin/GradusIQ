@@ -91,11 +91,16 @@ export function ResumeFlow({ accessToken }: { accessToken: string }) {
     await navigate('/dashboard', { replace: true, state: resumeSuccessState() });
   }
 
-  if (step === 'checking') return <ResumeLoading />;
+  // stage-section (index.css) is the same fade+rise every dashboard section
+  // switch already uses -- reused here so checking/upload/review/error no
+  // longer swap in as a hard cut. Each branch is a genuinely new mount (an
+  // early return of a different tree), so the animation always replays with
+  // no extra key/attribute needed.
+  if (step === 'checking') return <div className="stage-section"><ResumeLoading /></div>;
 
   if (step === 'recovery_error') {
     return (
-      <div className="login-bg">
+      <div className="login-bg stage-section">
         <div className="login-card">
           <div className="login-header">
             <h1 className="login-logo">GradusIQ</h1>
@@ -119,26 +124,32 @@ export function ResumeFlow({ accessToken }: { accessToken: string }) {
   }
 
   if (step === 'upload') {
-    return <ResumeUpload accessToken={accessToken} onUploaded={handleUploaded} />;
+    return (
+      <div className="stage-section">
+        <ResumeUpload accessToken={accessToken} onUploaded={handleUploaded} />
+      </div>
+    );
   }
 
   if (step === 'review') {
     return (
-      <CareerReview
-        accessToken={accessToken}
-        onConfirmed={() => {
-          void handleConfirmed();
-        }}
-        initialSections={recoveredSections ?? undefined}
-        sourceName={source?.name}
-        parsedAt={source?.at}
-        academicFacts={academicFacts ?? undefined}
-      />
+      <div className="stage-section">
+        <CareerReview
+          accessToken={accessToken}
+          onConfirmed={() => {
+            void handleConfirmed();
+          }}
+          initialSections={recoveredSections ?? undefined}
+          sourceName={source?.name}
+          parsedAt={source?.at}
+          academicFacts={academicFacts ?? undefined}
+        />
+      </div>
     );
   }
 
   // No terminal state left to fall through to.
-  return <ResumeLoading />;
+  return <div className="stage-section"><ResumeLoading /></div>;
 }
 
 function ResumeLoading() {

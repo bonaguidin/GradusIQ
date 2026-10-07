@@ -82,11 +82,16 @@ export function TranscriptFlow({ accessToken }: { accessToken: string }) {
     };
   }, [accessToken, attempt]);
 
-  if (step === 'checking') return <TranscriptLoading />;
+  // stage-section (index.css) is the same fade+rise every dashboard section
+  // switch already uses -- reused here so checking/upload/review/error no
+  // longer swap in as a hard cut. Each branch is a genuinely new mount (an
+  // early return of a different tree), so the animation always replays with
+  // no extra key/attribute needed.
+  if (step === 'checking') return <div className="stage-section"><TranscriptLoading /></div>;
 
   if (step === 'error') {
     return (
-      <div className="login-bg">
+      <div className="login-bg stage-section">
         <div className="login-card">
           <div className="login-header">
             <h1 className="login-logo">GradusIQ</h1>
@@ -111,34 +116,38 @@ export function TranscriptFlow({ accessToken }: { accessToken: string }) {
 
   if (step === 'upload') {
     return (
-      <TranscriptUpload
-        accessToken={accessToken}
-        onUploaded={async (upload: TranscriptUploadResult, fileName: string) => {
-          setUploadResult(upload);
-          setSourceName(fileName);
-          await load();
-        }}
-      />
+      <div className="stage-section">
+        <TranscriptUpload
+          accessToken={accessToken}
+          onUploaded={async (upload: TranscriptUploadResult, fileName: string) => {
+            setUploadResult(upload);
+            setSourceName(fileName);
+            await load();
+          }}
+        />
+      </div>
     );
   }
 
   if (step === 'review' && review?.ok) {
     return (
-      <TranscriptReview
-        accessToken={accessToken}
-        review={review}
-        uploadResult={uploadResult}
-        sourceName={sourceName}
-        onConfirmed={(result) => {
-          void handleConfirmed(result);
-        }}
-      />
+      <div className="stage-section">
+        <TranscriptReview
+          accessToken={accessToken}
+          review={review}
+          uploadResult={uploadResult}
+          sourceName={sourceName}
+          onConfirmed={(result) => {
+            void handleConfirmed(result);
+          }}
+        />
+      </div>
     );
   }
 
   // 'review' with a failed review payload is unreachable (the loader only sets
   // it on result.ok), and there is no terminal state left to fall through to.
-  return <TranscriptLoading />;
+  return <div className="stage-section"><TranscriptLoading /></div>;
 }
 
 function TranscriptLoading() {

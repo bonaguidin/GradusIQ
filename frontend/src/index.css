@@ -5809,6 +5809,27 @@ a {
   margin-bottom: 0.9rem;
 }
 
+/* Cards cascade in on first mount, one per parsed row, instead of landing in
+   one frame -- reads as "we went through your whole transcript/resume," not
+   a table dump. Each card's own animation-delay (set inline, from its index)
+   is what staggers them; this just defines the entrance itself. A plain
+   CSS animation on an element React never remounts (stable `key`) only ever
+   plays once, on real insertion -- an edit afterward re-renders the same
+   node and does not replay it. */
+.rv-card-enter {
+  opacity: 0;
+  transform: translateY(8px);
+  animation: rv-card-in var(--t-move) var(--ease-out) forwards;
+}
+
+@keyframes rv-card-in {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rv-card-enter { animation: none; opacity: 1; transform: none; }
+}
+
 .rv-card-head { margin-bottom: 0.9rem; }
 
 /* Mid-scale serif headings on the site (.member h3, .arch-lead h3) stay at
@@ -6049,6 +6070,137 @@ a {
 }
 .rv-commit-button:disabled { opacity: 0.75; cursor: default; }
 .rv-commit-button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+/* ── commit button states: spinner / check / cross ───────────────────────
+   No width-shrink here, unlike the first sketch of this: the real wait
+   (ConfirmingOverlay's own docs -- 20-50s against a cold-started backend)
+   is too long to leave the button looking collapsed, and it sits inline
+   next to the status line rather than alone, so a shrink would also shove
+   that text around for the whole wait. The label stays the real text (and
+   the button's accessible name) throughout; is-loading/is-success/is-error
+   only swap what's visible on top of it.
+
+   No success colour exists anywhere in this app (only --error does), so
+   the "oomph" on success is physical -- an overshoot and a ring -- rather
+   than a colour change, and the icons render in --on-accent, the button's
+   own existing text colour. ::before/::after are already the hover-fill and
+   the ripple (interaction.css); every new element here is a real child,
+   not a pseudo-element, so it never has to compete with those for the
+   same box. */
+.rv-commit-label {
+  transition: opacity 0.15s var(--ease-out);
+}
+.rv-commit-button.is-loading .rv-commit-label,
+.rv-commit-button.is-success .rv-commit-label,
+.rv-commit-button.is-error .rv-commit-label {
+  opacity: 0;
+}
+
+/* Rotation lives on its own ::before, separate from the span's own
+   appear/disappear scale -- a plain `transform: scale()` and a
+   `transform`-animating keyframe sharing one element is what made an
+   earlier version of this spinner look static instead of spinning. */
+.rv-commit-spinner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 16px;
+  height: 16px;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.4);
+  transition: opacity 0.15s var(--ease-out), transform 0.25s var(--ease-spring);
+}
+.rv-commit-spinner::before {
+  content: "";
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 2px solid rgb(var(--on-accent-rgb) / 0.35);
+  border-top-color: var(--on-accent);
+  animation: rv-commit-spin 0.7s linear infinite;
+}
+.rv-commit-button.is-loading .rv-commit-spinner { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+@keyframes rv-commit-spin { to { transform: rotate(360deg); } }
+
+.rv-commit-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--on-accent);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+}
+.rv-commit-check { stroke-dasharray: 20; stroke-dashoffset: 20; transform: translate(-50%, -50%) scale(0.4); }
+.rv-commit-button.is-success .rv-commit-check {
+  opacity: 1;
+  animation: rv-commit-check-draw 0.3s var(--ease-out) forwards, rv-commit-icon-pop 0.45s var(--ease-spring) forwards;
+}
+@keyframes rv-commit-check-draw { to { stroke-dashoffset: 0; } }
+@keyframes rv-commit-icon-pop {
+  0% { transform: translate(-50%, -50%) scale(0.4); }
+  55% { transform: translate(-50%, -50%) scale(1.3); }
+  100% { transform: translate(-50%, -50%) scale(1); }
+}
+.rv-commit-cross { transform: translate(-50%, -50%) scale(0.4); }
+.rv-commit-button.is-error .rv-commit-cross { opacity: 1; animation: rv-commit-icon-pop 0.3s var(--ease-spring) forwards; }
+
+/* The "oomph": success isn't just an icon swap, it's an impact -- the whole
+   button overshoots on landing and a ring shockwaves outward from it once,
+   both settling almost immediately. */
+.rv-commit-button.is-success { animation: rv-commit-slam 0.5s var(--ease-out); }
+@keyframes rv-commit-slam {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.1); }
+  62% { transform: scale(0.94); }
+  100% { transform: scale(1); }
+}
+.rv-commit-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 2px solid var(--on-accent);
+  opacity: 0;
+  pointer-events: none;
+}
+.rv-commit-button.is-success .rv-commit-ring { animation: rv-commit-ring 0.6s var(--ease-out); }
+@keyframes rv-commit-ring {
+  0% { opacity: 0.7; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.4); }
+}
+
+.rv-commit-button.is-error {
+  animation: rv-commit-shake 0.4s var(--ease-out);
+  background: var(--error);
+  border-color: var(--error);
+}
+@keyframes rv-commit-shake {
+  20% { transform: translateX(-5px); }
+  40% { transform: translateX(4px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(2px); }
+  100% { transform: translateX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rv-commit-button.is-success,
+  .rv-commit-button.is-error,
+  .rv-commit-ring,
+  .rv-commit-spinner::before {
+    animation: none !important;
+  }
+  .rv-commit-check,
+  .rv-commit-cross {
+    animation: none !important;
+    transform: translate(-50%, -50%) scale(1) !important;
+    stroke-dashoffset: 0 !important;
+  }
+}
 
 /* ── confirming overlay ───────────────────────────────────────────────────
    Dims the review content while a confirm is in flight. z-index 35 is

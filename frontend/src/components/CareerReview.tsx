@@ -244,7 +244,11 @@ export function CareerReview({
       setJustSaved(true);
       // `confirming` stays true on success on purpose -- see TranscriptReview's
       // handleConfirm for the reasoning. It clears when this screen unmounts.
-      window.setTimeout(() => onConfirmed(result), 450);
+      //
+      // 650ms, not 450: CommitBar's success state (the button's own slam +
+      // ring) runs up to 600ms, and the point of adding it was for the
+      // student to actually see it before the screen moves on.
+      window.setTimeout(() => onConfirmed(result), 650);
       return;
     }
     // API failure, timeout and validation all land here: the screen stays put

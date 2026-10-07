@@ -200,7 +200,11 @@ export function TranscriptReview({
       // canonical profile -- dropping the overlay here would expose a review
       // screen that still looks editable but describes records that are now
       // confirmed and gone. It clears when this screen unmounts.
-      window.setTimeout(() => onConfirmed(result), 450);
+      //
+      // 650ms, not 450: CommitBar's success state (the button's own slam +
+      // ring) runs up to 600ms, and the point of adding it was for the
+      // student to actually see it before the screen moves on.
+      window.setTimeout(() => onConfirmed(result), 650);
       return;
     }
     // A pending grade scale is not a failed action -- it is a state of our
