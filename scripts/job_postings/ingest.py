@@ -42,6 +42,7 @@ import argparse
 import json
 import os
 import sys
+from collections import Counter
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -188,6 +189,7 @@ class RunReport:
     clusters_matched_fuzzy: int = 0
     clusters_merged: int = 0
     clusters_adopted: int = 0
+    cluster_drop_failures: int = 0
 
     @property
     def quota_spent(self) -> int:
@@ -215,6 +217,7 @@ class RunReport:
             f"    new clusters              {self.clusters_created}",
             f"    clusters merged           {self.clusters_merged}",
             f"    clusters adopted          {self.clusters_adopted}",
+            f"    cluster drop failures     {self.cluster_drop_failures}",
         ]
         errors = sum(len(o.normalization_errors) for o in self.outcomes)
         if errors:
@@ -316,7 +319,7 @@ def fetch_one(
     return outcome
 
 
-def resolve_and_attach_identity(rows: list[dict], store: Any, report: RunReport) -> None:
+def resolve_and_attach_identity(rows: list[dict], store: Any, report: RunReport) -> list[str]:
     """Assign every row a posting_identity, per data/ats_fetcher/DEDUP.md.
 
     Exact before fuzzy, and never the other way round: an ATS id recovered
@@ -355,11 +358,19 @@ def resolve_and_attach_identity(rows: list[dict], store: Any, report: RunReport)
         cluster_id for cluster_id in existing_identities.values() if cluster_id
     }
     member_counts = store.get_cluster_member_counts(candidate_cluster_ids)
+    rows_leaving: Counter[str] = Counter()
+    rows_arriving: Counter[str] = Counter()
 
     for row in rows:
         exact, fuzzy = identity_keys(row)
         exact_hit = store.find_cluster(exact) if exact else None
         fuzzy_hit = store.find_cluster(fuzzy) if fuzzy else None
+        lookup_key = (
+            (row["source"], str(row["source_job_id"]))
+            if row.get("source_job_id") is not None
+            else None
+        )
+        prior_cluster_id = existing_identities.get(lookup_key) if lookup_key else None
 
         if exact_hit is not None:
             cluster_id, rule = exact_hit, "ats_url_id"
@@ -382,14 +393,6 @@ def resolve_and_attach_identity(rows: list[dict], store: Any, report: RunReport)
             report.clusters_matched_fuzzy += 1
 
         else:
-            lookup_key = (
-                (row["source"], str(row["source_job_id"]))
-                if row.get("source_job_id") is not None
-                else None
-            )
-            prior_cluster_id = (
-                existing_identities.get(lookup_key) if lookup_key else None
-            )
             prior_member_count = (
                 member_counts.get(prior_cluster_id, 0) if prior_cluster_id else 0
             )
@@ -440,6 +443,21 @@ def resolve_and_attach_identity(rows: list[dict], store: Any, report: RunReport)
 
         row["posting_identity"] = cluster_id
         row["_match_rule"] = rule
+        if prior_cluster_id is not None and prior_cluster_id != cluster_id:
+            rows_leaving[prior_cluster_id] += 1
+        if prior_cluster_id != cluster_id:
+            rows_arriving[cluster_id] += 1
+
+    # A cluster is vacated when, once this batch is written, no posting points
+    # at it. Counted from the pre-batch member count so it is correct even when
+    # several rows leave the same cluster in one batch. The caller must drop
+    # vacated clusters only after upsert_postings has repointed their rows: the
+    # posting_identity foreign key has no cascade.
+    return [
+        cluster_id
+        for cluster_id, leaving in rows_leaving.items()
+        if member_counts.get(cluster_id, 0) - leaving + rows_arriving[cluster_id] == 0
+    ]
 
 
 class DryRunStore:
@@ -503,6 +521,18 @@ class DryRunStore:
     def drop_fuzzy_keys(self, cluster_id: str) -> None:
         for k, v in list(self.clusters.items()):
             if v == cluster_id and k.startswith("fuzzy:"):
+                del self.clusters[k]
+
+    def drop_clusters(self, cluster_ids: list[str]) -> None:
+        occupied = set(self._identity_by_key.values())
+        empty = {cluster_id for cluster_id in cluster_ids if cluster_id not in occupied}
+        for cluster_id in set(cluster_ids) - empty:
+            print(
+                f"drop_clusters: skipping {cluster_id}, it gained member postings",
+                file=sys.stderr,
+            )
+        for k, v in list(self.clusters.items()):
+            if v in empty:
                 del self.clusters[k]
 
     def merge_clusters(self, absorbed: str, surviving: str, *, match_rule: str,
@@ -695,6 +725,45 @@ class SupabaseStore:
             if v == cluster_id and k.startswith("fuzzy:"):
                 del self._cluster_cache[k]
 
+    def drop_clusters(self, cluster_ids: list[str]) -> None:
+        """Delete clusters that have no member postings, after re-checking that.
+
+        The caller's count came from a snapshot taken before this batch. Re-read
+        the live membership here, and skip any cluster that has gained a member.
+
+        Clusters are deleted before their keys, and the identity-key cascade
+        removes the keys with the cluster. A member that appears between the
+        check and the delete is NOT protected by a foreign key: on the live
+        database job_postings.posting_identity is ON DELETE SET NULL, so that
+        posting loses its cluster and null_posting_identity flags it nightly. The
+        re-check narrows that window; it does not close it.
+        """
+        if not cluster_ids:
+            return
+        occupied = {
+            str(row["posting_identity"])
+            for row in self.client.table(POSTINGS_TABLE)
+            .select("posting_identity")
+            .in_("posting_identity", cluster_ids)
+            .execute()
+            .data
+            or []
+        }
+        for cluster_id in cluster_ids:
+            if cluster_id in occupied:
+                print(
+                    f"drop_clusters: skipping {cluster_id}, it gained member postings",
+                    file=sys.stderr,
+                )
+        empty = [cluster_id for cluster_id in cluster_ids if cluster_id not in occupied]
+        if not empty:
+            return
+        self.client.table(CLUSTERS_TABLE).delete().in_("id", empty).execute()
+        self.client.table(KEYS_TABLE).delete().in_("cluster_id", empty).execute()
+        for k, v in list(self._cluster_cache.items()):
+            if v in empty:
+                del self._cluster_cache[k]
+
     def merge_clusters(self, absorbed: str, surviving: str, *, match_rule: str,
                        triggered_by: str | None = None) -> None:
         """Fold `absorbed` into `surviving` and record why.
@@ -809,13 +878,23 @@ def run(
             report.outcomes.append(outcome)
 
             if outcome.rows:
-                # Put the source rows in place before identity resolution mutates
-                # clusters or keys. If this boundary fails, there is nothing to
-                # roll back and no identity orphan can be created. The second
-                # upsert persists posting_identity after resolution.
+                # Stage the source rows, resolve identity, then upsert again to
+                # persist posting_identity. A failure in the middle, or a job
+                # cancelled between resolve and the second upsert, can leave
+                # clusters with no postings and postings with NULL identity.
+                # Atomicity is an open item in outstanding-fixes.md.
                 store.stage_postings(outcome.rows)
-                resolve_and_attach_identity(outcome.rows, store, report)
+                vacated = resolve_and_attach_identity(outcome.rows, store, report)
                 report.rows_upserted += store.upsert_postings(outcome.rows)
+                try:
+                    store.drop_clusters(vacated)
+                except Exception as exc:  # noqa: BLE001 -- cleanup must not abort the run
+                    report.cluster_drop_failures += 1
+                    print(
+                        f"drop_clusters failed for {source}/{role}: "
+                        f"{type(exc).__name__}: {exc}",
+                        file=sys.stderr,
+                    )
 
             if live:
                 store.write_log(outcome.log_row())
@@ -891,16 +970,18 @@ def run_workday(*, live: bool, write: bool, store: Any = None) -> RunReport:
         if rows:
             try:
                 store.stage_postings(rows)
-                resolve_and_attach_identity(rows, store, report)
+                vacated = resolve_and_attach_identity(rows, store, report)
                 report.rows_upserted += store.upsert_postings(rows)
+                store.drop_clusters(vacated)
             except Exception as exc:  # noqa: BLE001 -- deliberately broad
                 # A store/DB error for one employer must not abort the sweep or
                 # drop the employers still queued -- same posture as the
                 # fetch_board failure branch above. Fixes A and B remove the
                 # known cause (source_job_id='Texas' -> 21000); this is the
-                # backstop. The initial posting upsert runs before identity
-                # mutation, so a posting-write failure cannot leave orphaned
-                # cluster/key rows for this employer.
+                # backstop. Identity is resolved between the two upserts, so a
+                # failure after resolve and before the second upsert can still
+                # leave empty clusters and NULL posting_identity rows. See
+                # outstanding-fixes.md (atomicity under cancellation).
                 outcome.status = "error"
                 outcome.error_detail = f"store: {type(exc).__name__}: {exc}"
 

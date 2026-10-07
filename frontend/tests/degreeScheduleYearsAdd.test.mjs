@@ -84,22 +84,26 @@ test('the Edit-courses popup owns the search box and the removable planned list'
   const dialog = await readFile(DIALOG, 'utf8')
   assert.match(dialog, /import \{ CourseSearchAdd \} from '\.\/CourseSearchAdd'/)
   assert.match(dialog, /<CourseSearchAdd/)
-  // The Remove button moved here from the card, behaviour unchanged: it still
-  // calls the parent's onRemove immediately (no staging).
-  assert.match(dialog, /onClick=\{\(\) => onRemove\(course\.id\)\}/)
+  // The Remove button moved here from the card. It still calls the parent's
+  // onRemove with no staging layer, but now only after the student confirms --
+  // same confirm-gated pattern as TermPlanner's Drop/Remove.
+  assert.match(dialog, /onClick=\{\(\) => onRemove\(course\.id, course\.course_code\)\}/)
   assert.match(dialog, /aria-label=\{`Remove \$\{course\.course_code\} from your plan`\}/)
   // "Confirm" is a close-only action -- it calls onClose, it does not submit.
   assert.match(dialog, /onClick=\{onClose\}>\s*Confirm/)
   assert.doesNotMatch(dialog, /addPlannedCourse|removePlannedCourse|fetch\(/)
 })
 
-test('the Edit-courses popup meets the dialog a11y bar: role, modal, focus-in, Escape-out', async () => {
+test('the Edit-courses popup meets the dialog a11y bar: role, modal, focus-in, Tab-trapped, Escape-out', async () => {
   const dialog = await readFile(DIALOG, 'utf8')
   assert.match(dialog, /role="dialog"/)
   assert.match(dialog, /aria-modal="true"/)
   assert.match(dialog, /aria-labelledby=\{titleId\}/)
   // Focus moves into the panel on open (same pattern as GuidedTour's cardRef).
   assert.match(dialog, /dialogRef\.current\?\.focus\(\)/)
+  // Tab/Shift+Tab can't walk focus out into the page behind the overlay.
+  assert.match(dialog, /import \{ useFocusTrap \} from '\.\.\/hooks\/useFocusTrap'/)
+  assert.match(dialog, /useFocusTrap\(dialogRef\)/)
   // Escape closes it.
   assert.match(dialog, /event\.key === 'Escape'\) onClose\(\)/)
   assert.match(dialog, /addEventListener\('keydown'/)

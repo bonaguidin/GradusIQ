@@ -35,7 +35,7 @@
    component that positions or clips its own button (pinned absolutely to a
    card corner, say) keeps its layout whatever order the stylesheets load in.
    An absolutely positioned button still anchors its own ::before/::after. */
-:where(.btn, .rv-commit-button) {
+:where(.btn, .rv-commit-button, .chat-chip) {
   --press-scale: 0.96;
   --press-fill: transparent;
   --press-ripple: transparent;
@@ -45,7 +45,8 @@
 }
 
 .btn,
-.rv-commit-button {
+.rv-commit-button,
+.chat-chip {
   transition:
     background-color var(--t-quick) var(--ease-out),
     border-color var(--t-quick) var(--ease-out),
@@ -57,8 +58,17 @@
 .btn-full { --press-scale: 0.985; }
 .rv-commit-button { --press-scale: 0.97; }
 
+/* Quietest control in its family (ChatPanel.tsx) -- same give, a touch less
+   travel so it doesn't compete with the suggestion it's offering. */
+.chat-chip {
+  --press-scale: 0.97;
+  --press-fill: rgb(var(--accent-rgb) / 0.12);
+  --press-ripple: rgb(var(--accent-rgb) / 0.22);
+}
+
 .btn:active:not(:disabled):not([aria-disabled="true"]),
-.rv-commit-button:active:not(:disabled) {
+.rv-commit-button:active:not(:disabled),
+.chat-chip:active:not(:disabled) {
   transform: scale(var(--press-scale));
   transition:
     background-color var(--t-quick) var(--ease-out),
@@ -148,6 +158,7 @@ button.tour-skip:hover:not(:disabled) {
 .btn-secondary::before,
 .btn-danger-ghost::before,
 .rv-commit-button::before,
+.chat-chip::before,
 .btn-ghost:not(:where(.career-subtab-panel :is(.cp-detail, .cp-field) .editable-section-actions .btn-ghost:only-child))::before {
   content: "";
   position: absolute;
@@ -170,6 +181,7 @@ button.tour-skip:hover:not(:disabled) {
   .btn-secondary:hover:not(:disabled)::before,
   .btn-danger-ghost:hover:not(:disabled)::before,
   .rv-commit-button:hover:not(:disabled)::before,
+  .chat-chip:hover:not(:disabled)::before,
   .btn-ghost:not(:where(.career-subtab-panel :is(.cp-detail, .cp-field) .editable-section-actions .btn-ghost:only-child)):hover:not(:disabled)::before {
     transform: translate(-50%, -50%) scale(1);
   }
@@ -201,7 +213,8 @@ button.tour-skip:hover:not(:disabled) {
 /* ── ripple: every button ── */
 
 .btn::after,
-.rv-commit-button::after {
+.rv-commit-button::after,
+.chat-chip::after {
   content: "";
   position: absolute;
   z-index: -1;
@@ -217,7 +230,8 @@ button.tour-skip:hover:not(:disabled) {
 }
 
 .btn[data-rippling]::after,
-.rv-commit-button[data-rippling]::after {
+.rv-commit-button[data-rippling]::after,
+.chat-chip[data-rippling]::after {
   animation: press-ripple var(--t-fill) var(--ease-out);
 }
 

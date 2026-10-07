@@ -950,3 +950,199 @@ def test_gc_empty_clusters_live_deletes_keys_before_clusters_and_spares_members(
     assert [d[0] for d in client.deletes] == [KEYS_TABLE, CLUSTERS_TABLE]
     assert client.clusters == [{"id": "c-has-member"}]
     assert client.keys == [{"key": "ats:workday:y:2", "cluster_id": "c-has-member"}]
+
+
+def _collin_row(source_job_id: str, title: str) -> dict:
+    return {
+        "source": "adzuna",
+        "source_job_id": source_job_id,
+        "url": f"https://www.adzuna.com/land/ad/{source_job_id}",
+        "company": "Collin College",
+        "title": title,
+        "location": "Frisco, TX",
+    }
+
+
+def _ingest_batch(rows: list[dict], store: DryRunStore, report: RunReport) -> None:
+    vacated = resolve_and_attach_identity(rows, store, report)
+    store.upsert_postings(rows)
+    store.drop_clusters(vacated)
+
+
+def _assert_no_orphan_clusters(store: DryRunStore) -> None:
+    live = set(store._identity_by_key.values())
+    referenced = set(store.clusters.values())
+    orphans = referenced - live
+    assert not orphans, (
+        f"keys still point at clusters with no member postings: {sorted(orphans)}"
+    )
+
+
+def test_two_rows_rekeying_together_leave_no_orphan_cluster():
+    """Regression for the 2026-10-03 orphan (cluster fff06a16). Both postings in
+    cluster X re-key to a new fuzzy title key in one batch. The first row mints
+    a new cluster (the pre-batch member count is 2, so adoption is correctly
+    skipped); the second row fuzzy-matches that new cluster. X is left with no
+    members and its old key intact."""
+    store, report = DryRunStore(), RunReport(started_at=datetime.now(timezone.utc), dry_run=True)
+    first = [_collin_row("A1", "Lab Assistant Science"), _collin_row("B1", "Lab Assistant Science")]
+    _ingest_batch(first, store, report)
+    assert first[0]["posting_identity"] == first[1]["posting_identity"]
+
+    re_keyed = [
+        _collin_row("A1", "Lab Assistant Science - Biology (Part-time)"),
+        _collin_row("B1", "Lab Assistant Science - Biology (Part-time)"),
+    ]
+    _ingest_batch(re_keyed, store, report)
+
+    assert re_keyed[0]["posting_identity"] == re_keyed[1]["posting_identity"]
+    _assert_no_orphan_clusters(store)
+
+
+def test_one_of_two_rows_rekeying_leaves_the_other_member_in_its_cluster():
+    store, report = DryRunStore(), RunReport(started_at=datetime.now(timezone.utc), dry_run=True)
+    first = [_collin_row("A1", "Lab Assistant Science"), _collin_row("B1", "Lab Assistant Science")]
+    _ingest_batch(first, store, report)
+    old_cluster = first[1]["posting_identity"]
+
+    only_a = [_collin_row("A1", "Lab Assistant Science - Biology (Part-time)")]
+    _ingest_batch(only_a, store, report)
+
+    assert only_a[0]["posting_identity"] != old_cluster
+    assert store._identity_by_key[("adzuna", "B1")] == old_cluster
+    _assert_no_orphan_clusters(store)
+
+
+def test_sole_member_rekey_still_adopts_its_cluster():
+    store, report = DryRunStore(), RunReport(started_at=datetime.now(timezone.utc), dry_run=True)
+    first = [_collin_row("A1", "Lab Assistant Science")]
+    _ingest_batch(first, store, report)
+    old_cluster = first[0]["posting_identity"]
+
+    rekeyed = [_collin_row("A1", "Lab Assistant Science - Biology (Part-time)")]
+    _ingest_batch(rekeyed, store, report)
+
+    assert rekeyed[0]["posting_identity"] == old_cluster
+    assert rekeyed[0]["_match_rule"] == "adopted"
+    _assert_no_orphan_clusters(store)
+
+
+def test_three_rows_rekeying_together_leave_no_orphan_cluster():
+    store, report = DryRunStore(), RunReport(started_at=datetime.now(timezone.utc), dry_run=True)
+    first = [_collin_row(f"{x}1", "Lab Assistant Science") for x in "ABC"]
+    _ingest_batch(first, store, report)
+
+    re_keyed = [_collin_row(f"{x}1", "Lab Assistant Science - Biology (Part-time)") for x in "ABC"]
+    _ingest_batch(re_keyed, store, report)
+
+    assert len({row["posting_identity"] for row in re_keyed}) == 1
+    _assert_no_orphan_clusters(store)
+
+
+def test_supabase_drop_clusters_deletes_clusters_before_keys_and_only_listed_ids():
+    clusters = [{"id": "c-vacated"}, {"id": "c-keep"}]
+    keys = [
+        {"key": "fuzzy:x", "cluster_id": "c-vacated"},
+        {"key": "fuzzy:y", "cluster_id": "c-keep"},
+    ]
+    client = _FakeGcClient(clusters=clusters, postings=[], keys=keys)
+    store = SupabaseStore.__new__(SupabaseStore)
+    store.client = client
+    store._cluster_cache = {"fuzzy:x": "c-vacated", "fuzzy:y": "c-keep"}
+
+    store.drop_clusters(["c-vacated"])
+
+    assert [d[0] for d in client.deletes] == [CLUSTERS_TABLE, KEYS_TABLE]
+    assert client.clusters == [{"id": "c-keep"}]
+    assert client.keys == [{"key": "fuzzy:y", "cluster_id": "c-keep"}]
+    assert store._cluster_cache == {"fuzzy:y": "c-keep"}
+
+
+def test_drop_clusters_with_nothing_vacated_touches_nothing():
+    client = _FakeGcClient(clusters=[{"id": "c-1"}], postings=[], keys=[{"key": "k", "cluster_id": "c-1"}])
+    store = SupabaseStore.__new__(SupabaseStore)
+    store.client = client
+    store._cluster_cache = {}
+
+    store.drop_clusters([])
+
+    assert client.deletes == []
+
+
+def test_supabase_drop_clusters_skips_a_cluster_that_gained_a_member_and_keeps_its_keys():
+    clusters = [{"id": "c-gained"}, {"id": "c-empty"}]
+    postings = [{"id": "p9", "posting_identity": "c-gained"}]
+    keys = [
+        {"key": "fuzzy:x", "cluster_id": "c-gained"},
+        {"key": "fuzzy:y", "cluster_id": "c-empty"},
+    ]
+    client = _FakeGcClient(clusters=clusters, postings=postings, keys=keys)
+    store = SupabaseStore.__new__(SupabaseStore)
+    store.client = client
+    store._cluster_cache = {"fuzzy:x": "c-gained", "fuzzy:y": "c-empty"}
+
+    store.drop_clusters(["c-gained", "c-empty"])
+
+    assert client.clusters == [{"id": "c-gained"}]
+    assert client.keys == [{"key": "fuzzy:x", "cluster_id": "c-gained"}]
+    assert store._cluster_cache == {"fuzzy:x": "c-gained"}
+
+
+def test_drop_clusters_on_an_already_deleted_cluster_is_a_no_op():
+    client = _FakeGcClient(clusters=[{"id": "c-keep"}], postings=[], keys=[{"key": "k", "cluster_id": "c-keep"}])
+    store = SupabaseStore.__new__(SupabaseStore)
+    store.client = client
+    store._cluster_cache = {}
+
+    store.drop_clusters(["c-already-gone"])
+
+    assert client.clusters == [{"id": "c-keep"}]
+    assert client.keys == [{"key": "k", "cluster_id": "c-keep"}]
+
+
+def test_dry_run_drop_clusters_skips_a_cluster_with_a_member_and_ignores_missing_ones():
+    store = DryRunStore()
+    store.clusters = {"fuzzy:live": "c-live", "fuzzy:dead": "c-dead"}
+    store._identity_by_key = {("adzuna", "A1"): "c-live"}
+
+    store.drop_clusters(["c-live", "c-dead", "c-already-gone"])
+
+    assert store.clusters == {"fuzzy:live": "c-live"}
+
+
+def test_adzuna_drop_clusters_failure_is_counted_and_does_not_abort_remaining_roles(monkeypatch, capsys):
+    import ingest as ingest_module
+
+    roles = ["Software Engineering Intern", "Finance Intern", "Operations Intern"]
+
+    def fake_fetch_one(source, target_role, **_kwargs):
+        row = _collin_row(f"id-{target_role.split()[0]}", "Lab Assistant Science")
+        row["target_role"] = target_role
+        return ingest_module.FetchOutcome(
+            source=source, target_role=target_role, results_count=1, rows=[row]
+        )
+
+    class FailingDropStore(DryRunStore):
+        def drop_clusters(self, cluster_ids):
+            raise RuntimeError("simulated cluster delete failure")
+
+    monkeypatch.setattr(ingest_module, "fetch_one", fake_fetch_one)
+    monkeypatch.setattr(ingest_module, "DryRunStore", FailingDropStore)
+
+    report = ingest_module.run(
+        sources=("adzuna",),
+        roles=roles,
+        live=True,
+        write=False,
+        page_size=20,
+        where="",
+        dump_shape=False,
+    )
+
+    assert [o.target_role for o in report.outcomes] == roles
+    assert all(o.status == "success" for o in report.outcomes)
+    assert report.rows_upserted == len(roles)
+    assert report.cluster_drop_failures == len(roles)
+    err = capsys.readouterr().err
+    assert err.count("drop_clusters failed for adzuna/") == len(roles)
+    assert "simulated cluster delete failure" in err

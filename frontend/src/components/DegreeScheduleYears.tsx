@@ -256,7 +256,7 @@ function SemesterColumn({ semester, identity, busyCode, mutation, isEditOpen, on
   onOpenEdit: () => void;
   onCloseEdit: () => void;
   onAdd: (semester: DegreeScheduleSemester, result: CatalogSearchResult) => void;
-  onRemove: (id: string) => void;
+  onRemove: (id: string, courseLabel: string) => void;
   onChoose: (requirementGroupId: string, candidate: RequirementCandidate, action: 'choose' | 'change') => void;
   onClear: (requirementGroupId: string) => void;
   onRestore: (requirementGroupId: string) => void;
@@ -527,7 +527,10 @@ export function DegreeScheduleYears({
     await Promise.all([loadPlanned(), loadTerms()]);
   }, [identity, loadPlanned, loadTerms]);
 
-  const handleRemovePlanned = useCallback(async (id: string) => {
+  const handleRemovePlanned = useCallback(async (id: string, courseLabel: string) => {
+    if (!window.confirm(`Remove ${courseLabel} from your plan?`)) {
+      return;
+    }
     setAddError(null);
     const response = await removePlannedCourse(identity, id);
     if (!response.ok) {

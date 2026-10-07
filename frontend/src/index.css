@@ -299,6 +299,13 @@ a {
     transition: none !important;
     animation: none !important;
   }
+
+  /* Indeterminate progress still has to read as "working," not "stuck" --
+     swap the spin for the same opacity pulse the skeletons already use. */
+  .spinner,
+  .spinner-small {
+    animation: skeleton-pulse var(--t-pulse) ease-in-out infinite !important;
+  }
 }
 
 /* ─── SHELL LAYOUT ───────────────────────────────────────────────────────── */
@@ -1885,6 +1892,16 @@ a {
 .analysis-refresh-error p {
   font-size: var(--text-xs);
   color: var(--error);
+}
+
+/* Career Intelligence gates FIT/GAP/SHIFT to one live call at a time; this
+   names which one a blocked panel is waiting on. Neutral, not an error --
+   sits alongside whatever this panel's own phase already rendered. */
+.analysis-blocked-note {
+  margin-top: var(--sp-2);
+  font-size: var(--text-xs);
+  color: var(--muted);
+  font-style: italic;
 }
 
 /* GAP score */

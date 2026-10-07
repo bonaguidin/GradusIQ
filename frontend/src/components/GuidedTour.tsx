@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import './GuidedTour.css';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -141,6 +142,10 @@ export function GuidedTour({ onNavigate, onClose, endActions }: GuidedTourProps)
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
+
+  // Keeps Tab/Shift+Tab from walking focus out into the dashboard behind
+  // the tour -- see useFocusTrap.
+  useFocusTrap(cardRef);
 
   function next() {
     setIndex((i) => Math.min(TOUR_STEPS.length - 1, i + 1));

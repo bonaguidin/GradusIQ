@@ -235,7 +235,10 @@ export function TermPlanner({ slug, accessToken, courses, onCourseRecordsChanged
     onCourseRecordsChanged();
   }
 
-  async function handleDrop(courseId: string) {
+  async function handleDrop(courseId: string, courseLabel: string) {
+    if (!window.confirm(`Drop ${courseLabel}? This marks it dropped on your record and can't be undone here.`)) {
+      return;
+    }
     setCourseBusyId(courseId);
     setError(null);
     const response = await editInProgressCourse(identity, courseId, { status: 'dropped' });
@@ -314,7 +317,7 @@ export function TermPlanner({ slug, accessToken, courses, onCourseRecordsChanged
               type="button"
               className="btn btn-ghost btn-sm"
               disabled={busy}
-              onClick={() => { void handleDrop(course.id); }}
+              onClick={() => { void handleDrop(course.id, course.course_code); }}
             >
               Drop
             </button>
@@ -361,7 +364,7 @@ export function TermPlanner({ slug, accessToken, courses, onCourseRecordsChanged
         <button
           type="button"
           className="btn btn-ghost btn-sm"
-          onClick={() => { void handleRemove(course.id); }}
+          onClick={() => { void handleRemove(course.id, course.course_code); }}
           aria-label={`Remove ${course.course_code} from your plan`}
         >
           Remove
@@ -412,7 +415,10 @@ export function TermPlanner({ slug, accessToken, courses, onCourseRecordsChanged
     }
   }
 
-  async function handleRemove(id: string) {
+  async function handleRemove(id: string, courseLabel: string) {
+    if (!window.confirm(`Remove ${courseLabel} from your plan?`)) {
+      return;
+    }
     setError(null);
     const response = await removePlannedCourse(identity, id);
     if (!response.ok) {
