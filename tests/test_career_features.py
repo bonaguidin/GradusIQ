@@ -603,7 +603,7 @@ def test_missing_prompt_file_is_handled_clearly(tmp_path):
 def test_run_career_feature_helper(feature_name, expected_runner):
     payload = '{"summary": "done", "data": {}}'
     if expected_runner == "FIT":
-        payload = '''{"summary":"done","data":{"role_matches":[{"role":"Business Analyst Intern","fit_level":"medium","rationale":"Relevant foundation.","supporting_signals":[],"missing_signals":[]}],"overall_fit_summary":"A developing fit."}}'''
+        payload = '''{"summary":"done","data":{"role_matches":[{"role":"Business Analyst Intern","fit_level":"medium","rationale":"Relevant foundation.","supporting_signals":["Excel proficiency"],"missing_signals":[]}],"overall_fit_summary":"A developing fit."}}'''
     elif expected_runner == "GAP":
         payload = _GAP_SUCCESS_JSON
     elif expected_runner == "SHIFT":

@@ -164,7 +164,14 @@ For each matched role (return 3–5), use this format:
 - **Why this fits you:** Explain specifically which of the student's skills,
   interests, courses, or experience align with this role. Ground it in what the
   occupation actually involves — use `core_tasks` rather than a generic
-  description of the job title.
+  description of the job title. Then list 2–5 of those same specific things
+  (a skill, interest, course, or experience — never a restatement of the role
+  title or fit level) as short phrases in the `supporting_signals` output
+  field. Each entry in that array is a plain string — just the text of one
+  signal, not an object with its own keys. Every role gets at least one
+  supporting signal, including a Developing fit — if the fit is weak, say
+  so in `rationale`, but still name the concrete signals that make it the
+  closest fit you found.
 
 - **What this occupation demands:** The highest-importance skills or knowledge
   areas for it, cited from `market_requirements` with their scores. Respect the
@@ -207,4 +214,4 @@ this student actually is, and why?
 
 ---
 
-*Gradus IQ — FIT Prompt v1.0 | Kasheia Williams | June 2026*
+*Gradus IQ — FIT Prompt v1.1 | Kasheia Williams | June 2026*

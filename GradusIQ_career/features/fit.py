@@ -59,7 +59,7 @@ class FitRunner(CareerFeatureRunner):
     feature = "FIT"
     prompt_filename = "gradus_iq_prompt_FIT.md"
     prompt_name = "fit"
-    prompt_version = "1.0"
+    prompt_version = "1.1"
     required_paths = (
         "student.major_intended",
         "career.target_roles",
