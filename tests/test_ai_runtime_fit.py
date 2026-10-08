@@ -249,7 +249,7 @@ def test_fit_runner_builds_grounding_once_across_repair(monkeypatch):
     result = runner.run_canonical(canonical_profile(), legacy)
     assert result["status"] == "success"
     assert calls == {"market": 1, "signals": 1}
-    assert runner.last_trace["prompt_version"] == "1.0"
+    assert runner.last_trace["prompt_version"] == "1.1"
 
 
 def test_same_fit_contract_is_used_by_runner_and_cache_validator():

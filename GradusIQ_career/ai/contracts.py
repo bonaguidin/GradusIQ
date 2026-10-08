@@ -26,7 +26,14 @@ class FitRoleMatch(StrictOutputModel):
     role: str = Field(min_length=1)
     fit_level: Literal["high", "medium", "low"]
     rationale: str = Field(min_length=1)
-    supporting_signals: list[str]
+    # min_length=1: every role match has to name at least one concrete
+    # signal, even a Developing fit (the prompt says so explicitly). Without
+    # this, an empty list validated as a legal "no signals found" instead of
+    # a prompt-following failure, and silently shipped a blank "Why this
+    # fits" section to the student. missing_signals stays unconstrained --
+    # a genuinely strong fit can have nothing missing, and forcing one would
+    # make the model invent a gap that isn't real.
+    supporting_signals: list[str] = Field(min_length=1)
     missing_signals: list[str]
     # Optional at the schema boundary (older cached/demo results predate this
     # field) but always populated for live runs -- fit.py's run_canonical
