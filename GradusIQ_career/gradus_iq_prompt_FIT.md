@@ -167,9 +167,11 @@ For each matched role (return 3–5), use this format:
   description of the job title. Then list 2–5 of those same specific things
   (a skill, interest, course, or experience — never a restatement of the role
   title or fit level) as short phrases in the `supporting_signals` output
-  field. Every role gets at least one supporting signal, including a
-  Developing fit — if the fit is weak, say so in `rationale`, but still name
-  the concrete signals that make it the closest fit you found.
+  field. Each entry in that array is a plain string — just the text of one
+  signal, not an object with its own keys. Every role gets at least one
+  supporting signal, including a Developing fit — if the fit is weak, say
+  so in `rationale`, but still name the concrete signals that make it the
+  closest fit you found.
 
 - **What this occupation demands:** The highest-importance skills or knowledge
   areas for it, cited from `market_requirements` with their scores. Respect the

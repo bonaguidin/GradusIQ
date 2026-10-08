@@ -1,8 +1,8 @@
 """Strict structured-output contracts for AI features."""
 
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class StrictOutputModel(BaseModel):
@@ -10,6 +10,49 @@ class StrictOutputModel(BaseModel):
 
 
 NonEmptyString = Annotated[str, Field(min_length=1)]
+
+_SIGNAL_TEXT_KEYS = ("signal", "text", "value", "description", "skill", "name", "detail")
+
+
+def _coerce_signal_list(value: Any) -> Any:
+    """Normalize a signal list's items to plain strings before type/length
+    validation runs.
+
+    Observed live: the model wrapped each supporting_signals entry in an
+    object (e.g. {"signal": "..."}) instead of the bare string the schema
+    (and the prompt's "short phrases") calls for, failing every item in the
+    list with a contract-violation error and taking the whole FIT run down
+    with it -- a formatting choice, not a content problem, so it should not
+    fail the run. Pulls the first recognizable text field out of each dict
+    item (falling back to its first string value), stringifies bare
+    scalars, and drops anything left with nothing usable. Left for Field's
+    own min_length/type checks to catch a genuinely empty or malformed
+    result; this only reshapes what's already there.
+
+    Not list input is returned unchanged -- that is a real type error for
+    the field's own validator to report, not something to paper over here.
+    """
+    if not isinstance(value, list):
+        return value
+    coerced: list[str] = []
+    for item in value:
+        text: str | None
+        if isinstance(item, str):
+            text = item
+        elif isinstance(item, dict):
+            text = next(
+                (item[key] for key in _SIGNAL_TEXT_KEYS if isinstance(item.get(key), str) and item[key].strip()),
+                None,
+            )
+            if text is None:
+                text = next((v for v in item.values() if isinstance(v, str) and v.strip()), None)
+        elif isinstance(item, (int, float, bool)):
+            text = str(item)
+        else:
+            text = None
+        if text and text.strip():
+            coerced.append(text.strip())
+    return coerced
 
 
 class FitHiringSignal(StrictOutputModel):
@@ -35,6 +78,12 @@ class FitRoleMatch(StrictOutputModel):
     # make the model invent a gap that isn't real.
     supporting_signals: list[str] = Field(min_length=1)
     missing_signals: list[str]
+
+    @field_validator("supporting_signals", "missing_signals", mode="before")
+    @classmethod
+    def _normalize_signals(cls, value: Any) -> Any:
+        return _coerce_signal_list(value)
+
     # Optional at the schema boundary (older cached/demo results predate this
     # field) but always populated for live runs -- fit.py's run_canonical
     # overwrites this per role with server-derived ground truth after
