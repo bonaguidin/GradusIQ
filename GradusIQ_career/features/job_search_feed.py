@@ -22,7 +22,7 @@ import re
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Mapping, Sequence
 
-from scripts.job_postings.identity import employer_display_name
+from scripts.job_postings.identity import employer_display_name, normalize_title
 from scripts.job_postings.role_family_matcher import (
     classify_title,
     expand_families,
@@ -135,6 +135,7 @@ class Card:
             "url": _string_or_none(row.get("url")),
             "family": self.family,
             "source": _string_or_none(row.get("source")),
+            "posting_count": self.size,
         }
 
 
@@ -163,6 +164,35 @@ def build_cards(rows: Sequence[Mapping[str, Any]], families: list[dict[str, Any]
         family = classify_title(newest.get("title"), families)
         cards.append(Card(newest, locations, family, len(members)))
     return cards
+
+
+def merge_display_duplicates(cards: Sequence[Card]) -> list[Card]:
+    """A second dedupe pass, after posting_identity. Company-name spelling
+    variants ("Micron" vs "Micron Technology, Inc.") do not always share a
+    posting_identity even for an identical title -- upstream fuzzy-identity
+    clustering at ingest time does not always merge them (confirmed live:
+    Micron's "Intern - Design Engineer, HIG HBM" postings came back as four
+    separate posting_identity clusters, not one). Grouping by
+    (employer_display_name, normalized title) instead catches that case.
+    Keeps the newest member's row (so its link is the one shown), merges
+    locations and posting counts across every card in the group.
+    """
+    groups: dict[tuple[str | None, str], list[Card]] = {}
+    for card in cards:
+        employer = card.to_dict()["employer"]
+        key = (employer, normalize_title(card.row.get("title")))
+        groups.setdefault(key, []).append(card)
+
+    merged: list[Card] = []
+    for members in groups.values():
+        if len(members) == 1:
+            merged.append(members[0])
+            continue
+        newest = min(members, key=lambda c: _sort_key(c.row))
+        locations = sorted({loc for member in members for loc in member.locations})
+        size = sum(member.size for member in members)
+        merged.append(Card(newest.row, locations, newest.family, size))
+    return merged
 
 
 def build_facets(cards: Sequence[Card]) -> dict[str, list[dict[str, Any]]]:
@@ -240,6 +270,7 @@ def get_job_search_feed(
 
     rows = fetch_candidate_pool(client, days)
     cards = build_cards(rows, all_families)
+    cards = merge_display_duplicates(cards)
     facets = build_facets(cards)
 
     filtered = [card for card in cards if card.family and card.family in scoped_families]

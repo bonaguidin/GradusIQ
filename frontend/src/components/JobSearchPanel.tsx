@@ -212,6 +212,9 @@ function JobCardView({ card }: { card: JobCard }) {
       <div className="theme-header">
         <span className="theme-name">{card.title ?? 'Untitled posting'}</span>
         {card.family && <span className="chip chip--tag">{card.family}</span>}
+        {card.posting_count > 1 && (
+          <span className="chip chip--count">{card.posting_count} postings</span>
+        )}
       </div>
       {details && <p className="theme-summary">{details}</p>}
       {card.url && (

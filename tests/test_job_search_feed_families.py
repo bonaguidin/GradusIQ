@@ -37,12 +37,23 @@ def related_families() -> dict[str, list[str]]:
     return load(FEED_FAMILIES)["related_families"]
 
 
-def test_feed_families_do_not_reuse_role_families_names():
-    """A feed family sharing a name with one of the 14 target-role families
-    would collide in role_family_matcher's combined family list."""
+# A feed-file block reusing one of the 14 role-family names is not a
+# collision in role_family_matcher's combined list -- entries are keyed by
+# (phrase, family name), so a repeated name just adds more match_phrases to
+# that same family. "Embedded Systems Intern" uses this deliberately to add
+# phrases role_families.yaml lacks (see job_search_feed_families.yaml's
+# comment) without editing that file. Any other reused name is unintentional
+# and should fail the test below.
+_INTENTIONAL_NAME_REUSE = {"Embedded Systems Intern"}
+
+
+def test_feed_families_do_not_reuse_role_families_names_unintentionally():
     role_names = {f["family"] for f in role_families()}
     feed_names = {f["family"] for f in feed_families()}
-    assert not (role_names & feed_names)
+    overlap = role_names & feed_names
+    assert overlap <= _INTENTIONAL_NAME_REUSE, (
+        f"unexpected name reuse with role_families.yaml: {overlap - _INTENTIONAL_NAME_REUSE}"
+    )
 
 
 def test_every_feed_family_has_at_least_one_match_phrase():

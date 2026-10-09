@@ -7,6 +7,7 @@ export interface JobCard {
   url: string | null;
   family: string | null;
   source: string | null;
+  posting_count: number;
 }
 
 export interface FamilyFacet {

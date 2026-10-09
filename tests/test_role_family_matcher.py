@@ -72,6 +72,57 @@ def test_qa_engineering_intern_still_matches_despite_the_bare_qa_exclude():
     assert classify_title("Quality Assurance Engineering Intern", FAMILIES) == "QA/SDET/SRE Intern"
 
 
+def test_word_order_reversed_titles_still_classify():
+    """Adzuna's Micron titles put 'Intern' before the role words ("Intern -
+    Design Engineer, HBM"), which the pre-fix adjacency-only matching
+    (requiring the literal phrase 'design engineer intern') never caught.
+    The candidate pool is already internship-filtered, so the core phrase
+    ('design engineer', with the trailing 'intern' stripped) is enough."""
+    assert classify_title("Intern - Design Engineer, HBM", FAMILIES) == "Design Engineering Intern"
+    assert classify_title("Intern - Design Engineer, HIG HBM", FAMILIES) == "Design Engineering Intern"
+
+
+def test_word_order_reversed_software_engineering_titles():
+    assert classify_title("Intern, Software Engineer", FAMILIES) == "Software Engineering Intern"
+    assert classify_title("Intern - Software Engineering", FAMILIES) == "Software Engineering Intern"
+
+
+def test_embedded_engineer_variant_wins_over_software_engineering():
+    """role_families.yaml's own Embedded phrases never carry an 'engineer'
+    variant ('embedded software intern', not '...software engineer
+    intern'), so without the feed file's extension phrases this falls
+    through to Software Engineering Intern's 'software engineer intern'."""
+    assert classify_title("Embedded Software Engineer Intern", FAMILIES) == "Embedded Systems Intern"
+    assert classify_title("Embedded Hardware Engineer Intern", FAMILIES) == "Embedded Systems Intern"
+    assert classify_title("Embedded Systems Engineer Intern", FAMILIES) == "Embedded Systems Intern"
+
+
+def test_database_engineering_classifies_as_data_engineering():
+    assert classify_title("Database Engineering Intern", FAMILIES) == "Data Engineering Intern"
+    assert classify_title("Database Engineer Co-op", FAMILIES) == "Data Engineering Intern"
+
+
+def test_devops_classifies_as_qa_sdet_sre():
+    assert classify_title("DevOps Engineering Intern", FAMILIES) == "QA/SDET/SRE Intern"
+    assert classify_title("DevOps Engineer Intern", FAMILIES) == "QA/SDET/SRE Intern"
+
+
+def test_design_engineering_excludes_still_hold_after_core_stripping():
+    """The core-phrase fix must not resurrect any of the short design
+    excludes -- they are compared verbatim, never core-stripped."""
+    assert classify_title("Graphic Design Intern", FAMILIES) is None
+    assert classify_title("Industrial Design Intern", FAMILIES) is None
+    assert classify_title("Site Design Engineering Intern", FAMILIES) is None
+
+
+def test_cybersecurity_and_systems_engineering_remain_unclassified():
+    """Deliberately left out of both files per scoping -- no phrases exist
+    for either, so these stay None rather than being force-fit into an
+    unrelated family."""
+    assert classify_title("Cybersecurity Engineer Internship", FAMILIES) is None
+    assert classify_title("Systems Engineering Intern (SEM)", FAMILIES) is None
+
+
 def test_no_match_returns_none():
     assert classify_title("Senior Accountant", FAMILIES) is None
     assert classify_title(None, FAMILIES) is None

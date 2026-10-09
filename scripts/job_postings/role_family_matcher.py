@@ -19,6 +19,7 @@ means here -- role_families.yaml's 14 are not edited or duplicated.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -29,6 +30,27 @@ from scripts.job_postings.identity import normalize_title
 CONFIG_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "job_postings"
 ROLE_FAMILIES_PATH = CONFIG_DIR / "role_families.yaml"
 FEED_FAMILIES_PATH = CONFIG_DIR / "job_search_feed_families.yaml"
+
+_TRAILING_INTERN = re.compile(r"\s+(?:intern|internship)$")
+_MIN_CORE_PHRASE_LENGTH = 3
+
+
+def _core_phrase(phrase: str) -> str | None:
+    """Strip a trailing "intern"/"internship" token so the role words match
+    regardless of where "intern" sits in the title. Every row in the feed's
+    candidate pool is already internship-filtered (fetch_candidate_pool), so
+    requiring that adjacency on top of that is redundant and is what breaks
+    on titles like "Intern - Design Engineer, HBM", where "Intern" comes
+    first. Returns None when there is nothing to strip, or when the result
+    is too short/generic to trust as a standalone word-boundary match (bare
+    2-letter acronyms like "ai"/"ml" are left to their longer sibling
+    phrases -- "artificial intelligence intern", "machine learning intern" --
+    instead).
+    """
+    core = _TRAILING_INTERN.sub("", phrase).strip()
+    if core == phrase or len(core) < _MIN_CORE_PHRASE_LENGTH:
+        return None
+    return core
 
 
 def load_role_families(path: Path = ROLE_FAMILIES_PATH) -> list[dict[str, Any]]:
@@ -67,11 +89,18 @@ def classify_title(title: str | None, families: Iterable[dict[str, Any]]) -> str
         return None
     folded = f" {normalize_title(title)} "
 
+    # Exclude phrases are never core-stripped: QA/SDET/SRE's excludes rely on
+    # their exact literal length ("quality assurance intern" must NOT reduce
+    # to "quality assurance", which would wrongly exclude "quality assurance
+    # engineering intern").
     entries: list[tuple[str, str, bool]] = []
     for fam in families:
         name = fam["family"]
         for phrase in fam["match_phrases"]:
             entries.append((phrase, name, False))
+            core = _core_phrase(phrase)
+            if core is not None:
+                entries.append((core, name, False))
         for phrase in fam.get("exclude_phrases") or []:
             entries.append((phrase, name, True))
 

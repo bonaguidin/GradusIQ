@@ -1302,6 +1302,13 @@ a {
   margin-left: var(--sp-2);
 }
 
+.chip--count {
+  cursor: default;
+  margin-left: var(--sp-2);
+  color: var(--muted);
+  font-size: var(--text-xs, 0.75rem);
+}
+
 .job-search-feed .btn-ghost {
   margin-top: var(--sp-4);
 }

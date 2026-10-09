@@ -333,20 +333,38 @@ test('authenticated dashboard covers canonical states, routing, themes, errors, 
         posting_id: 'posting-1', title: 'Software Engineering Intern', employer: 'Acme Corp',
         locations: ['Dallas, TX'], posted_date: new Date().toISOString().slice(0, 10),
         url: 'https://example.com/jobs/1', family: 'Software Engineering Intern', source: 'adzuna',
+        posting_count: 1,
+      },
+      {
+        // A display-dedupe-merged card (job_search_feed.py's second pass) --
+        // the "N postings" chip only renders above a singleton.
+        posting_id: 'posting-2', title: 'Design Engineering Intern', employer: 'Micron Technology, Inc.',
+        locations: ['Boise, ID', 'Dallas, TX'], posted_date: new Date().toISOString().slice(0, 10),
+        url: 'https://example.com/jobs/2', family: 'Design Engineering Intern', source: 'adzuna',
+        posting_count: 3,
       },
     ],
     facets: {
-      families: [{ family: 'Software Engineering Intern', count: 1 }],
-      employers: [{ employer: 'Acme Corp', count: 1 }],
+      families: [
+        { family: 'Software Engineering Intern', count: 1 },
+        { family: 'Design Engineering Intern', count: 1 },
+      ],
+      employers: [
+        { employer: 'Acme Corp', count: 1 },
+        { employer: 'Micron Technology, Inc.', count: 1 },
+      ],
     },
-    total: 1,
+    total: 2,
     next_cursor: null,
     scoped_families: ['Software Engineering Intern'],
   }
   await page.getByRole('combobox', { name: 'Posted within' }).selectOption('14')
   await page.getByText('Software Engineering Intern').first().waitFor()
   await page.locator('.theme-summary').getByText('Acme Corp', { exact: false }).waitFor()
-  await page.getByRole('link', { name: 'View posting' }).waitFor()
+  await page.getByRole('link', { name: 'View posting' }).first().waitFor()
+  await page.getByText('3 postings', { exact: false }).waitFor()
+  const singletonCard = page.locator('.theme-card').filter({ hasText: 'Acme Corp' })
+  assert.equal(await singletonCard.getByText('postings', { exact: false }).count(), 0)
 
   // CASE 1b: same profile, but with a requirement-satisfaction tree and
   // cached GAP/FIT results now available -- the ring shows a real percentage

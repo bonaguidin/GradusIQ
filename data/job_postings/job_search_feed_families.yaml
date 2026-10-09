@@ -47,6 +47,8 @@ families:
       - etl intern
       - data platform intern
       - analytics engineering intern
+      - database engineering intern
+      - database engineer intern
     exclude_phrases:
       - data entry intern
       # Clerical, not engineering -- shares the "data" and "intern" tokens
@@ -65,6 +67,8 @@ families:
       - sre intern
       - test engineering intern
       - test engineer intern
+      - devops engineering intern
+      - devops engineer intern
     exclude_phrases:
       - quality assurance intern
       - quality control intern
@@ -104,6 +108,21 @@ families:
       - product design
       - instructional design
       - architectural design
+
+  # Extends role_families.yaml's own Embedded Systems Intern family (not
+  # edited here or anywhere -- see the module docstring on why a repeated
+  # family name across these two files is additive, not a collision).
+  # role_families.yaml's embedded phrases never carry an "engineer" variant
+  # ("embedded software intern", not "embedded software engineer intern"),
+  # so titles like "Embedded Software Engineer Intern" fall through to
+  # Software Engineering Intern's own "software engineer intern" phrase
+  # instead. These are longer than that phrase and win on longest-match.
+  - family: Embedded Systems Intern
+    match_phrases:
+      - embedded software engineer intern
+      - embedded hardware engineer intern
+      - embedded systems engineer intern
+      - embedded engineer intern
 
 # Related-family expansion for the Job Search feed. A student's family set
 # is their own target-role families (role_families.yaml) plus whatever this

@@ -153,9 +153,13 @@ def test_dedupe_by_posting_identity_merges_locations_micron_example():
         ]
     )
     result = get_job_search_feed(client, target_role_families=[], families=["Computer Engineering Intern"])
-    # This title does not classify to any family (word order: "Intern" comes
-    # before "Design Engineer", not after), so it never appears in postings
-    # -- but the dedupe itself is visible in the employer facet count.
+    # This title classifies as "Design Engineering Intern" (core-phrase
+    # matching catches "Intern - Design Engineer" despite the word order),
+    # not "Computer Engineering Intern" itself -- and an explicit `families`
+    # override is used exactly as given, with no related-family expansion,
+    # so it never appears in postings here. The dedupe is still visible in
+    # the employer facet count, which is built over every card regardless
+    # of the request's family filter.
     employers = {f["employer"]: f["count"] for f in result["facets"]["employers"]}
     assert employers.get("Micron Technology, Inc.") == 1
 
@@ -175,22 +179,70 @@ def test_dedupe_merges_locations_for_a_classifiable_cluster():
 
 
 def test_rows_with_null_posting_identity_stand_alone():
+    """Each null-posting_identity row is its own cluster in build_cards --
+    distinct here only because employer differs too, so the second,
+    display-level dedupe pass (same employer + normalized title) does not
+    re-merge them. See test_display_dedupe_merges_across_posting_identities
+    for the case where it does."""
     client = _FakeClient(
         [
-            _row("1", posting_identity=None, title="Software Engineering Intern"),
-            _row("2", posting_identity=None, title="Software Engineering Intern"),
+            _row("1", posting_identity=None, title="Software Engineering Intern", company="Acme"),
+            _row("2", posting_identity=None, title="Software Engineering Intern", company="Other Co"),
         ]
     )
     result = get_job_search_feed(client, target_role_families=["Software Engineering Intern"])
     assert result["total"] == 2
 
 
-def test_ordering_newest_posted_date_first_then_fetched_at_then_id():
+def test_display_dedupe_merges_across_posting_identities():
+    """The real live-data finding this pass exists for: Micron's four
+    "Intern - Design Engineer, HIG HBM" rows came back as four separate
+    posting_identity clusters (two spellings x two more never clustered by
+    ingest), not one. Grouping by (employer_display_name, normalized title)
+    collapses all four to a single card with every location merged and a
+    posting_count of 4."""
     client = _FakeClient(
         [
-            _row("b", title="Software Engineering Intern", posted_date=_days_ago(1), fetched_at=f"{_days_ago(1)}T00:00:00Z"),
-            _row("a", title="Software Engineering Intern", posted_date=_days_ago(0), fetched_at=f"{_days_ago(1)}T00:00:00Z"),
-            _row("c", title="Software Engineering Intern", posted_date=None, fetched_at=f"{_days_ago(0)}T00:00:05Z"),
+            _row(
+                "1", posting_identity="c1", company="Micron", title="Intern - Design Engineer, HIG HBM",
+                location="Boise, ID",
+            ),
+            _row(
+                "2", posting_identity="c2", company="Micron Technology, Inc.",
+                title="Intern - Design Engineer, HIG HBM", location="Dallas, TX",
+            ),
+            _row(
+                "3", posting_identity=None, company="Micron",
+                title="Intern - Design Engineer, HIG HBM", location="Manassas, VA",
+            ),
+            _row(
+                "4", posting_identity=None, company="Micron Technology, Inc.",
+                title="Intern - Design Engineer, HIG HBM", location="Boise, ID",
+            ),
+        ]
+    )
+    result = get_job_search_feed(client, target_role_families=[], families=["Design Engineering Intern"])
+    assert result["total"] == 1
+    card = result["postings"][0]
+    assert card["employer"] == "Micron Technology, Inc."
+    assert card["posting_count"] == 4
+    assert sorted(card["locations"]) == ["Boise, ID", "Dallas, TX", "Manassas, VA"]
+
+
+def test_display_dedupe_keeps_posting_count_one_for_a_singleton():
+    client = _FakeClient([_row("1", title="Software Engineering Intern")])
+    result = get_job_search_feed(client, target_role_families=["Software Engineering Intern"])
+    assert result["postings"][0]["posting_count"] == 1
+
+
+def test_ordering_newest_posted_date_first_then_fetched_at_then_id():
+    # Distinct companies -- otherwise same-title same-employer rows collapse
+    # under the display-level dedupe pass before ordering is even reached.
+    client = _FakeClient(
+        [
+            _row("b", company="Co B", title="Software Engineering Intern", posted_date=_days_ago(1), fetched_at=f"{_days_ago(1)}T00:00:00Z"),
+            _row("a", company="Co A", title="Software Engineering Intern", posted_date=_days_ago(0), fetched_at=f"{_days_ago(1)}T00:00:00Z"),
+            _row("c", company="Co C", title="Software Engineering Intern", posted_date=None, fetched_at=f"{_days_ago(0)}T00:00:05Z"),
         ]
     )
     result = get_job_search_feed(client, target_role_families=["Software Engineering Intern"])
@@ -269,8 +321,12 @@ def test_empty_result_after_filtering_is_no_market_data_not_an_error():
 
 
 def test_pagination_page_size_and_next_cursor():
+    # Distinct companies per row -- same reason as the ordering test above.
     rows = [
-        _row(str(i), title="Software Engineering Intern", posted_date=_days_ago(0), fetched_at=f"{_days_ago(0)}T00:00:{i:02d}Z")
+        _row(
+            str(i), company=f"Co {i}", title="Software Engineering Intern",
+            posted_date=_days_ago(0), fetched_at=f"{_days_ago(0)}T00:00:{i:02d}Z",
+        )
         for i in range(30)
     ]
     client = _FakeClient(rows)
