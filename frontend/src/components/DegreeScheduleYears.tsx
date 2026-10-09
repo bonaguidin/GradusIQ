@@ -26,6 +26,7 @@ import type {
   PlanningTerm,
 } from '../lib/termPlanning.mjs';
 import { buildDegreeScheduleYears } from '../lib/degreeScheduleYears.mjs';
+import { useSearchParamState } from '../hooks/useSearchParamState';
 import type { DegreeScheduleSemester, DegreeScheduleTermDecision, DegreeScheduleYear } from '../lib/degreeScheduleYears.mjs';
 import { displayTermKey, formatCredits } from '../lib/degreeSchedulePresentation.mjs';
 import type { TermPlan } from '../api/degreeSchedule.mjs';
@@ -418,7 +419,6 @@ export function DegreeScheduleYears({
   const [planned, setPlanned] = useState<PlannedCourse[]>([]);
   const [busyCode, setBusyCode] = useState<string | null>(null);
   const [addError, setAddError] = useState<string | null>(null);
-  const [activeYearKey, setActiveYearKey] = useState<number | null>(null);
   // The termKey of the one future term whose "Edit courses" popup is open, or
   // null. A single value is the whole single-popup-at-a-time guarantee:
   // opening another term's popup just reassigns it.
@@ -545,15 +545,24 @@ export function DegreeScheduleYears({
     return withCurrentTerm?.yearKey ?? null;
   }, [years]);
 
-  useEffect(() => {
-    if (years.length === 0) return;
-    const stillValid = years.some((year) => year.yearKey === activeYearKey);
-    if (stillValid) return;
-    setActiveYearKey(inProgressYearKey ?? years[0].yearKey);
-    // Only re-picks when the current selection stops existing (e.g. first
-    // load) -- a student clicking between tabs must not get bounced back.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [years, inProgressYearKey]);
+  // The URL is the source of truth for which year tab is open (see
+  // useSearchParamState), not a plain useState -- so it survives a refresh
+  // and can be shared as a link. yearKey is a number (the academic year's
+  // starting calendar year); the hook deals only in strings, so it round-
+  // trips through String()/Number() at this boundary. '' stands in for
+  // "nothing picked yet" the same way it does in TermPlanner.
+  //
+  // No effect is needed to re-pick a default when the current selection
+  // stops existing (e.g. first load): with no useState of its own to
+  // preserve, an unrecognized/missing year falls back to defaultYearKey
+  // automatically, every render.
+  const yearKeyStrings = useMemo(() => years.map((year) => String(year.yearKey)), [years]);
+  const defaultYearKey = useMemo(
+    () => String(inProgressYearKey ?? years[0]?.yearKey ?? ''),
+    [years, inProgressYearKey],
+  );
+  const [activeYearKeyString, setActiveYearKeyString] = useSearchParamState('year', defaultYearKey, yearKeyStrings);
+  const activeYearKey = activeYearKeyString ? Number(activeYearKeyString) : null;
 
   if (years.length === 0) {
     return <p className="empty-state">No academic years on record or scheduled yet.</p>;
@@ -573,7 +582,7 @@ export function DegreeScheduleYears({
             aria-selected={activeYear.yearKey === year.yearKey}
             aria-controls={`degree-schedule-year-panel-${year.yearKey}`}
             className={`academic-tab${activeYear.yearKey === year.yearKey ? ' academic-tab--active' : ''}`}
-            onClick={() => { setActiveYearKey(year.yearKey); setEditingTermKey(null); }}
+            onClick={() => { setActiveYearKeyString(String(year.yearKey)); setEditingTermKey(null); }}
           >
             {year.label}
           </button>

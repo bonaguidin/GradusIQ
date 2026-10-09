@@ -34,6 +34,7 @@ import {
 } from '../api/planning';
 import type { AnalysisIdentity } from '../api/analysisApi.mjs';
 import { CourseSearchAdd } from './CourseSearchAdd';
+import { useSearchParamState } from '../hooks/useSearchParamState';
 
 /**
  * The Academic Record's term view: a term dropdown, that term's coursework, and
@@ -95,7 +96,11 @@ interface TermPlannerProps {
 
 export function TermPlanner({ slug, accessToken, courses, onCourseRecordsChanged }: TermPlannerProps) {
   const [terms, setTerms] = useState<PlanningTerm[]>([]);
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  // The upcoming term, as fetchTerms last reported it -- kept around (rather
+  // than used only inline, once, inside the effect below) because
+  // defaultTermKey below has to recompute this same "what would we pick"
+  // answer on every render, not just at fetch time.
+  const [upcomingTermKey, setUpcomingTermKey] = useState<string | null>(null);
   const [planned, setPlanned] = useState<PlannedCourse[]>([]);
   const [termsLoaded, setTermsLoaded] = useState(false);
   const [busyCode, setBusyCode] = useState<string | null>(null);
@@ -126,23 +131,11 @@ export function TermPlanner({ slug, accessToken, courses, onCourseRecordsChanged
       const result = await fetchTerms(identity);
       if (cancelled) return;
       setTerms(result.terms);
-      // Only pick a default when there is nothing to preserve: the first load
-      // (selectedKey still null), or a refetch whose term list no longer
-      // contains what the user had chosen. Otherwise this effect running again
-      // -- a discarded useMemo cache, a StrictMode double-invoke, a later
-      // identity change -- must not overwrite a live selection.
-      setSelectedKey((current) =>
-        current !== null && result.terms.some((term) => term.key === current)
-          ? current
-          : pickDefaultTermKey(
-              { terms: result.terms, upcoming_term_key: result.upcomingTermKey },
-              today,
-            ),
-      );
+      setUpcomingTermKey(result.upcomingTermKey ?? null);
       setTermsLoaded(true);
     })();
     return () => { cancelled = true; };
-  }, [identity, today]);
+  }, [identity]);
 
   // Every planned course for the student, not per-term: the payload is small,
   // and refetching on each dropdown change would make switching terms flicker
@@ -251,6 +244,23 @@ export function TermPlanner({ slug, accessToken, courses, onCourseRecordsChanged
     }
     onCourseRecordsChanged();
   }
+
+  // The URL is the source of truth for which term is open (see
+  // useSearchParamState), not a plain useState -- so it survives a refresh
+  // and can be shared as a link. '' stands in for "nothing selected yet"
+  // (terms.find below never matches it), the same role `null` played before.
+  //
+  // defaultTermKey recomputes pickDefaultTermKey's answer on every render
+  // instead of once at fetch time: with no useState of its own to preserve,
+  // a term the URL names that later drops out of `terms` (a refetch, a
+  // changed identity) falls back to this automatically, the same way an
+  // unrecognized param value would.
+  const termKeys = useMemo(() => terms.map((term) => term.key), [terms]);
+  const defaultTermKey = useMemo(
+    () => pickDefaultTermKey({ terms, upcoming_term_key: upcomingTermKey }, today) ?? '',
+    [terms, upcomingTermKey, today],
+  );
+  const [selectedKey, setSelectedKey] = useSearchParamState('term', defaultTermKey, termKeys);
 
   const selectedTerm = useMemo(
     () => terms.find((term) => term.key === selectedKey) ?? null,

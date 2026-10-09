@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { MemoryRouter } from 'react-router-dom';
+import { BrowserRouter, MemoryRouter } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { AuthContext, type AuthContextValue } from './auth/AuthContext';
 import { StudentAccountProblem } from './auth/AccountStateScreens';
@@ -202,7 +202,12 @@ const app = mode === 'error'
         </MemoryRouter>
       </AuthContext.Provider>
     )
-    : <AuthContext.Provider value={context}><MemoryRouter><AuthenticatedDashboard /></MemoryRouter></AuthContext.Provider>;
+    // BrowserRouter, not MemoryRouter: AuthenticatedDashboard's nav state now
+    // lives in the URL (useUrlParams), and MemoryRouter's history is isolated
+    // from the real address bar -- a Playwright test reading page.url() would
+    // never see it change. BrowserRouter keeps this preview's query string
+    // real, same as the production app.
+    : <AuthContext.Provider value={context}><BrowserRouter><AuthenticatedDashboard /></BrowserRouter></AuthContext.Provider>;
 
 // This harness substitutes AuthContext.Provider directly instead of
 // rendering the real AuthProvider, so AuthProvider's own institution-theming
