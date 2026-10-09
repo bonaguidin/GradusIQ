@@ -32,18 +32,26 @@ test('authenticated dashboard covers canonical states, routing, themes, errors, 
   // real values.
   let requirementSatisfactionFixture = null
   const analysisCacheFixtures = {}
-  // Job Search fixtures keyed by role: undefined -> zero-coverage response
-  // (the honest "nothing cached for this role" state, not a 404 -- mirrors
-  // the real endpoint's 200-with-coverage-marker contract).
-  const jobSearchFixtures = {}
+  // Job Search's combined feed -- one mutable fixture, read on every
+  // request regardless of the exact families/days/employer/cursor sent.
+  // null -> the honest "nothing cached yet" state (coverage: no_market_data,
+  // not a 404), matching the real endpoint's 200-with-coverage-marker
+  // contract even for a student whose target roles have no cached postings.
+  let jobSearchFixture = null
   const apiPlugin = { name: 'dashboard-api', configureServer(server) { server.middlewares.use((request, response, next) => {
     const path = request.url?.split('?')[0]
     if (planning.handle(path, request.method, request, response)) return undefined
     if (path === '/api/v2/student/me/job-search') {
-      const role = new URL(request.url, 'http://127.0.0.1').searchParams.get('role')
       response.setHeader('content-type', 'application/json')
       response.statusCode = 200
-      response.end(JSON.stringify(jobSearchFixtures[role] ?? { role, coverage: 'no_market_data', postings: [] }))
+      response.end(JSON.stringify(jobSearchFixture ?? {
+        coverage: 'no_market_data',
+        postings: [],
+        facets: { families: [], employers: [] },
+        total: 0,
+        next_cursor: null,
+        scoped_families: ['Software Engineer'],
+      }))
       return
     }
     if (path === '/api/v2/student/me/requirement-satisfaction') {
@@ -305,32 +313,39 @@ test('authenticated dashboard covers canonical states, routing, themes, errors, 
   // Clicking the parent always returns to its internal overview.
   await page.getByRole('heading', { name: 'Career Overview' }).waitFor()
 
-  // Job Search reads the cached postings endpoint for the selected target
-  // role -- no location input (the cache has no location axis). First, no
-  // fixture is set for this role: the endpoint's honest zero-coverage
-  // response renders as a clear, non-error empty state.
+  // Job Search loads its combined feed automatically on mount -- no role
+  // dropdown, no Search button, no location input (the cache has no
+  // location axis). No fixture is set yet: the endpoint's honest
+  // zero-coverage response renders as a clear, non-error empty state with
+  // no interaction required.
   await page.getByRole('button', { name: 'Job Search' }).click()
   await page.getByRole('heading', { name: 'Job Search', exact: true }).waitFor()
-  assert.equal(await page.getByRole('button', { name: 'Search Jobs' }).isDisabled(), false)
-  await page.getByRole('button', { name: 'Search Jobs' }).click()
-  await page.getByText('No postings found for this role recently').waitFor()
+  await page.getByText('No postings found recently').waitFor()
+  assert.equal(await page.getByRole('button', { name: 'Search Jobs' }).count(), 0)
 
-  // Now a real cached posting exists for the same role -- re-running the
-  // search (role selection is unchanged) shows it.
-  jobSearchFixtures['Software Engineer'] = {
-    role: 'Software Engineer',
+  // A real cached posting now exists -- changing a filter (there is no
+  // manual re-run control any more) re-fetches and the card renders with
+  // its family tag and merged employer/location/recency line.
+  jobSearchFixture = {
     coverage: 'available',
     postings: [
       {
-        posting_id: 'posting-1', cluster_id: 'cluster-1', employer: 'Acme Corp',
-        title: 'Software Engineering Intern', location: 'Dallas, TX', url: 'https://example.com/jobs/1',
-        posted_date: '2026-09-30', fetched_at: '2026-09-30T12:00:00Z', source: 'adzuna',
+        posting_id: 'posting-1', title: 'Software Engineering Intern', employer: 'Acme Corp',
+        locations: ['Dallas, TX'], posted_date: new Date().toISOString().slice(0, 10),
+        url: 'https://example.com/jobs/1', family: 'Software Engineering Intern', source: 'adzuna',
       },
     ],
+    facets: {
+      families: [{ family: 'Software Engineering Intern', count: 1 }],
+      employers: [{ employer: 'Acme Corp', count: 1 }],
+    },
+    total: 1,
+    next_cursor: null,
+    scoped_families: ['Software Engineering Intern'],
   }
-  await page.getByRole('button', { name: 'Search Jobs' }).click()
-  await page.getByText('Software Engineering Intern').waitFor()
-  await page.getByText('Acme Corp', { exact: false }).waitFor()
+  await page.getByRole('combobox', { name: 'Posted within' }).selectOption('14')
+  await page.getByText('Software Engineering Intern').first().waitFor()
+  await page.locator('.theme-summary').getByText('Acme Corp', { exact: false }).waitFor()
   await page.getByRole('link', { name: 'View posting' }).waitFor()
 
   // CASE 1b: same profile, but with a requirement-satisfaction tree and

@@ -136,10 +136,25 @@ const ME_TARGETS = Object.assign(Object.create(null), {
   // course-discovery, professor-comments have no cache file).
   'me-analysis-cache': { method: 'GET', needsFeature: false, needsCacheFeature: true },
   'me-career-role-options': { method: 'GET', needsFeature: false },
-  // Cached, role-filtered job postings -- reads only, never a live vendor
-  // call. `needsRole` validates the `role` query param the same way
-  // `needsQuery` validates catalog search's `q`.
-  'me-job-search': { method: 'GET', needsFeature: false, needsRole: true },
+  // Combined Job Search feed -- reads only, never a live vendor call. Every
+  // param is optional: `role` (a cached old bundle's one-family shape),
+  // `families` (comma list), `days`, `employer`, `cursor`. Each is
+  // validated only when present -- see the needsOptional* checks below --
+  // so a request with none of them (a fresh page load) is still valid,
+  // unlike the single required `role` this target used to carry. That
+  // distinction is exactly the #114 class of bug: a `has` condition gating
+  // the whole rewrite on one param being present would 404 the no-param
+  // case, so vercel.json routes every combination -- see its job-search
+  // entries.
+  'me-job-search': {
+    method: 'GET',
+    needsFeature: false,
+    needsOptionalRole: true,
+    needsOptionalFamilies: true,
+    needsOptionalDays: true,
+    needsOptionalEmployer: true,
+    needsOptionalCursor: true,
+  },
   // Degree Schedule's two PUT replace-in-full routes. Same shape as
   // me-syllabus-grade-state -- the method guard at the top of the handler
   // was widened for both, same reasoning as that one.
@@ -168,13 +183,24 @@ const RECORD_ID_PATTERN =
 const MAX_SEARCH_QUERY_LENGTH = 64
 const SEARCH_QUERY_PATTERN = /^[A-Za-z0-9 .,'&:/+-]{1,64}$/
 
-// Job Search's `role` carries a target-role name, not free text -- restricted
-// to the characters the curated role vocabulary actually uses (letters,
-// spaces, hyphens). The backend independently validates it against the
-// caller's own career.target_roles, same defence-in-depth shape as
-// SEARCH_QUERY_PATTERN above.
-const MAX_ROLE_LENGTH = 80
-const ROLE_PATTERN = /^[A-Za-z][A-Za-z -]{0,79}$/
+// Job Search's `role` and `families` carry target-role/family names, not
+// free text -- restricted to the characters the curated vocabulary actually
+// uses (letters, spaces, hyphens, and "/" for names like "AI/ML Intern").
+// The backend independently validates each against its own family
+// vocabulary, same defence-in-depth shape as SEARCH_QUERY_PATTERN above.
+// Optional: empty passes (absent and present-but-empty are both "no
+// filter"), same posture as optionalTermId.
+const MAX_FAMILY_LENGTH = 80
+const FAMILY_PATTERN = /^[A-Za-z][A-Za-z/ -]{0,79}$/
+const MAX_FAMILIES_LENGTH = 400
+const ALLOWED_DAYS = new Set(['', '7', '14', '30'])
+const MAX_EMPLOYER_LENGTH = 100
+const EMPLOYER_PATTERN = /^[A-Za-z0-9 .,'&/-]{0,100}$/
+const CURSOR_PATTERN = /^[0-9]{0,6}$/
+
+function isValidFamilyName(value) {
+  return value.length > 0 && value.length <= MAX_FAMILY_LENGTH && FAMILY_PATTERN.test(value)
+}
 
 function jsonError(status, detail) {
   return Response.json({ detail }, { status })
@@ -202,7 +228,7 @@ function backendPath(student, feature) {
   return `/api/students/${slug}/analyze/${feature}`
 }
 
-function meBackendPath(target, feature, reviewTable, recordId, searchQuery, termId, role) {
+function meBackendPath(target, feature, reviewTable, recordId, searchQuery, termId, role, families, days, employer, cursor) {
   if (target === 'me-terms') return '/api/v2/student/me/terms'
   if (target === 'me-gpa') return '/api/v2/student/me/gpa'
   if (target === 'me-grading-schema') return '/api/v2/student/me/grading-schema'
@@ -218,7 +244,19 @@ function meBackendPath(target, feature, reviewTable, recordId, searchQuery, term
   }
   if (target === 'me-analysis-cache') return `/api/v2/student/me/analysis-cache/${encodeURIComponent(feature)}`
   if (target === 'me-career-role-options') return '/api/v2/student/me/career-role-options'
-  if (target === 'me-job-search') return `/api/v2/student/me/job-search?role=${encodeURIComponent(role)}`
+  if (target === 'me-job-search') {
+    // Every param optional -- only append what the caller actually sent, so
+    // a bare request (no params) forwards to a bare backend URL rather than
+    // a query string full of empty values.
+    const params = new URLSearchParams()
+    if (role) params.set('role', role)
+    if (families) params.set('families', families)
+    if (days) params.set('days', days)
+    if (employer) params.set('employer', employer)
+    if (cursor) params.set('cursor', cursor)
+    const qs = params.toString()
+    return qs ? `/api/v2/student/me/job-search?${qs}` : '/api/v2/student/me/job-search'
+  }
   if (target === 'me-schedule-choices') return '/api/v2/student/me/schedule/choices'
   if (target === 'me-schedule-exclusions') return '/api/v2/student/me/schedule/exclusions'
   if (target === 'me-planned-courses') {
@@ -298,6 +336,10 @@ export function createProxyHandler({ env = process.env, fetchImpl = globalThis.f
       const searchQuery = requestUrl.searchParams.get('q') ?? ''
       const termId = requestUrl.searchParams.get('term_id') ?? ''
       const role = requestUrl.searchParams.get('role') ?? ''
+      const families = requestUrl.searchParams.get('families') ?? ''
+      const days = requestUrl.searchParams.get('days') ?? ''
+      const employer = requestUrl.searchParams.get('employer') ?? ''
+      const cursor = requestUrl.searchParams.get('cursor') ?? ''
 
       const isMeTarget = target !== ''
       let path
@@ -335,7 +377,28 @@ export function createProxyHandler({ env = process.env, fetchImpl = globalThis.f
         if (spec.needsCacheFeature && !ME_CACHE_FEATURES.has(feature)) {
           return jsonError(400, 'Invalid analysis route.')
         }
-        if (spec.needsRole && (role.length > MAX_ROLE_LENGTH || !ROLE_PATTERN.test(role))) {
+        if (spec.needsOptionalRole && role !== '' && !isValidFamilyName(role)) {
+          return jsonError(400, 'Invalid analysis route.')
+        }
+        if (spec.needsOptionalFamilies && families !== '') {
+          const parts = families.split(',').map((f) => f.trim())
+          if (
+            families.length > MAX_FAMILIES_LENGTH ||
+            parts.some((f) => !isValidFamilyName(f))
+          ) {
+            return jsonError(400, 'Invalid analysis route.')
+          }
+        }
+        if (spec.needsOptionalDays && !ALLOWED_DAYS.has(days)) {
+          return jsonError(400, 'Invalid analysis route.')
+        }
+        if (
+          spec.needsOptionalEmployer &&
+          (employer.length > MAX_EMPLOYER_LENGTH || !EMPLOYER_PATTERN.test(employer))
+        ) {
+          return jsonError(400, 'Invalid analysis route.')
+        }
+        if (spec.needsOptionalCursor && !CURSOR_PATTERN.test(cursor)) {
           return jsonError(400, 'Invalid analysis route.')
         }
         if (
@@ -351,7 +414,10 @@ export function createProxyHandler({ env = process.env, fetchImpl = globalThis.f
           return jsonError(400, 'Invalid analysis route.')
         }
         isBinaryTarget = spec.binary === true
-        path = meBackendPath(target, feature, reviewTable, recordId, searchQuery, termId, role)
+        path = meBackendPath(
+          target, feature, reviewTable, recordId, searchQuery, termId, role,
+          families, days, employer, cursor,
+        )
       } else {
         // PATCH exists only for the session-scoped review edit above. The
         // slug-addressed surface stays GET/POST-only: without this guard a

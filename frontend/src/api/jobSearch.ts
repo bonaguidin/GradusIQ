@@ -1,37 +1,69 @@
-export interface JobPosting {
+export interface JobCard {
   posting_id: string | null;
-  cluster_id: string | null;
-  employer: string | null;
   title: string | null;
-  location: string | null;
-  url: string | null;
+  employer: string | null;
+  locations: string[];
   posted_date: string | null;
-  fetched_at: string | null;
+  url: string | null;
+  family: string | null;
   source: string | null;
 }
 
-export interface JobSearchResult {
-  role: string;
-  coverage: 'available' | 'no_market_data';
-  postings: JobPosting[];
+export interface FamilyFacet {
+  family: string;
+  count: number;
+}
+
+export interface EmployerFacet {
+  employer: string;
+  count: number;
+}
+
+export type JobSearchDays = 7 | 14 | 30;
+
+export interface JobSearchFeedResult {
+  coverage: 'available' | 'no_market_data' | 'no_target_roles';
+  postings: JobCard[];
+  facets: { families: FamilyFacet[]; employers: EmployerFacet[] };
+  total: number;
+  next_cursor: number | null;
+  scoped_families: string[];
+}
+
+export interface JobSearchFeedParams {
+  families?: string[];
+  days?: JobSearchDays;
+  employer?: string;
+  cursor?: number;
 }
 
 /**
- * Cached, role-filtered postings for one of the caller's own target roles.
- * Reads the nightly Adzuna-backed cache -- never triggers a live vendor
- * call, since the quota is already fully allocated to the scheduled fetch.
- * There is no location parameter: the cache has no location axis.
+ * The combined Job Search feed -- internships across the caller's own
+ * target roles plus related families, newest first. Reads only the
+ * cached job_postings table (features/job_search_feed.py) -- never a live
+ * per-request vendor call. Every param is sent explicitly, even empty, so
+ * the request always matches vercel.json's all-four-params rewrite rather
+ * than falling through to a different rule.
  */
-export async function searchJobPostings(accessToken: string, role: string): Promise<JobSearchResult> {
-  const response = await fetch(`/api/v2/student/me/job-search?role=${encodeURIComponent(role)}`, {
+export async function fetchJobSearchFeed(
+  accessToken: string,
+  params: JobSearchFeedParams = {},
+): Promise<JobSearchFeedResult> {
+  const qs = new URLSearchParams();
+  qs.set('families', (params.families ?? []).join(','));
+  qs.set('days', String(params.days ?? 30));
+  qs.set('employer', params.employer ?? '');
+  qs.set('cursor', String(params.cursor ?? 0));
+
+  const response = await fetch(`/api/v2/student/me/job-search?${qs.toString()}`, {
     headers: {
       Accept: 'application/json',
       Authorization: `Bearer ${accessToken}`,
     },
   });
   if (!response.ok) {
-    const body = await response.json().catch(() => null) as { detail?: string } | null;
+    const body = (await response.json().catch(() => null)) as { detail?: string } | null;
     throw new Error(body?.detail ?? 'Job postings could not be loaded.');
   }
-  return response.json() as Promise<JobSearchResult>;
+  return response.json() as Promise<JobSearchFeedResult>;
 }

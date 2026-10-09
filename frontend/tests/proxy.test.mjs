@@ -1340,7 +1340,19 @@ test('me-analysis-cache forwards gap/fit/shift and rejects anything else', async
   }
 })
 
-test('me-job-search forwards an encoded role and rejects junk', async () => {
+test('me-job-search with no params forwards a bare request', async () => {
+  const { handler, seen } = planningHandler()
+  const response = await handler.fetch(
+    new Request('https://gradusiq.example/api/proxy?target=me-job-search', {
+      method: 'GET',
+      headers: { Authorization: 'Bearer t' },
+    }),
+  )
+  assert.equal(response.status, 200)
+  assert.equal(seen[0].url, 'https://backend.example/api/v2/student/me/job-search')
+})
+
+test('me-job-search forwards an encoded legacy role and rejects junk', async () => {
   const { handler, seen } = planningHandler()
   await handler.fetch(
     new Request(
@@ -1350,16 +1362,96 @@ test('me-job-search forwards an encoded role and rejects junk', async () => {
     ),
   )
   assert.equal(
-    seen[0].url,
-    'https://backend.example/api/v2/student/me/job-search?role=Software%20Engineering%20Intern',
+    new URL(seen[0].url).searchParams.get('role'),
+    'Software Engineering Intern',
   )
 
-  const rejected = ['', '<script>', 'a'.repeat(81), '123 Intern', 'Intern; DROP TABLE']
+  const rejected = ['<script>', 'a'.repeat(81), '123 Intern', 'Intern; DROP TABLE']
   for (const role of rejected) {
     const { handler: bad, seen: badSeen } = planningHandler()
     const response = await bad.fetch(
       new Request(
         `https://gradusiq.example/api/proxy?target=me-job-search&role=${encodeURIComponent(role)}`,
+        { method: 'GET' },
+      ),
+    )
+    assert.equal(response.status, 400)
+    assert.equal(badSeen.length, 0)
+  }
+})
+
+test('me-job-search forwards families (including a "/" family name), days, employer, and cursor together', async () => {
+  const { handler, seen } = planningHandler()
+  const qs = new URLSearchParams({
+    families: 'Software Engineering Intern,AI/ML Intern',
+    days: '14',
+    employer: "O'Reilly Auto Parts",
+    cursor: '25',
+  })
+  const response = await handler.fetch(
+    new Request(`https://gradusiq.example/api/proxy?target=me-job-search&${qs}`, {
+      method: 'GET',
+      headers: { Authorization: 'Bearer t' },
+    }),
+  )
+  assert.equal(response.status, 200)
+  const forwarded = new URL(seen[0].url)
+  assert.equal(forwarded.pathname, '/api/v2/student/me/job-search')
+  assert.equal(forwarded.searchParams.get('families'), 'Software Engineering Intern,AI/ML Intern')
+  assert.equal(forwarded.searchParams.get('days'), '14')
+  assert.equal(forwarded.searchParams.get('employer'), "O'Reilly Auto Parts")
+  assert.equal(forwarded.searchParams.get('cursor'), '25')
+})
+
+test('me-job-search days only accepts 7, 14, or 30 (or empty)', async () => {
+  for (const days of ['7', '14', '30', '']) {
+    const { handler, seen } = planningHandler()
+    const response = await handler.fetch(
+      new Request(`https://gradusiq.example/api/proxy?target=me-job-search&days=${days}`, {
+        method: 'GET',
+      }),
+    )
+    assert.equal(response.status, 200)
+    if (days) assert.equal(new URL(seen[0].url).searchParams.get('days'), days)
+  }
+  for (const days of ['0', '15', '365', 'thirty']) {
+    const { handler: bad, seen: badSeen } = planningHandler()
+    const response = await bad.fetch(
+      new Request(`https://gradusiq.example/api/proxy?target=me-job-search&days=${days}`, {
+        method: 'GET',
+      }),
+    )
+    assert.equal(response.status, 400)
+    assert.equal(badSeen.length, 0)
+  }
+})
+
+test('me-job-search cursor must be digits only', async () => {
+  const { handler: bad, seen: badSeen } = planningHandler()
+  const response = await bad.fetch(
+    new Request('https://gradusiq.example/api/proxy?target=me-job-search&cursor=-1', {
+      method: 'GET',
+    }),
+  )
+  assert.equal(response.status, 400)
+  assert.equal(badSeen.length, 0)
+
+  const { handler: huge, seen: hugeSeen } = planningHandler()
+  const hugeResponse = await huge.fetch(
+    new Request('https://gradusiq.example/api/proxy?target=me-job-search&cursor=1234567', {
+      method: 'GET',
+    }),
+  )
+  assert.equal(hugeResponse.status, 400)
+  assert.equal(hugeSeen.length, 0)
+})
+
+test('me-job-search employer rejects an overlong or out-of-charset value', async () => {
+  for (const employer of ['a'.repeat(101), '<script>alert(1)</script>']) {
+    const { handler: bad, seen: badSeen } = planningHandler()
+    const response = await bad.fetch(
+      new Request(
+        `https://gradusiq.example/api/proxy?target=me-job-search&employer=${encodeURIComponent(employer)}`,
         { method: 'GET' },
       ),
     )
@@ -1411,11 +1503,42 @@ test('Vercel rewrites cover every route added by fix/api-proxy-allowlist-gaps', 
     ['/api/v2/student/me/course-records/:id', '/api/proxy?target=me-course-record&id=:id'],
     ['/api/v2/student/me/analysis-cache/:feature', '/api/proxy?target=me-analysis-cache&feature=:feature'],
     ['/api/v2/student/me/career-role-options', '/api/proxy?target=me-career-role-options'],
-    ['/api/v2/student/me/job-search', '/api/proxy?target=me-job-search&role=:role'],
     ['/api/v2/student/me/schedule/choices', '/api/proxy?target=me-schedule-choices'],
     ['/api/v2/student/me/schedule/exclusions', '/api/proxy?target=me-schedule-exclusions'],
   ]
   for (const [source, destination] of expected) {
     assert.equal(rewrites.get(source), destination, `missing or wrong rewrite for ${source}`)
   }
+})
+
+test('Vercel rewrites job-search for every param combination, not gated on one param', async () => {
+  // A Map keyed by source cannot represent three rules sharing one source --
+  // this is the #114 class of bug: a rewrite gated on a single param being
+  // present 404s a request with none of them. Confirms all three exist, in
+  // an order where the more specific ones are not shadowed by the fallback.
+  const config = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'))
+  const jobSearch = config.rewrites.filter((r) => r.source === '/api/v2/student/me/job-search')
+  assert.equal(jobSearch.length, 3)
+
+  const byHasKeys = (r) => (r.has || []).map((h) => h.key).sort().join(',')
+  const withFilters = jobSearch.find((r) => byHasKeys(r) === 'cursor,days,employer,families')
+  const withRole = jobSearch.find((r) => byHasKeys(r) === 'role')
+  const bare = jobSearch.find((r) => !r.has)
+
+  assert.ok(withFilters, 'missing the all-four-filters rule')
+  assert.equal(
+    withFilters.destination,
+    '/api/proxy?target=me-job-search&families=:families&days=:days&employer=:employer&cursor=:cursor',
+  )
+  assert.ok(withRole, 'missing the legacy role rule')
+  assert.equal(withRole.destination, '/api/proxy?target=me-job-search&role=:role')
+  assert.ok(bare, 'missing the bare fallback rule')
+  assert.equal(bare.destination, '/api/proxy?target=me-job-search')
+
+  // The bare fallback must be last among the three, or it would shadow the
+  // more specific rules for requests that would otherwise match them.
+  const bareIndex = config.rewrites.indexOf(bare)
+  const withFiltersIndex = config.rewrites.indexOf(withFilters)
+  const withRoleIndex = config.rewrites.indexOf(withRole)
+  assert.ok(bareIndex > withFiltersIndex && bareIndex > withRoleIndex)
 })

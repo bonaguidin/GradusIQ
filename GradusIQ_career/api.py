@@ -136,7 +136,7 @@ from GradusIQ_career.course_discovery.models import (
 from GradusIQ_career.course_discovery.needs import derive_career_skill_needs
 from GradusIQ_career.course_discovery.prerequisites import structured_prerequisite
 from GradusIQ_career.features.market_data import is_role_supported, supported_target_roles
-from GradusIQ_career.features.posting_provider import get_role_posting_grounding
+from GradusIQ_career.features.job_search_feed import DEFAULT_DAYS, get_job_search_feed
 from GradusIQ_career.course_discovery.service import CourseDiscoveryService
 from GradusIQ_career.course_discovery.requirement_satisfaction import (
     evaluate_requirement_tree,
@@ -1654,36 +1654,68 @@ def get_me_career_role_options(request: Request) -> dict:
     "/api/v2/student/me/job-search",
     dependencies=[Depends(authorize_proxy_request)],
 )
-def get_me_job_search(request: Request, role: str) -> dict:
-    """Cached postings for one of the caller's own target roles.
+def get_me_job_search(
+    request: Request,
+    role: str | None = None,
+    families: str | None = None,
+    days: int = DEFAULT_DAYS,
+    employer: str | None = None,
+    cursor: int = 0,
+) -> dict:
+    """Combined Job Search feed: internships across the caller's own target
+    roles plus related families, newest first, read from the cached
+    job_postings table only -- never a live per-request vendor call.
 
-    Reads the same Adzuna-backed cache FIT's hiring_signal already reads
-    (features/posting_provider.py) -- never a live per-request vendor call.
-    job-posting-integration-spec.md is explicit that a student page load must
-    never trigger a live Adzuna/JSearch call, since the vendor quota is
-    already fully allocated to the nightly scheduled fetch. There is no
-    location parameter: is_dfw is a boolean baked in at ingest time, not a
-    queryable location axis.
+    Deliberately not features/posting_provider.py, which answers a
+    different question for FIT's hiring_signal (keyed by the stored
+    target_role column, Adzuna/JSearch only, Workday excluded). This feed
+    classifies both sources at read time by title via
+    features/job_search_feed.py's role_family_matcher, so Workday rows
+    (which never carry a target_role) are included. Never selects
+    raw_payload or description.
+
+    `role` is kept for a cached frontend bundle that still calls the
+    single-role shape; it is treated as a one-family override and is
+    ignored when `families` is also given.
     """
     client = _session_client(request)
     student_id = _resolve_session_student_id(client)
     canonical = build_student_intelligence_profile(client, student_id)
-    if role not in canonical.career.target_roles:
-        raise HTTPException(status_code=422, detail="Role is not one of your target roles.")
+
+    requested_families: list[str] | None = None
+    if families is not None:
+        requested_families = [f.strip() for f in families.split(",") if f.strip()]
+    elif role is not None:
+        requested_families = [role]
+
+    target_role_families = list(canonical.career.target_roles)
+    if not target_role_families and requested_families is None:
+        # No service client built -- there is nothing to query. Mirrors
+        # get_job_search_feed's own check; short-circuited here too so a
+        # profile with no confirmed target roles never touches Supabase.
+        return {
+            "coverage": "no_target_roles",
+            "postings": [],
+            "facets": {"families": [], "employers": []},
+            "total": 0,
+            "next_cursor": None,
+        }
+
     try:
         service_client = build_service_client()
     except SupabaseConfigError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     try:
-        grounding = get_role_posting_grounding(service_client, [role])
+        return get_job_search_feed(
+            service_client,
+            target_role_families=target_role_families,
+            families=requested_families,
+            days=days,
+            employer=employer,
+            cursor=max(cursor, 0),
+        )
     except Exception as exc:  # noqa: BLE001 -- external dependency boundary
         raise HTTPException(status_code=502, detail="Job postings are temporarily unavailable.") from exc
-    role_result = grounding["by_role"][role]
-    return {
-        "role": role,
-        "coverage": role_result["coverage"],
-        "postings": role_result["postings"],
-    }
 
 
 @router.patch(

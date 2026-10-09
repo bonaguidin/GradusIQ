@@ -1,0 +1,119 @@
+# Job Search feed — families beyond role_families.yaml's 14, plus the
+# related-family expansion map.
+#
+# role_families.yaml's 14 families are the keys in data/role_requirements.json
+# -- FIT and GAP key off that file, so adding a family there for feed-only
+# reasons would create a family nothing can retrieve by role name, and this
+# file does not touch it. The Job Search feed needs a few families that
+# genuinely don't exist in the student-role taxonomy (AI/ML, data
+# engineering, QA/SDET/SRE, design engineering as its own catch beyond what
+# Computer Engineering Intern's own phrases already claim) -- they live here
+# instead.
+#
+# MATCHING is identical to role_families.yaml's own rule, and is applied
+# GLOBALLY across role_families.yaml's 14 families and this file's families
+# together, not as two separate matching passes: longest phrase first,
+# exclude_phrases beats any match (scoped to the family that owns the
+# exclude -- it does not suppress any other family's match), no match ->
+# null. See scripts/job_postings/role_family_matcher.py, the first place
+# this algorithm is actually implemented in code (role_families.yaml's own
+# header documents the rule; nothing read it until this feed needed to).
+#
+# Same conventions role_families.yaml's own tests pin: every match_phrase
+# and exclude_phrase lowercase, no seniority word, no phrase duplicated
+# across two families (checked globally against role_families.yaml too --
+# see tests/test_job_search_feed_families.py).
+
+families:
+
+  - family: AI/ML Intern
+    match_phrases:
+      - ai intern
+      - artificial intelligence intern
+      - machine learning intern
+      - ml intern
+      - ml engineering intern
+      - deep learning intern
+      - computer vision intern
+      - nlp intern
+      - ai engineering intern
+      - data science intern
+
+  - family: Data Engineering Intern
+    match_phrases:
+      - data engineering intern
+      - data engineer intern
+      - big data intern
+      - etl intern
+      - data platform intern
+      - analytics engineering intern
+    exclude_phrases:
+      - data entry intern
+      # Clerical, not engineering -- shares the "data" and "intern" tokens
+      # with nothing else here, so this is defensive rather than observed
+      # to misfire, same posture as several role_families.yaml excludes.
+
+  - family: QA/SDET/SRE Intern
+    match_phrases:
+      - qa engineering intern
+      - qa engineer intern
+      - quality assurance engineering intern
+      - quality assurance engineer intern
+      - sdet intern
+      - site reliability engineering intern
+      - site reliability engineer intern
+      - sre intern
+      - test engineering intern
+      - test engineer intern
+    exclude_phrases:
+      - quality assurance intern
+      - quality control intern
+      # Bare QA/QC without "engineer"/"engineering" is frequently
+      # manufacturing or physical-product QA, not software test engineering.
+      # Both excludes require "intern" directly after "assurance"/"control"
+      # with no "engineering" between, so they do not suppress the
+      # "...engineering intern" match_phrases above.
+
+  - family: Design Engineering Intern
+    match_phrases:
+      - design engineer intern
+      - design engineering intern
+      - digital design engineering intern
+      - ic design engineering intern
+      - hardware design engineering intern
+      - electrical design engineering intern
+      - circuit design engineering intern
+      - chip design engineering intern
+    exclude_phrases:
+      # Short fragments, not full "...intern" phrases, so they also catch a
+      # compound title like "Site Design Engineering Intern" (confirmed in a
+      # live Adzuna sample for "design engineer intern" -- it is a civil/
+      # construction role, not hardware design engineering). "Design" here
+      # must mean design ENGINEERING only.
+      - graphic design
+      - industrial design
+      - interior design
+      - ux design
+      - ui design
+      - landscape design
+      - civil design
+      - site design
+      - web design
+      - fashion design
+      - game design
+      - product design
+      - instructional design
+      - architectural design
+
+# Related-family expansion for the Job Search feed. A student's family set
+# is their own target-role families (role_families.yaml) plus whatever this
+# map adds for each one -- never the reverse, and never transitive (a family
+# only appearing as a VALUE here is not expanded further).
+related_families:
+  Software Engineering Intern:
+    - AI/ML Intern
+    - Data Engineering Intern
+    - QA/SDET/SRE Intern
+  Computer Engineering Intern:
+    - Embedded Systems Intern
+    - Design Engineering Intern
