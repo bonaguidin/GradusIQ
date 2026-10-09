@@ -28,6 +28,7 @@ import type { ProfileCompleteness } from '../types/student';
 import { ChatPanel } from '../components/ChatPanel';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { useFocusTrap } from '../hooks/useFocusTrap';
+import { useUrlParams } from '../hooks/useUrlParams';
 import { GuidedTour } from '../components/GuidedTour';
 import { AuthenticatedDashboard } from './AuthenticatedDashboard';
 import { AnimatedNumber } from '../components/AnimatedNumber';
@@ -36,6 +37,10 @@ import { formatFixed } from '../lib/format.mjs';
 // ── Types ──────────────────────────────────────────────────────────────────
 
 type NavSection = 'overview' | 'academic' | 'career';
+
+// Mirrors NavSection -- its own list, rather than mapped from NAV_ITEMS, so
+// it reads as plain data for useUrlParams' allowedValues.
+const SECTION_VALUES: NavSection[] = ['overview', 'academic', 'career'];
 
 // 'overview' is each parent's own default view -- what the top-level nav item
 // itself renders -- not a visible child tab. Mirrors AuthenticatedDashboard.tsx's
@@ -49,11 +54,16 @@ const ACADEMIC_SUB_TABS: Array<{ key: AcademicSubTab; label: string }> = [
   { key: 'course-discovery', label: 'Course Discovery' },
 ];
 
+// Unlike ACADEMIC_SUB_TABS (the visible nav list), this includes 'overview'.
+const ACADEMIC_SUB_TAB_VALUES: AcademicSubTab[] = ['overview', 'gpa-calculator', 'course-discovery'];
+
 const CAREER_SUB_TABS: Array<{ key: CareerSubTab; label: string }> = [
   { key: 'intelligence', label: 'Career Intelligence' },
   { key: 'job-search', label: 'Job Search' },
   { key: 'profile', label: 'Career Profile' },
 ];
+
+const CAREER_SUB_TAB_VALUES: CareerSubTab[] = ['overview', 'intelligence', 'job-search', 'profile'];
 
 // ── Readiness Rail (sidebar signature element) ─────────────────────────────
 
@@ -296,9 +306,17 @@ export function DashboardPage() {
 function DemoDashboardPage() {
   const { profile, logout, slug } = useAuth();
   const navigate = useNavigate();
-  const [activeSection, setActiveSection] = useState<NavSection>('overview');
-  const [academicSubTab, setAcademicSubTab] = useState<AcademicSubTab>('overview');
-  const [careerSubTab, setCareerSubTab] = useState<CareerSubTab>('overview');
+  // Backed by the URL (see useUrlParams) rather than useState -- same
+  // reasoning and sharing rule as AuthenticatedDashboard.tsx's identical
+  // block.
+  const { getParam, setParams } = useUrlParams();
+  const activeSection = getParam('section', 'overview', SECTION_VALUES);
+  const academicSubTab = getParam('academic', 'overview', ACADEMIC_SUB_TAB_VALUES);
+  const careerSubTab = getParam('career', 'overview', CAREER_SUB_TAB_VALUES);
+  const setActiveSection = useCallback(
+    (section: NavSection) => setParams({ section: section === 'overview' ? null : section }),
+    [setParams],
+  );
   const [railOpen, setRailOpen] = useState(false);
   const railRef = useRef<HTMLElement>(null);
   const railTriggerRef = useRef<HTMLButtonElement>(null);
@@ -383,12 +401,14 @@ function DemoDashboardPage() {
     shift: rawShiftRun,
   });
 
-  const requestField = useCallback((request: ProfileFieldRequest) => {
-    setActiveSection('career');
-    setCareerSubTab('profile');
-    setRailOpen(false);
-    setFieldFocus({ path: request.path, nonce: Date.now() });
-  }, []);
+  const requestField = useCallback(
+    (request: ProfileFieldRequest) => {
+      setParams({ section: 'career', career: 'profile' });
+      setRailOpen(false);
+      setFieldFocus({ path: request.path, nonce: Date.now() });
+    },
+    [setParams],
+  );
 
   const careerEditing: CareerEditing = useMemo(
     () => ({
@@ -441,23 +461,24 @@ function DemoDashboardPage() {
   }
 
   function navigateTo(section: NavSection) {
-    setActiveSection(section);
     // The top-level item IS the overview -- always reset to it, matching
-    // AuthenticatedDashboard.tsx's own navigateTo.
-    if (section === 'academic') setAcademicSubTab('overview');
-    if (section === 'career') setCareerSubTab('overview');
+    // AuthenticatedDashboard.tsx's own navigateTo. Both params change
+    // together, so one setParams call, not two setters.
+    setParams({
+      section: section === 'overview' ? null : section,
+      ...(section === 'academic' ? { academic: null } : {}),
+      ...(section === 'career' ? { career: null } : {}),
+    });
     setRailOpen(false);
   }
 
   function navigateToAcademicSubTab(tab: AcademicSubTab) {
-    setActiveSection('academic');
-    setAcademicSubTab(tab);
+    setParams({ section: 'academic', academic: tab === 'overview' ? null : tab });
     setRailOpen(false);
   }
 
   function navigateToCareerSubTab(tab: CareerSubTab) {
-    setActiveSection('career');
-    setCareerSubTab(tab);
+    setParams({ section: 'career', career: tab === 'overview' ? null : tab });
     setRailOpen(false);
   }
 
