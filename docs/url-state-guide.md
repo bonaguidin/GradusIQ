@@ -87,6 +87,7 @@ changes.
 | `career` | `overview` \| `intelligence` \| `job-search` \| `profile` | same | `overview` |
 | `term` | a term key, e.g. `2026-Fall` | `TermPlanner.tsx` | the smart pick from `pickDefaultTermKey` |
 | `year` | an academic year's starting calendar year, e.g. `2026` | `DegreeScheduleYears.tsx` | the in-progress year, else the earliest |
+| `view` | `grades` \| `comments` \| `analysis` \| `topics` | `AcademicSnapshot.tsx` | `grades` |
 
 \* The demo dashboard's `AcademicSubTab` union is missing `grade-calculator` — an
 existing difference between the real and demo nav, not something this
@@ -139,13 +140,15 @@ purpose, not forgotten:
   (`CareerOptimizationPanel.tsx`) are both still plain `useState`. Lower
   traffic, simpler state — good candidates for the next pass using the
   exact recipe above.
-- **Degree Schedule's year tabs have no end-to-end browser test of their
-  own yet** (`DegreeScheduleYears.tsx`'s existing tests are source-level/
-  mocked, not Playwright-driven). The URL wiring itself is verified by
-  TypeScript and the existing test suite, but there's no
-  click-then-reload assertion the way there is for the dashboard shell
-  and Term Planner — worth adding alongside whatever harness eventually
-  exercises that component end to end.
+- **Degree Schedule's year tabs and `AcademicSnapshot`'s Grades/Comments/
+  AI Analysis/Exam Topics tabs have no end-to-end browser test of their
+  own.** `DegreeScheduleYears.tsx`'s existing tests are source-level/
+  mocked, not Playwright-driven; `AcademicSnapshot.tsx` (demo-account
+  path only, rendered from `DashboardPage.tsx`) has no browser test of
+  any kind yet. Both are verified by TypeScript and the existing test
+  suite, but there's no click-then-reload assertion the way there is for
+  the dashboard shell and Term Planner — worth adding alongside whatever
+  harness eventually exercises either component end to end.
 - `CareerSnapshotPanel.tsx`'s `onViewFull` callback (meant to deep-link
   straight to a specific GAP/FIT/SHIFT card) has no current caller — if
   it gets wired up, that's the natural hook point for a fourth
