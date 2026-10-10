@@ -1,11 +1,13 @@
-import { useState } from 'react';
 import type { Course, Enrollment, Assignment, Submission, ExamTopicTags } from '../types/student';
 import { CourseGradeTable } from './CourseGradeTable';
 import { ProfessorCommentList } from './ProfessorCommentList';
 import { ExamTopicBreakdown } from './ExamTopicBreakdown';
 import { ProfessorCommentAnalysisPanel } from './ProfessorCommentAnalysisPanel';
+import { useSearchParamState } from '../hooks/useSearchParamState';
 
 type AcademicTab = 'grades' | 'comments' | 'analysis' | 'topics';
+
+const TAB_VALUES: AcademicTab[] = ['grades', 'comments', 'analysis', 'topics'];
 
 interface AcademicSnapshotProps {
   courses: Course[];
@@ -29,7 +31,10 @@ export function AcademicSnapshot({
   submissions,
   examTopicTags,
 }: AcademicSnapshotProps) {
-  const [activeTab, setActiveTab] = useState<AcademicTab>('grades');
+  // The URL is the source of truth for which view is open (see
+  // useSearchParamState), not a plain useState -- so it survives a refresh
+  // and can be shared as a link, same as the dashboard's other tabs.
+  const [activeTab, setActiveTab] = useSearchParamState<AcademicTab>('view', 'grades', TAB_VALUES);
 
   return (
     <div className="academic-snapshot">

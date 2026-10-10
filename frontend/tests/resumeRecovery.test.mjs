@@ -144,7 +144,12 @@ test('resume page recovers persisted review across load, error, confirmation, an
   await page.locator('.dash-notice-dismiss').click()
   assert.equal(await page.locator('.dash-notice').count(), 0)
   await page.reload()
-  await page.getByRole('button', { name: 'Career' }).waitFor()
+  // Nav state now lives in the URL, so this reload lands back on Career
+  // Profile rather than resetting to Overview -- both sub-items are visible
+  // in the sidebar, so the top-level nav button needs `exact: true` to stay
+  // unambiguous (Career Profile's own button also matches a loose "Career").
+  await page.getByRole('button', { name: 'Career', exact: true }).waitFor()
+  await page.locator('.cp-roles li').getByText('Software Engineer').waitFor()
   assert.equal(await page.locator('.dash-notice').count(), 0)
 
   // CASE R10: the confirmed review does not come back.

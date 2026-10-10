@@ -154,12 +154,20 @@ test('authenticated dashboard covers canonical states, routing, themes, errors, 
   // a future term.
   await page.locator('.academic-readiness-cards').getByText('No current term.').waitFor()
 
+  // Nav state lives in the URL now (useUrlParams) -- read it the same way a
+  // shared link would be built, straight off the real address bar.
+  const urlParam = (key) => new URL(page.url()).searchParams.get(key)
+
   await page.getByRole('button', { name: 'Academic' }).click()
 
   // The top-level Academic item is itself the overview -- clicking it lands
   // on Academic Overview, expands exactly three nested children, and none
   // is named "Overview" (that state is internal, not a visible tab).
   await page.getByRole('heading', { name: 'Academic Overview' }).waitFor()
+  // Academic Overview is the default sub-tab, so it's left out of the URL
+  // entirely -- only the top-level section shows up.
+  assert.equal(urlParam('section'), 'academic')
+  assert.equal(urlParam('academic'), null)
   assert.deepEqual(
     await page.locator('.rail-subitem').allTextContents(),
     ['GPA Calculator', 'Grade Calculator', 'Course Discovery'],
@@ -177,6 +185,15 @@ test('authenticated dashboard covers canonical states, routing, themes, errors, 
     'page',
   )
   await page.getByRole('heading', { name: 'GPA Calculator' }).waitFor()
+  assert.equal(urlParam('section'), 'academic')
+  assert.equal(urlParam('academic'), 'gpa-calculator')
+
+  // Deep link: a fresh load straight at this URL renders GPA Calculator
+  // directly -- the whole point of putting it in the URL in the first
+  // place -- and a reload survives the same way.
+  await page.reload()
+  await page.getByRole('heading', { name: 'GPA Calculator' }).waitFor()
+  await page.locator('.term-season-tabs').waitFor()
 
   // Term selection is a year tab + a season tab (TermPlanner's academic-tabs
   // / term-season-tabs), not the old dropdown -- each season tab's id
@@ -201,6 +218,13 @@ test('authenticated dashboard covers canonical states, routing, themes, errors, 
   // a different academic-year tab (2025–26) than the default 2026-Fall
   // (2026–27).
   await selectTerm('2025–26', 'Fall')
+  await page.getByText('CS 101').waitFor()
+  // Not the auto-picked default term, so it shows up in the URL --
+  // and survives a reload, the actual point of putting it there.
+  assert.equal(urlParam('term'), '2025-Fall')
+  await page.reload()
+  await page.locator('.term-season-tabs').waitFor()
+  assert.equal(await activeTermKey(), '2025-Fall')
   await page.getByText('CS 101').waitFor()
 
   // Planning: search, add, see it listed as distinctly PLANNED, remove it.
@@ -280,8 +304,11 @@ test('authenticated dashboard covers canonical states, routing, themes, errors, 
     ['Career Intelligence', 'Job Search', 'Career Profile'],
   )
   assert.equal(await page.getByRole('tab').count(), 0, 'old horizontal Career tabs remain')
+  assert.equal(urlParam('section'), 'career')
+  assert.equal(urlParam('career'), null)
   // CareerProfile now lives under the Career Profile sidebar child.
   await page.getByRole('button', { name: 'Career Profile' }).click()
+  assert.equal(urlParam('career'), 'profile')
   // Target roles now appear twice by design -- once as the Career summary
   // headline, once in the Career direction list -- so both are named rather
   // than matched loosely.
@@ -297,6 +324,15 @@ test('authenticated dashboard covers canonical states, routing, themes, errors, 
   await page.getByRole('heading', { name: /GAP/ }).waitFor()
   await page.getByRole('heading', { name: /FIT/ }).waitFor()
   await page.getByRole('heading', { name: /SHIFT/ }).waitFor()
+  assert.equal(urlParam('career'), 'intelligence')
+
+  // The actual deep-link promise: sharing this exact URL (or just hitting
+  // Reload) lands a second visitor on Career Intelligence directly, not back
+  // on Overview.
+  await page.reload()
+  await page.getByRole('heading', { name: 'Career Intelligence' }).waitFor()
+  await page.getByRole('heading', { name: /FIT/ }).waitFor()
+
   await page.getByRole('button', { name: 'Academic', exact: true }).click()
   await page.getByRole('heading', { name: 'Academic Overview' }).waitFor()
   await page.getByRole('button', { name: 'GPA Calculator' }).click()
@@ -424,6 +460,24 @@ test('authenticated dashboard covers canonical states, routing, themes, errors, 
     await page.getByRole('button', { name: 'Academic', exact: true }).getAttribute('aria-current'),
     'page',
   )
+
+  // Deep link straight into Career Intelligence from a fresh load -- no
+  // clicking through the nav first. This is the actual link a student would
+  // share or bookmark.
+  await page.goto(`${origin}/authenticated-dashboard-preview.html?mode=complete&section=career&career=intelligence`)
+  await page.getByRole('heading', { name: 'Career Intelligence' }).waitFor()
+  await page.getByRole('heading', { name: /FIT/ }).waitFor()
+
+  // An unrecognized sub-tab value (a stale link, a typo) falls back to that
+  // section's own overview instead of rendering blank or throwing.
+  await page.goto(`${origin}/authenticated-dashboard-preview.html?mode=complete&section=career&career=not-a-real-tab`)
+  await page.getByRole('heading', { name: 'Career Overview' }).waitFor()
+
+  // An unrecognized top-level section falls back to Overview the same way.
+  await page.goto(`${origin}/authenticated-dashboard-preview.html?mode=complete&section=not-a-real-section`)
+  await page.getByRole('heading', { name: 'Alex Morgan' }).waitFor()
+  assert.equal(await page.getByRole('heading', { name: 'Career Overview' }).count(), 0)
+  assert.equal(await page.getByRole('heading', { name: 'Academic Overview' }).count(), 0)
 
   // CASE 2: career only renders academic onboarding.
   await page.goto(`${origin}/authenticated-dashboard-preview.html?mode=career`)

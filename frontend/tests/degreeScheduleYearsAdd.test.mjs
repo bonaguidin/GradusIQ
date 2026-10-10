@@ -117,7 +117,7 @@ test('closing the popup returns focus to the trigger; only one popup opens at a 
   assert.match(years, /isEditOpen=\{editingTermKey === semester\.termKey\}/)
   assert.match(years, /onOpenEdit=\{\(\) => setEditingTermKey\(semester\.termKey\)\}/)
   // Switching year tabs also dismisses any open popup.
-  assert.match(years, /setActiveYearKey\(year\.yearKey\); setEditingTermKey\(null\)/)
+  assert.match(years, /setActiveYearKeyString\(String\(year\.yearKey\)\); setEditingTermKey\(null\)/)
   // The close path refocuses the trigger button (covers both Confirm and Escape).
   assert.match(years, /editTriggerRef\.current\?\.focus\(\)/)
   assert.match(years, /ref=\{editTriggerRef\}/)
