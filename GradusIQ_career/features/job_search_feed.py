@@ -40,12 +40,39 @@ SELECT_COLUMNS = (
 )
 
 
-_INTERN_PATTERN = re.compile(r"intern(ship)?|co[\s-]?op", re.IGNORECASE)
+# Word-boundaried: "intern(ship)?" alone would also match "Internal" and
+# "International" as substrings (confirmed live -- titles like "Manager -
+# Internal Audit" and "International Tax Director" were entering the
+# candidate pool this way), which is harmless on its own but becomes real
+# noise once a family's core-stripped phrase (role_family_matcher.py) can
+# match a bare word anywhere in a non-internship title. "s|ships?" covers
+# the plural forms ("2027 Programmatic Interns - Client Relations" is a
+# real internship the word-boundary fix alone would otherwise have
+# dropped) without reopening the "internal"/"international"/"internist"
+# substring gap -- none of those have a word boundary right after "intern".
+_INTERN_PATTERN = re.compile(r"\bintern(s|ships?)?\b|\bco[\s-]?op\b", re.IGNORECASE)
 _PAGE = 1000
 
 
 def _days_cutoff(days: int) -> str:
     return (date.today() - timedelta(days=days)).isoformat()
+
+
+def is_internship_role_name(name: str) -> bool:
+    """Whether a target-role family's own NAME says "intern" -- the data
+    already encodes this distinction (role_requirements.json's 14 keys
+    include four, Lab Assistant / Pre-Health Clinical Volunteer / Research
+    Assistant / Student Success Peer Mentor, that were never internship
+    titles in the first place), so this reads the name rather than
+    hard-coding the four in code. A role whose name doesn't say "intern"
+    has no internship-shaped postings to gate on title text for -- the
+    live Job Search (posting_provider.py, keyed on the stored target_role
+    column) already proves that out: Lab Assistant and Research Assistant
+    carry real target_role-labeled rows, just never internship-titled
+    ones, which the intern-shaped-title pool filter was silently zeroing
+    out for exactly these four.
+    """
+    return "intern" in name.lower()
 
 
 def fetch_candidate_pool(client: Any, days: int) -> list[dict[str, Any]]:
@@ -84,6 +111,46 @@ def fetch_candidate_pool(client: Any, days: int) -> list[dict[str, Any]]:
         title = row.get("title") or ""
         if not _INTERN_PATTERN.search(title):
             continue
+        posted = row.get("posted_date")
+        if posted is not None and str(posted) < cutoff:
+            continue
+        pool.append(row)
+    return pool
+
+
+def fetch_role_labeled_pool(client: Any, role: str, days: int) -> list[dict[str, Any]]:
+    """Every is_dfw posting whose stored target_role equals `role`, posted
+    within `days` or undated -- no title gate at all. For non-internship
+    roles (is_internship_role_name(role) is False) this is the ONLY path
+    into the feed: there is no internship-shaped title to classify, so the
+    stored target_role column (set at ingest time by the role-scoped query
+    that fetched the row -- the same column posting_provider.py already
+    trusts for FIT) is the sole signal. Never used for internship-named
+    roles, whose cards come from fetch_candidate_pool + title
+    classification instead, so generic core phrases (role_family_matcher's
+    "research", "finance", "operations", ...) never have to carry relevance
+    on their own outside that gate.
+    """
+    cutoff = _days_cutoff(days)
+    rows: list[dict[str, Any]] = []
+    start = 0
+    while True:
+        response = (
+            client.table(POSTINGS_TABLE)
+            .select(SELECT_COLUMNS)
+            .eq("target_role", role)
+            .eq("is_dfw", True)
+            .range(start, start + _PAGE - 1)
+            .execute()
+        )
+        page = response.data or []
+        rows.extend(page)
+        if len(page) < _PAGE:
+            break
+        start += _PAGE
+
+    pool = []
+    for row in rows:
         posted = row.get("posted_date")
         if posted is not None and str(posted) < cutoff:
             continue
@@ -143,27 +210,48 @@ def _string_or_none(value: Any) -> str | None:
     return None if value is None else str(value)
 
 
-def build_cards(rows: Sequence[Mapping[str, Any]], families: list[dict[str, Any]]) -> list[Card]:
-    """Dedupe the candidate pool by posting_identity. A row with no
-    posting_identity stands alone, keyed by its own id. The cluster's
-    family is the classification of its newest row's title; locations
-    across every row in the cluster are merged and de-duplicated.
-    """
+def _group_by_posting_identity(
+    rows: Sequence[Mapping[str, Any]],
+) -> list[tuple[Mapping[str, Any], list[str], int]]:
+    """Groups rows by posting_identity (a row with none stands alone, keyed
+    by its own id), returning each cluster's newest row, its merged/deduped
+    locations, and its member count. Shared by build_cards (title-classified
+    family) and build_preset_family_cards (a family already known from the
+    stored target_role column)."""
     groups: dict[str, list[Mapping[str, Any]]] = {}
     for row in rows:
         key = row.get("posting_identity") or f"single:{row.get('id')}"
         groups.setdefault(key, []).append(row)
 
-    cards: list[Card] = []
+    clusters = []
     for members in groups.values():
         members_sorted = sorted(members, key=_sort_key)
         newest = members_sorted[0]
         locations = sorted(
             {loc for loc in (m.get("location") for m in members) if loc},
         )
-        family = classify_title(newest.get("title"), families)
-        cards.append(Card(newest, locations, family, len(members)))
-    return cards
+        clusters.append((newest, locations, len(members)))
+    return clusters
+
+
+def build_cards(rows: Sequence[Mapping[str, Any]], families: list[dict[str, Any]]) -> list[Card]:
+    """Dedupe the candidate pool by posting_identity. The cluster's family
+    is the classification of its newest row's title."""
+    return [
+        Card(newest, locations, classify_title(newest.get("title"), families), size)
+        for newest, locations, size in _group_by_posting_identity(rows)
+    ]
+
+
+def build_preset_family_cards(rows: Sequence[Mapping[str, Any]], family: str) -> list[Card]:
+    """Dedupe a role-labeled pool (fetch_role_labeled_pool) by
+    posting_identity, same as build_cards, but the family is already known
+    from the query -- these rows were fetched by target_role, not
+    title-classified, so there is nothing to run classify_title against."""
+    return [
+        Card(newest, locations, family, size)
+        for newest, locations, size in _group_by_posting_identity(rows)
+    ]
 
 
 def merge_display_duplicates(cards: Sequence[Card]) -> list[Card]:
@@ -270,6 +358,21 @@ def get_job_search_feed(
 
     rows = fetch_candidate_pool(client, days)
     cards = build_cards(rows, all_families)
+
+    # The four target-role families whose own names say they were never
+    # internship titles (is_internship_role_name) have no internship-shaped
+    # postings for fetch_candidate_pool's title gate to find -- Lab
+    # Assistant and Research Assistant alone carry dozens of real
+    # target_role-labeled rows that the gate was silently zeroing out.
+    # Every OTHER family still comes only from the gated pool above, so a
+    # generic core phrase (role_family_matcher's "research", "finance",
+    # "operations", ...) never has to carry relevance on its own outside
+    # that gate.
+    for role in target_role_families:
+        if not is_internship_role_name(role):
+            role_rows = fetch_role_labeled_pool(client, role, days)
+            cards.extend(build_preset_family_cards(role_rows, role))
+
     cards = merge_display_duplicates(cards)
     facets = build_facets(cards)
 

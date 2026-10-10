@@ -28,6 +28,7 @@ from GradusIQ_career.features.job_search_feed import (
     SELECT_COLUMNS,
     fetch_candidate_pool,
     get_job_search_feed,
+    is_internship_role_name,
 )
 
 
@@ -80,6 +81,7 @@ def _row(
     fetched_at=_UNSET,
     source="adzuna",
     is_dfw=True,
+    target_role=None,
 ):
     if posted_date is _UNSET:
         posted_date = _days_ago(0)
@@ -95,6 +97,7 @@ def _row(
         "fetched_at": fetched_at,
         "source": source,
         "is_dfw": is_dfw,
+        "target_role": target_role,
     }
 
 
@@ -124,6 +127,37 @@ def test_title_must_look_like_an_internship_or_co_op():
     ]
     pool = fetch_candidate_pool(_FakeClient(rows), days=30)
     assert {r["id"] for r in pool} == {"1", "2", "3"}
+
+
+def test_plural_interns_and_internships_still_match():
+    rows = [
+        _row("1", title="Engineering Interns - 2027"),
+        _row("2", title="2027 Programmatic Interns - Client Relations"),
+        _row("3", title="Summer Internships Program"),
+    ]
+    pool = fetch_candidate_pool(_FakeClient(rows), days=30)
+    assert {r["id"] for r in pool} == {"1", "2", "3"}
+
+
+def test_internal_and_international_are_not_mistaken_for_internship():
+    """Confirmed live: "Manager - Internal Audit" and "International Tax
+    Director" -- neither an internship -- were entering the candidate pool
+    because "intern(ship)?" with no word boundary also matches "Internal"
+    and "International" as substrings. Once core-stripped family phrases
+    (role_family_matcher.py) can match a bare word anywhere in the title,
+    an unboundaried pool filter turns into visible classification noise,
+    not just a harmless overcount."""
+    rows = [
+        _row("1", title="Manager - Internal Audit"),
+        _row("2", title="International Tax Director"),
+        _row("3", title="Clinical Research Assistant II, Internal Medicine"),
+        # Plural support (test_plural_interns_and_internships_still_match)
+        # must not reopen this gap -- "Internists" has no word boundary
+        # right after "intern" either.
+        _row("4", title="Staff Physician Internists Needed"),
+    ]
+    pool = fetch_candidate_pool(_FakeClient(rows), days=30)
+    assert pool == []
 
 
 def test_days_window_excludes_old_rows_but_keeps_null_dated_rows():
@@ -377,3 +411,66 @@ def test_facets_reflect_the_pool_before_the_family_filter_is_applied():
     family_names = {f["family"] for f in result["facets"]["families"]}
     assert family_names == {"Software Engineering Intern", "Finance Intern"}
     assert len(result["postings"]) == 1
+
+
+def test_is_internship_role_name_reads_the_name_not_a_hard_coded_list():
+    assert is_internship_role_name("Software Engineering Intern") is True
+    assert is_internship_role_name("Finance Intern") is True
+    assert is_internship_role_name("Lab Assistant") is False
+    assert is_internship_role_name("Research Assistant") is False
+    assert is_internship_role_name("Pre-Health Clinical Volunteer") is False
+    assert is_internship_role_name("Student Success Peer Mentor") is False
+
+
+def test_non_internship_role_includes_non_intern_titled_rows_by_target_role():
+    """Lab Assistant and Research Assistant have real target_role-labeled
+    rows (posting_provider.py's own live Job Search shows them) that were
+    never internship-titled -- fetch_candidate_pool's title gate was
+    silently zeroing them out. These rows carry no "intern"/"internship"
+    word at all, so they would never enter the gated pool; the family
+    comes from the stored target_role column directly, not classify_title.
+    """
+    client = _FakeClient(
+        [
+            _row("1", title="Lab Assistant II", target_role="Lab Assistant", company="Quest"),
+            _row("2", title="Clinical Research Assistant", target_role="Research Assistant", company="UTSW"),
+            # A real internship elsewhere in the pool -- confirms the gated
+            # path is untouched, not replaced.
+            _row("3", title="Software Engineering Intern"),
+        ]
+    )
+    result = get_job_search_feed(client, target_role_families=["Lab Assistant", "Research Assistant"])
+    titles_by_family = {p["title"]: p["family"] for p in result["postings"]}
+    assert titles_by_family["Lab Assistant II"] == "Lab Assistant"
+    assert titles_by_family["Clinical Research Assistant"] == "Research Assistant"
+    assert "Software Engineering Intern" not in titles_by_family  # not in scoped_families here
+
+
+def test_non_internship_role_rows_still_go_through_both_dedupe_passes():
+    client = _FakeClient(
+        [
+            _row(
+                "1", title="Lab Assistant II", target_role="Lab Assistant",
+                company="Quest Diagnostics", posting_identity="c1", location="Dallas, TX",
+            ),
+            _row(
+                "2", title="Lab Assistant II", target_role="Lab Assistant",
+                company="Quest Diagnostics", posting_identity="c2", location="Plano, TX",
+            ),
+        ]
+    )
+    result = get_job_search_feed(client, target_role_families=["Lab Assistant"])
+    assert result["total"] == 1
+    card = result["postings"][0]
+    assert card["posting_count"] == 2
+    assert sorted(card["locations"]) == ["Dallas, TX", "Plano, TX"]
+
+
+def test_internship_named_roles_are_not_affected_by_the_non_internship_path():
+    """A target role whose name says "intern" must still come only from
+    the gated pool -- the generic single-word cores (role_family_matcher's
+    "research", "finance", ...) depend on that gate to stay precise."""
+    client = _FakeClient([_row("1", title="Internal Audit Manager", target_role="Finance Intern")])
+    result = get_job_search_feed(client, target_role_families=["Finance Intern"])
+    assert result["total"] == 0
+    assert result["coverage"] == "no_market_data"
