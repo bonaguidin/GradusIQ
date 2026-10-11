@@ -135,15 +135,28 @@ class AdzunaClient:
             print(f"  params: {self.masked_params(params)}")
             return None
 
+        endpoint = f"/{country}/search/{page}"  # path only -- never the query string
         try:
             response = self.session.get(url, params=params, timeout=self.timeout)
             response.raise_for_status()
         except requests.RequestException as exc:
+            # requests' own str(exc) embeds the full request URL, which for
+            # this API includes app_id/app_key as query params -- confirmed
+            # live when a transient 503 put both in a printed traceback. Never
+            # interpolate `exc` itself (not even via `from exc`, which keeps
+            # the original exception, URL and all, reachable from the new
+            # one's __cause__ and printed by the default traceback handler) --
+            # only its type, the HTTP status if one was received, and the
+            # endpoint PATH built above, with no query string.
             status = exc.response.status_code if exc.response is not None else None
             transient = isinstance(exc, (requests.ConnectionError, requests.Timeout)) or (
                 status == 429 or (status is not None and 500 <= status < 600)
             )
-            raise JobPostingRequestError(f"Adzuna request failed: {exc}", transient=transient) from exc
+            status_label = str(status) if status is not None else "no response"
+            raise JobPostingRequestError(
+                f"Adzuna request failed: {type(exc).__name__} (status={status_label}) at {endpoint}",
+                transient=transient,
+            ) from None
 
         # A 200 with a non-JSON body (Adzuna maintenance page, CDN error) must
         # surface as a caught JobPostingRequestError -- otherwise the raw
@@ -154,9 +167,10 @@ class AdzunaClient:
             return response.json()
         except ValueError as exc:  # includes requests' JSONDecodeError
             raise JobPostingRequestError(
-                f"Adzuna returned a non-JSON body (HTTP {response.status_code}): {exc}",
+                f"Adzuna returned a non-JSON body: {type(exc).__name__} "
+                f"(HTTP {response.status_code}) at {endpoint}",
                 transient=False,
-            ) from exc
+            ) from None
 
 
 def main() -> None:
