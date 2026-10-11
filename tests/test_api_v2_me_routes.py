@@ -7,6 +7,7 @@ space the slug-addressed routes structurally cannot reach.
 
 import json
 from contextlib import contextmanager
+from datetime import date, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -1434,30 +1435,36 @@ def test_action_plan_typed_error_is_preserved_when_assembly_fails(client, monkey
 
 
 # --- /api/v2/student/me/job-search -----------------------------------------
+#
+# The feed reads via job_search_feed.fetch_candidate_pool: table().select()
+# .eq("is_dfw", True).range(start, end).execute(), paginated. These tests
+# fake exactly that chain rather than posting_provider's (different module,
+# see job_search_feed.py's own module docstring for why they are separate).
 
-class _FakePostingsClient:
-    """Mimics the chain posting_provider.get_role_posting_grounding() drives:
-    table().select().eq("target_role", ...).eq("is_dfw", True).neq("source", "workday").execute()
-    """
-
+class _FakeJobSearchClient:
     def __init__(self, rows):
         self._rows = rows
+        self._eq = {}
 
     def table(self, name):
         assert name == "job_postings"
         return self
 
-    def select(self, *a, **k):
+    def select(self, cols):
+        assert "raw_payload" not in cols and "description" not in cols
         return self
 
-    def eq(self, *a, **k):
+    def eq(self, col, val):
+        self._eq[col] = val
         return self
 
-    def neq(self, *a, **k):
+    def range(self, start, end):
+        matched = [r for r in self._rows if all(r.get(k) == v for k, v in self._eq.items())]
+        self._page = matched[start : end + 1]
         return self
 
     def execute(self):
-        return SimpleNamespace(data=self._rows)
+        return SimpleNamespace(data=self._page)
 
 
 def _posting_row(**overrides):
@@ -1468,42 +1475,41 @@ def _posting_row(**overrides):
         "title": "Software Engineering Intern",
         "location": "Dallas, TX",
         "url": "https://example.com/jobs/1",
-        "posted_date": "2026-09-30",
+        "posted_date": date.today().isoformat(),
         "fetched_at": "2026-09-30T12:00:00Z",
         "source": "adzuna",
-        "target_role": "Software Engineering Intern",
         "is_dfw": True,
     }
     row.update(overrides)
     return row
 
 
-def test_job_search_returns_cached_postings_for_a_role_with_data(client, monkeypatch):
+def test_job_search_returns_cached_postings_for_the_students_own_roles(client, monkeypatch):
     _patch_session(monkeypatch, profile=_full_profile())
     monkeypatch.setattr(
-        api, "build_service_client", lambda: _FakePostingsClient([_posting_row()])
+        api, "build_service_client", lambda: _FakeJobSearchClient([_posting_row()])
     )
 
-    response = _call(client, "get", "/api/v2/student/me/job-search?role=Software+Engineering+Intern", None)
+    response = _call(client, "get", "/api/v2/student/me/job-search", None)
 
     assert response.status_code == 200
     body = response.json()
-    assert body["role"] == "Software Engineering Intern"
     assert body["coverage"] == "available"
     assert len(body["postings"]) == 1
     posting = body["postings"][0]
     assert posting["employer"] == "Acme Corp"
     assert posting["title"] == "Software Engineering Intern"
-    assert posting["location"] == "Dallas, TX"
+    assert posting["locations"] == ["Dallas, TX"]
     assert posting["url"] == "https://example.com/jobs/1"
-    assert posting["posted_date"] == "2026-09-30"
+    assert posting["posted_date"] == date.today().isoformat()
+    assert posting["family"] == "Software Engineering Intern"
 
 
-def test_job_search_reports_no_market_data_for_a_role_with_zero_rows(client, monkeypatch):
+def test_job_search_reports_no_market_data_for_zero_rows(client, monkeypatch):
     _patch_session(monkeypatch, profile=_full_profile())
-    monkeypatch.setattr(api, "build_service_client", lambda: _FakePostingsClient([]))
+    monkeypatch.setattr(api, "build_service_client", lambda: _FakeJobSearchClient([]))
 
-    response = _call(client, "get", "/api/v2/student/me/job-search?role=Software+Engineering+Intern", None)
+    response = _call(client, "get", "/api/v2/student/me/job-search", None)
 
     assert response.status_code == 200
     body = response.json()
@@ -1520,30 +1526,110 @@ def test_job_search_never_makes_a_live_vendor_call(client, monkeypatch):
     monkeypatch.setattr(
         api,
         "build_service_client",
-        lambda: calls.append("called") or _FakePostingsClient([_posting_row()]),
+        lambda: calls.append("called") or _FakeJobSearchClient([_posting_row()]),
     )
 
-    response = _call(client, "get", "/api/v2/student/me/job-search?role=Software+Engineering+Intern", None)
+    response = _call(client, "get", "/api/v2/student/me/job-search", None)
 
     assert response.status_code == 200
     assert calls == ["called"]
 
 
-def test_job_search_rejects_a_role_not_on_the_students_profile(client, monkeypatch):
+def test_job_search_no_target_roles_and_no_families_param_is_200_not_an_error(client, monkeypatch):
     _patch_session(monkeypatch, profile=_full_profile())
+    # _patch_session's profile arg only shapes the legacy /profile response;
+    # the canonical profile this route actually reads is the fixed
+    # _canonical_profile() _patch_session wires up regardless, so the empty
+    # target_roles case has to override that directly.
+    no_roles_canonical = _canonical_profile()
+    no_roles_canonical.career.target_roles = []
+    monkeypatch.setattr(api, "build_student_intelligence_profile", lambda client, sid: no_roles_canonical)
     monkeypatch.setattr(
         api, "build_service_client", lambda: pytest.fail("must not query postings")
     )
 
-    response = _call(client, "get", "/api/v2/student/me/job-search?role=Underwater+Basket+Weaving+Intern", None)
+    response = _call(client, "get", "/api/v2/student/me/job-search", None)
 
-    assert response.status_code == 422
-    assert "target roles" in response.json()["detail"]
+    assert response.status_code == 200
+    body = response.json()
+    assert body["coverage"] == "no_target_roles"
+    assert body["postings"] == []
 
 
-def test_job_search_rejects_missing_role_query_param(client, monkeypatch):
+def test_job_search_families_param_overrides_the_students_own_roles(client, monkeypatch):
     _patch_session(monkeypatch, profile=_full_profile())
+    monkeypatch.setattr(
+        api,
+        "build_service_client",
+        lambda: _FakeJobSearchClient(
+            [_posting_row(id="1", title="Finance Intern"), _posting_row(id="2")]
+        ),
+    )
+
+    response = _call(
+        client, "get", "/api/v2/student/me/job-search?families=Finance+Intern", None
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [p["title"] for p in body["postings"]] == ["Finance Intern"]
+
+
+def test_job_search_role_param_is_compatible_with_a_cached_old_bundle(client, monkeypatch):
+    _patch_session(monkeypatch, profile=_full_profile())
+    monkeypatch.setattr(
+        api,
+        "build_service_client",
+        lambda: _FakeJobSearchClient(
+            [_posting_row(id="1", title="Finance Intern"), _posting_row(id="2")]
+        ),
+    )
+
+    response = _call(
+        client, "get", "/api/v2/student/me/job-search?role=Finance+Intern", None
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [p["title"] for p in body["postings"]] == ["Finance Intern"]
+
+
+def test_job_search_days_param_narrows_the_window(client, monkeypatch):
+    today = date.today()
+    _patch_session(monkeypatch, profile=_full_profile())
+    monkeypatch.setattr(
+        api,
+        "build_service_client",
+        lambda: _FakeJobSearchClient(
+            [
+                _posting_row(id="recent", posted_date=today.isoformat()),
+                _posting_row(id="old", posted_date=(today - timedelta(days=60)).isoformat()),
+            ]
+        ),
+    )
+
+    response = _call(client, "get", "/api/v2/student/me/job-search?days=7", None)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [p["posting_id"] for p in body["postings"]] == ["recent"]
+
+
+def test_job_search_dedupes_by_posting_identity(client, monkeypatch):
+    _patch_session(monkeypatch, profile=_full_profile())
+    monkeypatch.setattr(
+        api,
+        "build_service_client",
+        lambda: _FakeJobSearchClient(
+            [
+                _posting_row(id="1", posting_identity="c1", location="Dallas, TX"),
+                _posting_row(id="2", posting_identity="c1", location="Plano, TX"),
+            ]
+        ),
+    )
 
     response = _call(client, "get", "/api/v2/student/me/job-search", None)
 
-    assert response.status_code == 422
+    body = response.json()
+    assert body["total"] == 1
+    assert sorted(body["postings"][0]["locations"]) == ["Dallas, TX", "Plano, TX"]

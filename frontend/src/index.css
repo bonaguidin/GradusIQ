@@ -1228,6 +1228,91 @@ a {
   font: inherit;
 }
 
+/* The authenticated Job Search feed (JobSearchPanel.tsx). The demo
+   dashboard's static placeholder keeps .job-search-shell above, unchanged. */
+.job-search-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-5);
+}
+
+.job-search-controls label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.job-search-controls select {
+  min-height: 42px;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-chip);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+}
+
+.job-search-families {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  border: none;
+  padding: 0;
+  margin: 0;
+  flex: 1 1 100%;
+}
+
+.job-search-families legend {
+  width: 100%;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  margin-bottom: var(--sp-2);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-1) var(--sp-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-chip);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.chip--on {
+  background: var(--accent-soft, var(--line));
+  border-color: var(--ink);
+  font-weight: 600;
+}
+
+.chip-count {
+  color: var(--muted);
+  font-size: var(--text-xs, 0.75rem);
+}
+
+.chip--tag {
+  cursor: default;
+  margin-left: var(--sp-2);
+}
+
+.chip--count {
+  cursor: default;
+  margin-left: var(--sp-2);
+  color: var(--muted);
+  font-size: var(--text-xs, 0.75rem);
+}
+
+.job-search-feed .btn-ghost {
+  margin-top: var(--sp-4);
+}
+
 @media (max-width: 760px) {
   .career-overview-grid,
   .job-search-shell {
