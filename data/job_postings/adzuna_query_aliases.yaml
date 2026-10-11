@@ -1,0 +1,44 @@
+# Nightly Adzuna alias queries (PR 3, design (v) -- see
+# scripts/job_postings/ingest.py's ALIAS INVARIANT note and the job
+# postings README's "Alias queries" section).
+#
+# These are ADDITIONAL search strings run alongside the 14 role queries,
+# to catch postings the role queries' own phrasing misses. An alias
+# query's rows are upserted WITHOUT a target_role label -- the Job Search
+# feed classifies internship titles into families from title text at read
+# time (scripts/job_postings/role_family_matcher.py), so an alias row
+# doesn't need one. FIT's hiring_signal (posting_provider.py) only ever
+# reads rows where target_role equals one of the 14 canonical names, so
+# alias rows are invisible to it, exactly as they are today before this
+# file existed -- this adds coverage to the feed, not to FIT.
+#
+# `evidence` is the live result count from the capped diagnostic test
+# (results_per_page as noted, Dallas-only, scripts/job_postings/
+# adzuna_client.py). Queries that returned 0-3 results in that same test
+# -- devops engineer intern, qa engineer intern, embedded software
+# engineer intern, fpga intern, digital design engineer intern -- are
+# deliberately NOT included here: not enough volume to justify a nightly
+# call. Revisit once a fuller test is run.
+
+aliases:
+  - query: "AI intern"
+    note: >
+      Broader phrasing than AI/ML Intern's own match_phrases
+      ("ai intern" is already one of them, but this bare query surfaces
+      additional postings the role query "AI/ML Intern" itself does not).
+    evidence: "25 results (live test, Dallas)"
+
+  - query: "design engineer intern"
+    note: >
+      Feeds Design Engineering Intern -- catches titles outside what the
+      Computer Engineering Intern role query returns (the Micron "Intern -
+      Design Engineer, HBM" word-order case this family was built for).
+    evidence: "34 results (live test, Dallas)"
+
+  - query: "data engineer intern"
+    note: "Feeds Data Engineering Intern."
+    evidence: "8 results (live test, Dallas, results_per_page=5)"
+
+  - query: "data science intern"
+    note: "Feeds AI/ML Intern."
+    evidence: "6 results (live test, Dallas, results_per_page=5)"
