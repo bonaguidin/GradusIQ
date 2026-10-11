@@ -142,7 +142,99 @@ def test_adzuna_200_with_non_json_body_raises_caught_error_not_a_raw_decode():
         client.search(what="x", where="Dallas", live=True)
 
     assert exc_info.value.transient is False
-    assert "non-JSON body (HTTP 200)" in str(exc_info.value)
+    assert "non-JSON body" in str(exc_info.value)
+    assert "HTTP 200" in str(exc_info.value)
+
+
+# ------------------------------------------------- Credential redaction
+#
+# A transient 503 during a live diagnostic run put the full request URL --
+# including app_id and app_key, since Adzuna takes them as query params --
+# into a printed traceback. requests' own exceptions embed that URL in
+# their str(): HTTPError via response.url (set from the request that was
+# actually sent), ConnectionError via urllib3's retry message. These pin
+# that neither leaks through JobPostingRequestError's message, and that
+# `from None` severs the chain so the original exception (URL and all) is
+# not reachable from the raised one's __cause__/__context__ either.
+
+
+def _real_response_with_credential_bearing_url(status_code: int) -> requests.Response:
+    """A genuine requests.Response (not the simplified FakeHTTPResponse
+    stand-in above) so response.raise_for_status() -- the exact call
+    AdzunaClient.search() makes -- builds its message the same way it did
+    for the real 503 that leaked: "503 Server Error: ... for url: ...",
+    with the full query string including app_id/app_key."""
+    response = requests.Response()
+    response.status_code = status_code
+    response.reason = "Service Temporarily Unavailable"
+    response.url = (
+        "https://api.adzuna.com/v1/api/jobs/us/search/1"
+        "?app_id=SECRETAPPID&app_key=SECRETAPPKEY&what=software+engineer+intern"
+    )
+    return response
+
+
+def test_live_503_does_not_leak_credentials_into_the_raised_error():
+    # FakeSession returns this response from .get(); AdzunaClient.search()
+    # then calls the REAL response.raise_for_status() on it, exactly as it
+    # does against a real Adzuna response -- not a hand-built exception.
+    response = _real_response_with_credential_bearing_url(503)
+    session = FakeSession(response=response)
+    client = adzuna_client.AdzunaClient(app_id="SECRETAPPID", app_key="SECRETAPPKEY", session=session)
+
+    with pytest.raises(JobPostingRequestError) as exc_info:
+        client.search(what="software engineer intern", where="Dallas", live=True)
+
+    message = str(exc_info.value)
+    assert "SECRETAPPID" not in message
+    assert "SECRETAPPKEY" not in message
+    assert "api.adzuna.com" not in message
+    assert exc_info.value.transient is True
+    assert exc_info.value.__cause__ is None
+    assert exc_info.value.__suppress_context__ is True  # from None -- never auto-printed
+
+
+def test_live_connection_error_does_not_leak_credentials_into_the_raised_error():
+    # urllib3's own retry-exhausted message embeds the full path + query
+    # string it was trying to reach, including the credentials.
+    underlying = requests.ConnectionError(
+        "HTTPSConnectionPool(host='api.adzuna.com', port=443): Max retries "
+        "exceeded with url: /v1/api/jobs/us/search/1?app_id=SECRETAPPID&"
+        "app_key=SECRETAPPKEY&what=software+engineer+intern"
+    )
+    session = FakeSession(exc=underlying)
+    client = adzuna_client.AdzunaClient(app_id="SECRETAPPID", app_key="SECRETAPPKEY", session=session)
+
+    with pytest.raises(JobPostingRequestError) as exc_info:
+        client.search(what="software engineer intern", where="Dallas", live=True)
+
+    message = str(exc_info.value)
+    assert "SECRETAPPID" not in message
+    assert "SECRETAPPKEY" not in message
+    assert exc_info.value.transient is True
+    assert exc_info.value.__cause__ is None
+    assert exc_info.value.__suppress_context__ is True  # from None -- never auto-printed
+
+
+def test_full_traceback_text_does_not_contain_credentials():
+    """The exact failure mode: a caller that prints traceback.format_exc()
+    (or lets an uncaught exception print one) must not see the credentials
+    either -- not just str(exc) in isolation."""
+    import traceback
+
+    response = _real_response_with_credential_bearing_url(503)
+    session = FakeSession(response=response)
+    client = adzuna_client.AdzunaClient(app_id="SECRETAPPID", app_key="SECRETAPPKEY", session=session)
+
+    try:
+        client.search(what="software engineer intern", where="Dallas", live=True)
+    except JobPostingRequestError:
+        rendered = traceback.format_exc()
+    else:
+        pytest.fail("expected JobPostingRequestError")
+
+    assert "SECRETAPPID" not in rendered
+    assert "SECRETAPPKEY" not in rendered
 
 
 # ---------------------------------------------------------------- JSearch
