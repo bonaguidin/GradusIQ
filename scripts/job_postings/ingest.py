@@ -27,6 +27,16 @@ with target_role NULL. No shared quota -- politeness and page volume are the
 only constraints -- so it gets its own workflow job, not a slot in the vendor
 sweep. It reuses run()'s normalize/dedup/upsert tail unchanged.
 
+ALIAS QUERIES (PR 3) ADD COVERAGE, NEVER A LABEL. data/job_postings/
+adzuna_query_aliases.yaml's queries run alongside the 14 role queries in
+the Adzuna sweep, but their rows never carry a target_role key at all
+(absent, not None) and are upserted in their own call, never combined
+with a role query's rows -- see fetch_alias's ALIAS INVARIANT comment and
+data/job_postings/README.md's "Alias queries" section for why. Alias
+calls count toward --max-adzuna-calls (default 24) the same as role
+calls; the run refuses outright, before any call is made, if the planned
+total would exceed it.
+
 WHAT THIS CANNOT DO YET
 -----------------------
 The tables do not exist. supabase/migrations/20260817210000 is staged and
@@ -48,6 +58,8 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 HERE = Path(__file__).resolve().parent
 REPO_ROOT = HERE.parents[1]
 sys.path.insert(0, str(HERE))
@@ -61,6 +73,7 @@ from normalize import (  # noqa: E402
 )
 
 ROLE_REQUIREMENTS = REPO_ROOT / "data" / "role_requirements.json"
+ALIAS_QUERIES_PATH = REPO_ROOT / "data" / "job_postings" / "adzuna_query_aliases.yaml"
 
 POSTINGS_TABLE = "job_postings"
 FETCH_LOG_TABLE = "job_posting_fetch_log"
@@ -118,6 +131,28 @@ def dedupe_by_conflict_key(rows: list[dict]) -> list[dict]:
         out.append(r)
     return out
 
+
+class MixedTargetRoleBatchError(Exception):
+    """Raised when one upsert_postings() call's rows disagree on whether
+    they carry a target_role key -- the ALIAS INVARIANT's enforcement
+    point. A real, mixed batch is exactly how an alias upsert could
+    silently null out or overwrite an existing role label (see
+    fetch_alias's docstring); this makes that impossible rather than
+    relying only on run()'s per-query call structure to keep it from
+    happening."""
+
+
+def _assert_homogeneous_target_role(rows: list[dict]) -> None:
+    has_key = [("target_role" in r) for r in rows]
+    if has_key and any(has_key) and not all(has_key):
+        raise MixedTargetRoleBatchError(
+            f"{sum(has_key)} of {len(rows)} rows in this upsert_postings() call "
+            f"carry a target_role key and the rest do not -- refusing. Role and "
+            f"alias rows must be upserted in separate calls (see the ALIAS "
+            f"INVARIANT note on fetch_alias)."
+        )
+
+
 # Rows per vendor call. Small on purpose -- one call returns one page, and a
 # bigger page does not cost more quota but does cost more to normalize wrongly
 # while the field maps are unconfirmed.
@@ -140,6 +175,17 @@ def load_target_roles() -> list[str]:
     with ROLE_REQUIREMENTS.open(encoding="utf-8") as f:
         data = json.load(f)
     return [k for k in data if k != "_notes"]
+
+
+def load_adzuna_query_aliases(path: Path = ALIAS_QUERIES_PATH) -> list[str]:
+    """Nightly alias search strings for Adzuna -- additional queries that
+    catch postings the 14 role queries miss, without claiming a
+    target_role label (see the ALIAS INVARIANT note on run()). Each
+    config entry also carries a note and the live-test evidence that
+    justified adding it; only the query string itself is used here."""
+    with path.open(encoding="utf-8") as f:
+        data = yaml.safe_load(f)
+    return [entry["query"] for entry in data.get("aliases") or []]
 
 
 @dataclass
@@ -317,6 +363,87 @@ def fetch_one(
     outcome.normalization_errors = errors
     outcome.results_count = len(rows)
     return outcome
+
+
+# ALIAS INVARIANT (design (v), PR 3): an alias query's rows must never
+# carry a target_role key at all -- not a `None`/NULL value, absent
+# entirely -- and must be upserted in their OWN store.upsert_postings()
+# call, never combined with a role query's rows into one payload list.
+#
+# Why: the upsert conflict key is (source, source_job_id), and PostgREST's
+# bulk upsert declares the column set to write via the UNION of keys
+# across every row in ONE call (postgrest-py's `columns=` query param,
+# computed by `_unique_columns`). If even one row in a call carries
+# target_role, every row in that SAME call is treated as declaring the
+# column, and a row that omitted it would be nulled out instead of left
+# untouched. Keeping alias rows in their own homogeneous, target_role-free
+# call -- exactly what fetch_alias + the `for query in aliases` loop in
+# run() do -- means an alias upsert can NEVER overwrite an existing role
+# query's label, in either call order, with no migration and no
+# ignore_duplicates staleness tradeoff. See job postings README's
+# "Alias queries" section for the full comparison against the
+# alternatives this was chosen over.
+def fetch_alias(
+    source: str,
+    query: str,
+    *,
+    live: bool,
+    page_size: int = DEFAULT_PAGE_SIZE,
+    where: str = DEFAULT_WHERE,
+    dump_shape: bool = False,
+) -> FetchOutcome:
+    """One alias query, one call. Mirrors fetch_one, except the row payload
+    never carries target_role -- see the ALIAS INVARIANT note above."""
+    outcome = FetchOutcome(source=source, target_role=f"alias:{query}")
+
+    try:
+        client = build_client(source)
+    except JobPostingConfigError as exc:
+        outcome.status = "error"
+        outcome.error_detail = f"config: {exc}"
+        return outcome
+
+    try:
+        payload = client.search(
+            what=query,
+            where=where,
+            distance=DEFAULT_DISTANCE_MILES,
+            results_per_page=page_size,
+            live=live,
+        )
+    except JobPostingRequestError as exc:
+        outcome.status = "error"
+        outcome.error_detail = f"request (transient={exc.transient}): {exc}"
+        outcome.quota_used = 1  # a failed call still spends the call
+        return outcome
+
+    if payload is None:  # dry run -- the client printed the request
+        return outcome
+
+    outcome.quota_used = 1
+
+    if dump_shape:
+        print(describe_shape(payload, source))
+
+    try:
+        rows, errors = normalize_response(payload, source, target_role=None)
+    except NormalizationError as exc:
+        outcome.status = "error"
+        outcome.error_detail = f"normalize: {exc}"
+        return outcome
+
+    outcome.rows = rows
+    outcome.normalization_errors = errors
+    outcome.results_count = len(rows)
+    return outcome
+
+
+class AdzunaQuotaExceededError(Exception):
+    """Raised when a run's planned Adzuna calls (role + alias) exceed the
+    configured cap, before any call is made."""
+
+
+DEFAULT_MAX_ADZUNA_CALLS_PER_RUN = 24
 
 
 def resolve_and_attach_identity(rows: list[dict], store: Any, report: RunReport) -> list[str]:
@@ -559,6 +686,7 @@ class DryRunStore:
         self.canonical[cluster_id] = (source, source_job_id)
 
     def upsert_postings(self, rows: list[dict]) -> int:
+        _assert_homogeneous_target_role(rows)
         rows = dedupe_by_conflict_key(rows)
         self.rows.extend(rows)
         return len(rows)
@@ -824,6 +952,7 @@ class SupabaseStore:
             ).eq("id", cluster_id).execute()
 
     def upsert_postings(self, rows: list[dict]) -> int:
+        _assert_homogeneous_target_role(rows)
         # Collapse intra-batch (source, source_job_id) duplicates before the
         # upsert -- Postgres 21000 otherwise. See dedupe_by_conflict_key.
         rows = dedupe_by_conflict_key(rows)
@@ -852,6 +981,33 @@ class SupabaseStore:
         self.client.table(FETCH_LOG_TABLE).insert(log_row).execute()
 
 
+def _stage_resolve_upsert(
+    outcome: FetchOutcome, store: Any, report: RunReport, *, subject: str
+) -> None:
+    """Shared tail for one fetch outcome: stage, resolve identity, upsert
+    again to persist posting_identity, drop vacated clusters, log. Used by
+    both the role loop and the alias loop below -- each call's
+    outcome.rows is exactly one query's rows, so an alias call's upsert is
+    never combined with a role call's (see the ALIAS INVARIANT note on
+    fetch_alias)."""
+    if outcome.rows:
+        # A failure in the middle, or a job cancelled between resolve and
+        # the second upsert, can leave clusters with no postings and
+        # postings with NULL identity. Atomicity is an open item in
+        # outstanding-fixes.md.
+        store.stage_postings(outcome.rows)
+        vacated = resolve_and_attach_identity(outcome.rows, store, report)
+        report.rows_upserted += store.upsert_postings(outcome.rows)
+        try:
+            store.drop_clusters(vacated)
+        except Exception as exc:  # noqa: BLE001 -- cleanup must not abort the run
+            report.cluster_drop_failures += 1
+            print(
+                f"drop_clusters failed for {subject}: {type(exc).__name__}: {exc}",
+                file=sys.stderr,
+            )
+
+
 def run(
     *,
     sources: tuple[str, ...],
@@ -861,7 +1017,24 @@ def run(
     page_size: int,
     where: str,
     dump_shape: bool,
+    aliases: list[str] | None = None,
+    max_adzuna_calls: int = DEFAULT_MAX_ADZUNA_CALLS_PER_RUN,
 ) -> RunReport:
+    aliases = aliases or []
+
+    # Pre-flight, before any call is made -- same posture as the JSearch
+    # over-quota refusal in main(). Scoped to Adzuna specifically (the only
+    # source aliases apply to); a jsearch-only or workday-only run is
+    # unaffected regardless of how many aliases are configured.
+    if "adzuna" in sources:
+        planned = len(roles) + len(aliases)
+        if planned > max_adzuna_calls:
+            raise AdzunaQuotaExceededError(
+                f"Refusing: {planned} planned Adzuna calls ({len(roles)} role + "
+                f"{len(aliases)} alias) exceeds the cap of {max_adzuna_calls}. "
+                f"Pass a higher max_adzuna_calls if this is intentional."
+            )
+
     report = RunReport(started_at=datetime.now(timezone.utc), dry_run=not live)
     store: Any = SupabaseStore() if write else DryRunStore()
 
@@ -876,28 +1049,26 @@ def run(
                 dump_shape=dump_shape,
             )
             report.outcomes.append(outcome)
-
-            if outcome.rows:
-                # Stage the source rows, resolve identity, then upsert again to
-                # persist posting_identity. A failure in the middle, or a job
-                # cancelled between resolve and the second upsert, can leave
-                # clusters with no postings and postings with NULL identity.
-                # Atomicity is an open item in outstanding-fixes.md.
-                store.stage_postings(outcome.rows)
-                vacated = resolve_and_attach_identity(outcome.rows, store, report)
-                report.rows_upserted += store.upsert_postings(outcome.rows)
-                try:
-                    store.drop_clusters(vacated)
-                except Exception as exc:  # noqa: BLE001 -- cleanup must not abort the run
-                    report.cluster_drop_failures += 1
-                    print(
-                        f"drop_clusters failed for {source}/{role}: "
-                        f"{type(exc).__name__}: {exc}",
-                        file=sys.stderr,
-                    )
-
+            _stage_resolve_upsert(outcome, store, report, subject=f"{source}/{role}")
             if live:
                 store.write_log(outcome.log_row())
+
+        if source == "adzuna" and aliases:
+            for query in aliases:
+                outcome = fetch_alias(
+                    source,
+                    query,
+                    live=live,
+                    page_size=page_size,
+                    where=where,
+                    dump_shape=dump_shape,
+                )
+                report.outcomes.append(outcome)
+                _stage_resolve_upsert(
+                    outcome, store, report, subject=f"{source}/alias:{query}"
+                )
+                if live:
+                    store.write_log(outcome.log_row())
 
     return report
 
@@ -1166,6 +1337,19 @@ def build_parser() -> argparse.ArgumentParser:
         help="Print what the vendor actually returned against what normalize.py expects. "
              "Use this to confirm the field maps with one deliberately-spent call.",
     )
+    p.add_argument(
+        "--no-aliases",
+        action="store_true",
+        help=f"Skip the nightly alias queries ({ALIAS_QUERIES_PATH.name}) even when "
+             f"--source adzuna runs.",
+    )
+    p.add_argument(
+        "--max-adzuna-calls",
+        type=int,
+        default=DEFAULT_MAX_ADZUNA_CALLS_PER_RUN,
+        help=f"Hard cap on total Adzuna calls (role + alias) in one run. "
+             f"Default {DEFAULT_MAX_ADZUNA_CALLS_PER_RUN}.",
+    )
     return p
 
 
@@ -1194,17 +1378,25 @@ def main() -> int:
         )
         return 2
 
+    aliases = [] if args.no_aliases else load_adzuna_query_aliases()
+
     reports: list[RunReport] = []
     if vendor_sources:
-        reports.append(run(
-            sources=vendor_sources,
-            roles=roles,
-            live=args.live,
-            write=args.write,
-            page_size=args.page_size,
-            where=args.where,
-            dump_shape=args.dump_shape,
-        ))
+        try:
+            reports.append(run(
+                sources=vendor_sources,
+                roles=roles,
+                live=args.live,
+                write=args.write,
+                page_size=args.page_size,
+                where=args.where,
+                dump_shape=args.dump_shape,
+                aliases=aliases,
+                max_adzuna_calls=args.max_adzuna_calls,
+            ))
+        except AdzunaQuotaExceededError as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
     if do_workday:
         reports.append(run_workday(live=args.live, write=args.write))
 
