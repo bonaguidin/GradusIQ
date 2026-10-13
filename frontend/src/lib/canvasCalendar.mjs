@@ -4,7 +4,7 @@
 // canvasCalendar.test.mjs pins these.
 
 export const CANVAS_CALENDAR_URL = '/api/v2/student/me/canvas-calendar'
-export const canvasCalendarRefreshUrl = () => `${CANVAS_CALENDAR_URL}?refresh=true`
+export const canvasCalendarRefreshUrl = () => `${CANVAS_CALENDAR_URL}/refresh`
 
 function asEvent(raw) {
   if (!raw || typeof raw !== 'object') return null

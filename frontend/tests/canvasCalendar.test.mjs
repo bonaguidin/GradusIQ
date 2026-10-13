@@ -27,7 +27,7 @@ const raw = (overrides = {}) => ({
 
 test('routes', () => {
   assert.equal(CANVAS_CALENDAR_URL, '/api/v2/student/me/canvas-calendar')
-  assert.equal(canvasCalendarRefreshUrl(), '/api/v2/student/me/canvas-calendar?refresh=true')
+  assert.equal(canvasCalendarRefreshUrl(), '/api/v2/student/me/canvas-calendar/refresh')
   assert.equal(canvasCalendarPageUrl('canvas.tamu.edu'), 'https://canvas.tamu.edu/calendar')
   assert.equal(canvasCalendarPageUrl(null), null)
 })

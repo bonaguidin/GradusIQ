@@ -20,7 +20,10 @@ async function send(url: string, init: RequestInit): Promise<{ status: number; b
 const auth = (token: string) => ({ Accept: 'application/json', Authorization: `Bearer ${token}` });
 
 export async function fetchCanvasCalendar(token: string, refresh = false): Promise<CanvasCalendarResult> {
-  const { status, body } = await send(refresh ? canvasCalendarRefreshUrl() : CANVAS_CALENDAR_URL, { method: 'GET', headers: auth(token) });
+  const { status, body } = await send(
+    refresh ? canvasCalendarRefreshUrl() : CANVAS_CALENDAR_URL,
+    { method: refresh ? 'POST' : 'GET', headers: auth(token) },
+  );
   return normalizeCanvasCalendar(status, body);
 }
 

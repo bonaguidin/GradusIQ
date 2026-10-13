@@ -397,6 +397,27 @@ def test_stale_get_refresh_failure_keeps_cached_events(client, monkeypatch):
     assert fake.tables["canvas_calendar_feeds"][0]["last_error"] == body["last_error"]
 
 
+def test_refresh_route_forces_a_sync(client, monkeypatch, feed_body):
+    now = datetime.now(timezone.utc)
+    fake = FakeClient(feeds=[{
+        "student_id": STUDENT,
+        "feed_url": FEED_URL,
+        "feed_host": "canvas.tamu.edu",
+        "events": [],
+        "synced_at": now.isoformat(),
+        "last_error": None,
+    }])
+    monkeypatch.setattr(api, "build_client_for_token", lambda token: fake)
+
+    assert client.get("/api/v2/student/me/canvas-calendar", headers=AUTH).json()["events"] == []
+    assert feed_body == []
+
+    resp = client.post("/api/v2/student/me/canvas-calendar/refresh", headers=AUTH)
+    assert resp.status_code == 200
+    assert feed_body == [FEED_URL]
+    assert len(resp.json()["events"]) == 3
+
+
 def test_delete_disconnects(client, monkeypatch):
     fake = FakeClient(feeds=[{"student_id": STUDENT, "feed_url": FEED_URL, "events": []}])
     monkeypatch.setattr(api, "build_client_for_token", lambda token: fake)

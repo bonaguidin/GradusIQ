@@ -4273,7 +4273,21 @@ def _refresh_canvas_calendar(client, student_id: str, row: dict, canvas_host: st
     "/api/v2/student/me/canvas-calendar",
     dependencies=[Depends(authorize_proxy_request)],
 )
-def get_me_canvas_calendar(request: Request, refresh: bool = False) -> dict:
+def get_me_canvas_calendar(request: Request) -> dict:
+    return _serve_canvas_calendar(request, force_refresh=False)
+
+
+@router.post(
+    "/api/v2/student/me/canvas-calendar/refresh",
+    dependencies=[Depends(authorize_proxy_request)],
+)
+def refresh_me_canvas_calendar(request: Request) -> dict:
+    """Re-sync now, ignoring staleness and failure backoff. A path of its own
+    rather than a ?refresh flag so the Vercel proxy forwards a fixed path."""
+    return _serve_canvas_calendar(request, force_refresh=True)
+
+
+def _serve_canvas_calendar(request: Request, *, force_refresh: bool) -> dict:
     client = _session_client(request)
     student_id = _resolve_session_student_id(client)
     institution_id = _home_institution_id(client, student_id)
@@ -4281,7 +4295,7 @@ def get_me_canvas_calendar(request: Request, refresh: bool = False) -> dict:
     now = datetime.now(timezone.utc)
 
     row = _load_canvas_calendar_row(client, student_id)
-    if row is not None and (refresh or calendar_feed.is_stale(row, now)):
+    if row is not None and (force_refresh or calendar_feed.is_stale(row, now)):
         row = _refresh_canvas_calendar(client, student_id, row, canvas_host, now)
     return _canvas_calendar_response(row, canvas_host, now)
 
