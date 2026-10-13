@@ -35,7 +35,8 @@ export function TranscriptPage() {
 
 export function TranscriptFlow({ accessToken }: { accessToken: string }) {
   const navigate = useNavigate();
-  const { reloadStudentProfile } = useAuth();
+  const { reloadStudentProfile, studentAccount } = useAuth();
+  const institutionName = studentAccount.profile?.intelligence_profile.institution.name ?? null;
   const [step, setStep] = useState<Step>('checking');
   const [review, setReview] = useState<TranscriptReviewResult | null>(null);
   const [sourceName, setSourceName] = useState<string>();
@@ -119,6 +120,7 @@ export function TranscriptFlow({ accessToken }: { accessToken: string }) {
       <div className="stage-section">
         <TranscriptUpload
           accessToken={accessToken}
+          institutionName={institutionName}
           onUploaded={async (upload: TranscriptUploadResult, fileName: string) => {
             setUploadResult(upload);
             setSourceName(fileName);

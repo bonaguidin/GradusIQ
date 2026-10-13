@@ -75,7 +75,8 @@ const TOUR_STEPS: TourStep[] = [
       <>
         Your classes and grades live here. To populate them, upload your{' '}
         <strong>transcript</strong> — we read the courses off it and you confirm
-        each line. Direct <strong>Canvas &amp; Blackboard sync is coming soon</strong>.
+        each line. Connect your <strong>Canvas calendar</strong> on Academic Overview to see
+        upcoming due dates and exams.
         Once your record is in: AI analysis of your grades and professor
         comments, plus an exam-topic breakdown.
       </>
