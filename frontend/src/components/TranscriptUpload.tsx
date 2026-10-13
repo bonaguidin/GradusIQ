@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { uploadTranscript } from '../api/transcript';
+import { ConfirmButton, useConfirmStatus } from './ConfirmButton';
 import { ProcessingStatus, processingLabel } from './ProcessingStatus';
 import type { TranscriptUploadResult } from '../lib/transcriptApi.mjs';
 import { GENERIC_TRANSCRIPT_STEPS, isAcceptedTranscriptFile, transcriptSourceFor } from '../lib/transcriptSources.mjs';
@@ -57,6 +58,7 @@ export function TranscriptUpload({ accessToken, onUploaded, institutionName }: T
   const [dragging, setDragging] = useState(false);
   const [dropError, setDropError] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
+  const confirm = useConfirmStatus();
   const source = transcriptSourceFor(institutionName);
 
   /**
@@ -89,15 +91,18 @@ export function TranscriptUpload({ accessToken, onUploaded, institutionName }: T
     if (!file || busy) return;
     setBusy(true);
     setFailure(null);
+    confirm.start();
     const result = await uploadTranscript(accessToken, file);
     if (result.ok) {
       // `busy` stays true on success -- see ResumeUpload's submit for the
       // reasoning. The processing timers are cleaned up by unmount.
+      await confirm.succeed();
       onUploaded(result, file.name);
       return;
     }
     // Every failure -- parse, network, timeout -- lands here, which is what
     // guarantees the processing state cannot outlive the request.
+    confirm.fail();
     setFailure(result);
     setBusy(false);
   }
@@ -192,9 +197,9 @@ export function TranscriptUpload({ accessToken, onUploaded, institutionName }: T
             </div>
           )}
 
-          <button className="rv-commit-button" type="submit" disabled={!file || busy}>
-            {busy ? processingLabel('transcript') : 'Upload transcript'}
-          </button>
+          <ConfirmButton className="rv-commit-button" type="submit" status={confirm.status} disabled={!file || busy}>
+            {confirm.status === 'success' ? 'Uploaded' : busy ? processingLabel('transcript') : 'Upload transcript'}
+          </ConfirmButton>
 
           {failure && (
             <button
