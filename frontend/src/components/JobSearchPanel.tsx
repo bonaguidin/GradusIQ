@@ -117,27 +117,32 @@ export function JobSearchPanel({ targetRoles, accessToken }: JobSearchPanelProps
       ) : (
         <>
           <div className="job-search-controls">
-            <fieldset className="job-search-families" aria-label="Filter by family">
-              <legend>Families</legend>
-              {facets.families.map((f) => {
-                const on = (activeFamilies ?? []).includes(f.family);
-                return (
-                  <button
-                    key={f.family}
-                    type="button"
-                    className={`chip${on ? ' chip--on' : ''}`}
-                    aria-pressed={on}
-                    onClick={() => toggleFamily(f.family)}
-                  >
-                    {f.family} <span className="chip-count">{f.count}</span>
-                  </button>
-                );
-              })}
-            </fieldset>
+            {/* No families means nothing to filter by, and an empty labelled
+                group read as a broken control. */}
+            {facets.families.length > 0 && (
+              <fieldset className="job-search-families" aria-label="Filter by family">
+                <legend>Families</legend>
+                {facets.families.map((f) => {
+                  const on = (activeFamilies ?? []).includes(f.family);
+                  return (
+                    <button
+                      key={f.family}
+                      type="button"
+                      className={`chip${on ? ' chip--on' : ''}`}
+                      aria-pressed={on}
+                      onClick={() => toggleFamily(f.family)}
+                    >
+                      {f.family} <span className="chip-count">{f.count}</span>
+                    </button>
+                  );
+                })}
+              </fieldset>
+            )}
 
             <label>
               Posted within
               <select
+                className="form-select"
                 value={days}
                 onChange={(event) => changeDays(Number(event.target.value) as JobSearchDays)}
               >
@@ -151,7 +156,7 @@ export function JobSearchPanel({ targetRoles, accessToken }: JobSearchPanelProps
 
             <label>
               Employer
-              <select value={employer} onChange={(event) => changeEmployer(event.target.value)}>
+              <select className="form-select" value={employer} onChange={(event) => changeEmployer(event.target.value)}>
                 <option value="">All employers</option>
                 {facets.employers.map((e) => (
                   <option key={e.employer} value={e.employer}>

@@ -8,10 +8,12 @@
   gap: var(--sp-4);
   padding: var(--sp-5) var(--sp-6);
   margin-bottom: var(--sp-6);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-left: 3px solid var(--accent);
-  border-radius: var(--radius);
+  /* The app's shared elevated card (index.css, "SURFACE SYSTEM"). The old
+     accent bar down the left edge made the panel read as a notice. */
+  background: var(--surface-elevated);
+  border: none;
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
 }
 
 .chat-header {
