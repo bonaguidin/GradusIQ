@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
+import { ConfirmButton, useConfirmStatus } from '../components/ConfirmButton';
 import { useErrorFocus } from '../hooks/useErrorFocus';
 import { INSTITUTIONS, todayIso, validateSignupForm } from '../lib/signupRules.mjs';
 
@@ -40,6 +41,7 @@ export function SignUpPage() {
   const [dateOfBirth, setDateOfBirth] = useState('');
 
   const [submitting, setSubmitting] = useState(false);
+  const confirm = useConfirmStatus();
   const [error, setError] = useState<string | null>(null);
   const errorRef = useRef<HTMLParagraphElement>(null);
   useErrorFocus(error, errorRef);
@@ -57,16 +59,21 @@ export function SignUpPage() {
     );
     if (problem) {
       setError(problem);
+      confirm.fail();
       return;
     }
 
     setSubmitting(true);
+    confirm.start();
     try {
       const outcome = await signUpWithPassword(email.trim(), password, {
         name: name.trim(),
         institution_id: institutionId,
         date_of_birth: dateOfBirth,
       });
+
+      // Both outcomes leave this form, so the check plays first.
+      await confirm.succeed();
 
       if (outcome === 'authenticated') {
         // Signed in already. Mirrors LoginPage's post-sign-in navigation
@@ -77,6 +84,7 @@ export function SignUpPage() {
 
       setSentTo(email.trim());
     } catch (err) {
+      confirm.fail();
       setError(err instanceof Error ? err.message : 'Sign-up failed.');
     } finally {
       // Runs on the authenticated branch too. Navigation unmounts this page, so
@@ -220,21 +228,14 @@ export function SignUpPage() {
             </p>
           )}
 
-          <button
+          <ConfirmButton
             type="submit"
             className="btn btn-primary btn-full"
+            status={confirm.status}
             disabled={submitting}
-            aria-busy={submitting}
           >
-            {submitting ? (
-              <span className="btn-loading">
-                <span className="spinner-small" aria-hidden="true" />
-                Creating account…
-              </span>
-            ) : (
-              'Create account'
-            )}
-          </button>
+            {confirm.status === 'success' ? 'Account created' : submitting ? 'Creating account…' : 'Create account'}
+          </ConfirmButton>
         </form>
 
         <p className="login-note">

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { connectCanvasCalendar, disconnectCanvasCalendar, fetchCanvasCalendar } from '../api/canvasCalendar';
+import { ConfirmButton, useConfirmStatus } from './ConfirmButton';
 import {
   canvasCalendarPageUrl,
   dayHeading,
@@ -23,6 +24,7 @@ export function CanvasCalendarPanel({ accessToken }: { accessToken: string }) {
   const [feedUrl, setFeedUrl] = useState('');
   const [busy, setBusy] = useState<'connect' | 'refresh' | 'disconnect' | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const confirm = useConfirmStatus();
 
   useEffect(() => {
     let active = true;
@@ -38,16 +40,23 @@ export function CanvasCalendarPanel({ accessToken }: { accessToken: string }) {
     event.preventDefault();
     if (!feedUrl.trim()) {
       setFormError('Paste the Calendar Feed link from Canvas.');
+      confirm.fail();
       return;
     }
     setBusy('connect');
     setFormError(null);
+    confirm.start();
     const result = await connectCanvasCalendar(accessToken, feedUrl.trim());
-    setBusy(null);
     if (result.ok) {
+      // The connected view replaces this form, so the check plays first.
+      await confirm.succeed();
+      setBusy(null);
       setFeedUrl('');
       setState(result);
+      confirm.reset();
     } else {
+      setBusy(null);
+      confirm.fail();
       setFormError(result.message);
     }
   }
@@ -112,9 +121,9 @@ export function CanvasCalendarPanel({ accessToken }: { accessToken: string }) {
             onChange={(e) => setFeedUrl(e.target.value)}
             disabled={busy !== null}
           />
-          <button type="submit" className="btn btn-primary btn-sm" disabled={busy !== null}>
-            {busy === 'connect' ? 'Connecting…' : 'Connect'}
-          </button>
+          <ConfirmButton type="submit" className="btn btn-primary btn-sm" status={confirm.status} disabled={busy !== null}>
+            {confirm.status === 'success' ? 'Connected' : busy === 'connect' ? 'Connecting…' : 'Connect'}
+          </ConfirmButton>
         </form>
         {formError && <p className="login-error" role="alert">{formError}</p>}
         <p className="canvas-calendar-note">

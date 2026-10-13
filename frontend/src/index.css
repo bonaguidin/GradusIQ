@@ -6173,7 +6173,12 @@ a {
 .rv-commit-button:disabled { opacity: 0.75; cursor: default; }
 .rv-commit-button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 
-/* ── commit button states: spinner / check / cross ───────────────────────
+/* ── confirm animation: spinner / check / cross ──────────────────────────
+   Shared by every big-moment button through components/ConfirmButton.tsx
+   (the review CommitBar, transcript and resume upload, Connect Canvas,
+   profile save, Create account). .confirm-anim goes on top of the button's
+   own look (.rv-commit-button or .btn-primary), so each keeps its size.
+
    No width-shrink here, unlike the first sketch of this: the real wait
    (ConfirmingOverlay's own docs -- 20-50s against a cold-started backend)
    is too long to leave the button looking collapsed, and it sits inline
@@ -6189,12 +6194,21 @@ a {
    the ripple (interaction.css); every new element here is a real child,
    not a pseudo-element, so it never has to compete with those for the
    same box. */
-.rv-commit-label {
+.confirm-anim-label {
   transition: opacity 0.15s var(--ease-out);
 }
-.rv-commit-button.is-loading .rv-commit-label,
-.rv-commit-button.is-success .rv-commit-label,
-.rv-commit-button.is-error .rv-commit-label {
+/* A button mid-save or showing its check is disabled so it can't be pressed
+   twice, but it is the thing the student is watching, so it keeps full
+   strength rather than the faded look of a button that can't be used. */
+.confirm-anim.is-loading:disabled,
+.confirm-anim.is-success:disabled {
+  opacity: 1;
+  cursor: default;
+}
+
+.confirm-anim.is-loading .confirm-anim-label,
+.confirm-anim.is-success .confirm-anim-label,
+.confirm-anim.is-error .confirm-anim-label {
   opacity: 0;
 }
 
@@ -6202,7 +6216,7 @@ a {
    appear/disappear scale -- a plain `transform: scale()` and a
    `transform`-animating keyframe sharing one element is what made an
    earlier version of this spinner look static instead of spinning. */
-.rv-commit-spinner {
+.confirm-anim-spinner {
   position: absolute;
   top: 50%;
   left: 50%;
@@ -6212,7 +6226,7 @@ a {
   transform: translate(-50%, -50%) scale(0.4);
   transition: opacity 0.15s var(--ease-out), transform 0.25s var(--ease-spring);
 }
-.rv-commit-spinner::before {
+.confirm-anim-spinner::before {
   content: "";
   display: block;
   width: 100%;
@@ -6220,12 +6234,12 @@ a {
   border-radius: 50%;
   border: 2px solid rgb(var(--on-accent-rgb) / 0.35);
   border-top-color: var(--on-accent);
-  animation: rv-commit-spin var(--t-spin) linear infinite;
+  animation: confirm-anim-spin var(--t-spin) linear infinite;
 }
-.rv-commit-button.is-loading .rv-commit-spinner { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-@keyframes rv-commit-spin { to { transform: rotate(360deg); } }
+.confirm-anim.is-loading .confirm-anim-spinner { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+@keyframes confirm-anim-spin { to { transform: rotate(360deg); } }
 
-.rv-commit-icon {
+.confirm-anim-icon {
   position: absolute;
   top: 50%;
   left: 50%;
@@ -6238,31 +6252,31 @@ a {
   stroke-linejoin: round;
   opacity: 0;
 }
-.rv-commit-check { stroke-dasharray: 20; stroke-dashoffset: 20; transform: translate(-50%, -50%) scale(0.4); }
-.rv-commit-button.is-success .rv-commit-check {
+.confirm-anim-check { stroke-dasharray: 20; stroke-dashoffset: 20; transform: translate(-50%, -50%) scale(0.4); }
+.confirm-anim.is-success .confirm-anim-check {
   opacity: 1;
-  animation: rv-commit-check-draw 0.3s var(--ease-out) forwards, rv-commit-icon-pop 0.45s var(--ease-spring) forwards;
+  animation: confirm-anim-check-draw 0.3s var(--ease-out) forwards, confirm-anim-icon-pop 0.45s var(--ease-spring) forwards;
 }
-@keyframes rv-commit-check-draw { to { stroke-dashoffset: 0; } }
-@keyframes rv-commit-icon-pop {
+@keyframes confirm-anim-check-draw { to { stroke-dashoffset: 0; } }
+@keyframes confirm-anim-icon-pop {
   0% { transform: translate(-50%, -50%) scale(0.4); }
   55% { transform: translate(-50%, -50%) scale(1.3); }
   100% { transform: translate(-50%, -50%) scale(1); }
 }
-.rv-commit-cross { transform: translate(-50%, -50%) scale(0.4); }
-.rv-commit-button.is-error .rv-commit-cross { opacity: 1; animation: rv-commit-icon-pop 0.3s var(--ease-spring) forwards; }
+.confirm-anim-cross { transform: translate(-50%, -50%) scale(0.4); }
+.confirm-anim.is-error .confirm-anim-cross { opacity: 1; animation: confirm-anim-icon-pop 0.3s var(--ease-spring) forwards; }
 
 /* The "oomph": success isn't just an icon swap, it's an impact -- the whole
    button overshoots on landing and a ring shockwaves outward from it once,
    both settling almost immediately. */
-.rv-commit-button.is-success { animation: rv-commit-slam 0.5s var(--ease-out); }
-@keyframes rv-commit-slam {
+.confirm-anim.is-success { animation: confirm-anim-slam 0.5s var(--ease-out); }
+@keyframes confirm-anim-slam {
   0% { transform: scale(1); }
   35% { transform: scale(1.1); }
   62% { transform: scale(0.94); }
   100% { transform: scale(1); }
 }
-.rv-commit-ring {
+.confirm-anim-ring {
   position: absolute;
   inset: 0;
   border-radius: inherit;
@@ -6270,18 +6284,21 @@ a {
   opacity: 0;
   pointer-events: none;
 }
-.rv-commit-button.is-success .rv-commit-ring { animation: rv-commit-ring 0.6s var(--ease-out); }
-@keyframes rv-commit-ring {
+.confirm-anim.is-success .confirm-anim-ring { animation: confirm-anim-ring 0.6s var(--ease-out); }
+@keyframes confirm-anim-ring {
   0% { opacity: 0.7; transform: scale(1); }
   100% { opacity: 0; transform: scale(1.4); }
 }
 
-.rv-commit-button.is-error {
-  animation: rv-commit-shake 0.4s var(--ease-out);
+/* The hover selectors are listed so a pointer resting on the button can't
+   repaint the error state in the hover colour mid-shake. */
+.confirm-anim.is-error,
+.confirm-anim.is-error:hover:not(:disabled) {
+  animation: confirm-anim-shake 0.4s var(--ease-out);
   background: var(--error);
   border-color: var(--error);
 }
-@keyframes rv-commit-shake {
+@keyframes confirm-anim-shake {
   20% { transform: translateX(-5px); }
   40% { transform: translateX(4px); }
   60% { transform: translateX(-3px); }
@@ -6290,14 +6307,14 @@ a {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .rv-commit-button.is-success,
-  .rv-commit-button.is-error,
-  .rv-commit-ring,
-  .rv-commit-spinner::before {
+  .confirm-anim.is-success,
+  .confirm-anim.is-error,
+  .confirm-anim-ring,
+  .confirm-anim-spinner::before {
     animation: none !important;
   }
-  .rv-commit-check,
-  .rv-commit-cross {
+  .confirm-anim-check,
+  .confirm-anim-cross {
     animation: none !important;
     transform: translate(-50%, -50%) scale(1) !important;
     stroke-dashoffset: 0 !important;
