@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 
 export type ConfirmStatus = 'idle' | 'loading' | 'success' | 'error';
@@ -76,9 +76,28 @@ export interface ConfirmButtonProps extends ButtonHTMLAttributes<HTMLButtonEleme
  * screen reader still hears "Saving…" or "Saved".
  */
 export function ConfirmButton({ status, className, children, disabled, type = 'button', ...rest }: ConfirmButtonProps) {
+  // The in-flight labels ("Connecting…", "Reading your transcript…") are
+  // longer than the idle ones, but they are hidden behind the icon, so letting
+  // them size the button just makes it jump wider on click and push its
+  // neighbours around. Hold the idle width until the attempt is over. Layout
+  // effects run before paint, so the wider frame is never drawn.
+  const button = useRef<HTMLButtonElement>(null);
+  const idleWidth = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    const node = button.current;
+    if (!node) return;
+    if (status === 'idle') {
+      node.style.width = '';
+      idleWidth.current = node.offsetWidth;
+    } else if (idleWidth.current !== null) {
+      node.style.width = `${String(idleWidth.current)}px`;
+    }
+  });
+
   return (
     <button
       {...rest}
+      ref={button}
       type={type}
       className={`${className ?? ''} confirm-anim${status === 'idle' ? '' : ` is-${status}`}`.trim()}
       disabled={disabled || status === 'loading' || status === 'success'}

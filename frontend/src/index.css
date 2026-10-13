@@ -6290,10 +6290,12 @@ a {
   100% { opacity: 0; transform: scale(1.4); }
 }
 
-/* The hover selectors are listed so a pointer resting on the button can't
-   repaint the error state in the hover colour mid-shake. */
+/* The pointer is usually still on the button when it fails, so the hover
+   colour and the liquid fill (interaction.css, ::before) would otherwise paint
+   over the red. --press-fill retints that fill instead of hiding it. */
 .confirm-anim.is-error,
 .confirm-anim.is-error:hover:not(:disabled) {
+  --press-fill: var(--error);
   animation: confirm-anim-shake 0.4s var(--ease-out);
   background: var(--error);
   border-color: var(--error);
