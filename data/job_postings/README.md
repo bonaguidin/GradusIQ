@@ -37,6 +37,54 @@ the nightly run instead of fixing anything.
 | `skill_aliases.yaml` | Canonical skill → surface forms | 46 skills, review still owed |
 | `slug_worksheet.md` | Generated checklist behind the CSV | Complete |
 | `employers.example.yaml` | Shape template from the skeleton repo | Superseded by the CSV |
+| `adzuna_query_aliases.yaml` | Extra nightly Adzuna search strings, no target_role label | Added for PR 3's alias-query coverage |
+
+## adzuna_query_aliases.yaml — alias queries, and why they carry no label
+
+Nightly ingest (`scripts/job_postings/ingest.py`) runs one Adzuna call per
+one of the 14 target roles, searching `what=<role name>`. That phrasing
+misses postings a differently-worded search would catch -- confirmed live,
+e.g. "design engineer intern" (34 results) finds titles the "Computer
+Engineering Intern" role query does not. This file adds those extra
+queries to the nightly sweep.
+
+**ALIAS INVARIANT -- an alias query's rows never carry a `target_role`
+key at all** (not `None`/NULL, the key is *absent* from the row dict --
+see `normalize_listing`'s `target_role: str | None` parameter), and are
+upserted in their own `store.upsert_postings()` call, never combined with
+a role query's rows. This is deliberate, not an oversight:
+
+- The upsert conflict key is `(source, source_job_id)`. PostgREST's bulk
+  upsert declares which columns to write as the *union* of keys across
+  every row in one call (postgrest-py's `columns=` param). If an alias
+  row sat in the same call as a role row that *does* carry `target_role`,
+  the alias row would get `target_role` nulled on conflict instead of
+  left alone -- and in the other direction, an alias upsert that runs
+  *after* a role query returns the same job id could silently overwrite
+  that row's role label, pulling it out of FIT's hiring_signal and the
+  feed's non-internship-role fallback (both key off the exact 14 role
+  names; see `posting_provider.py` and `job_search_feed.py`).
+- Keeping alias rows target_role-free and in their own call sidesteps
+  that entirely: an alias upsert can never touch an existing role label,
+  in either call order, and FIT is unaffected since it never reads a row
+  whose `target_role` isn't one of its 14 names. The Job Search feed
+  doesn't need the label either -- it classifies internship titles from
+  the title text at read time (`role_family_matcher.py`).
+- This was chosen over three alternatives considered and rejected:
+  running alias queries before role queries so the role label always
+  wins (order becomes a fragile, unenforced invariant); `ignore_duplicates`
+  for alias upserts only (order-independent, but an alias-only row then
+  never refreshes again after its first insert, and its frozen
+  `posted_date` eventually pushes it out of the feed's 7/14/30-day
+  window even if Adzuna is still returning it nightly); and a separate
+  provenance column (robust and fresh, but needs a migration this table
+  doesn't otherwise require, plus new code to consume the second column).
+
+`job_posting_fetch_log` rows for an alias query show up as
+`alias:<query>` in `target_role` (that table's own column, identifying
+*which query ran* -- unrelated to `job_postings.target_role`, which an
+alias query never touches) and count toward the per-run Adzuna quota cap
+(`--max-adzuna-calls`, default 24) the same as any role query.
 
 ## role_families.yaml — remapped 2026-08-19
 

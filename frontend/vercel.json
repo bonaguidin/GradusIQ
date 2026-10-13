@@ -149,6 +149,14 @@
       "destination": "/api/proxy?target=me-planned-courses"
     },
     {
+      "source": "/api/v2/student/me/canvas-calendar/refresh",
+      "destination": "/api/proxy?target=me-canvas-calendar-refresh"
+    },
+    {
+      "source": "/api/v2/student/me/canvas-calendar",
+      "destination": "/api/proxy?target=me-canvas-calendar"
+    },
+    {
       "source": "/api/v2/student/me/gpa",
       "destination": "/api/proxy?target=me-gpa"
     },

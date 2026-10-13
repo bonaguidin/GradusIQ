@@ -153,8 +153,15 @@ def _coerce_number(value: Any) -> float | None:
         return None
 
 
-def normalize_listing(listing: dict, field_map: FieldMap, *, target_role: str) -> dict:
-    """One vendor listing -> one job_postings row. Raises on a missing required field."""
+def normalize_listing(listing: dict, field_map: FieldMap, *, target_role: str | None) -> dict:
+    """One vendor listing -> one job_postings row. Raises on a missing required field.
+
+    target_role=None OMITS the "target_role" key from the row entirely
+    (not a `None`/NULL value in the dict) -- an alias query's upsert must
+    never carry that key at all, so PostgREST's upsert never declares the
+    column for that call and an existing role-labeled row's target_role is
+    left untouched on conflict. See ingest.py's ALIAS INVARIANT note.
+    """
     row: dict[str, Any] = {
         "source": field_map.source,
         "source_job_id": field_map.source_job_id(listing),
@@ -162,12 +169,13 @@ def normalize_listing(listing: dict, field_map: FieldMap, *, target_role: str) -
         "company": field_map.company(listing),
         "location": field_map.location(listing),
         "url": field_map.url(listing),
-        "target_role": target_role,
         "posted_date": _coerce_date(field_map.posted_date(listing)),
         "salary_min": _coerce_number(field_map.salary_min(listing)),
         "salary_max": _coerce_number(field_map.salary_max(listing)),
         "raw_payload": listing,
     }
+    if target_role is not None:
+        row["target_role"] = target_role
 
     # Adzuna returns company.display_name = "" rather than omitting the key
     # when it has no employer to report (confirmed live: the Computer
@@ -207,7 +215,7 @@ def normalize_response(
     payload: dict,
     source: str,
     *,
-    target_role: str,
+    target_role: str | None,
 ) -> tuple[list[dict], list[str]]:
     """Whole vendor response -> (rows, errors).
 

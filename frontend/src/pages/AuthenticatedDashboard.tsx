@@ -26,6 +26,7 @@ import { JobSearchPanel } from '../components/JobSearchPanel';
 import { GapAnalysisPanel } from '../components/GapAnalysisPanel';
 import { ShiftAnalysisPanel } from '../components/ShiftAnalysisPanel';
 import { TermPlanner } from '../components/TermPlanner';
+import { CanvasCalendarPanel } from '../components/CanvasCalendarPanel';
 import { GradeCalculatorPanel } from '../components/GradeCalculatorPanel';
 import { CareerProfile, type CareerFieldFocus } from '../components/career/CareerProfile';
 import { updateProfile } from '../api/profile';
@@ -578,6 +579,9 @@ export function AuthenticatedDashboard() {
                         </>
                       )}
                     </section>
+                    {/* Due dates and exams from the student's Canvas calendar
+                        feed. Session-only: a demo identity has no feed. */}
+                    {accessToken && <CanvasCalendarPanel accessToken={accessToken} />}
                     {/* Compact reflection of the same run Course Discovery
                         itself shows (courseDiscoveryRun, lifted above) -- not
                         a second analysis or a second result store. */}

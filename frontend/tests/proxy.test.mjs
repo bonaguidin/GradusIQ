@@ -1542,3 +1542,43 @@ test('Vercel rewrites job-search for every param combination, not gated on one p
   const withRoleIndex = config.rewrites.indexOf(withRole)
   assert.ok(bareIndex > withFiltersIndex && bareIndex > withRoleIndex)
 })
+
+test('me-canvas-calendar carries GET, PUT and DELETE; refresh is a POST on its own path', async () => {
+  for (const method of ['GET', 'PUT', 'DELETE']) {
+    const { handler, seen } = planningHandler()
+    const response = await handler.fetch(
+      new Request('https://gradusiq.example/api/proxy?target=me-canvas-calendar', {
+        method,
+        headers: { Authorization: 'Bearer t', 'Content-Type': 'application/json' },
+        ...(method === 'PUT' ? { body: '{"feed_url":"https://canvas.tamu.edu/feeds/calendars/user_x.ics"}' } : {}),
+      }),
+    )
+    assert.equal(response.status, 200)
+    assert.equal(seen[0].url, 'https://backend.example/api/v2/student/me/canvas-calendar')
+    assert.equal(seen[0].method, method)
+  }
+
+  const { handler, seen } = planningHandler()
+  const refreshed = await handler.fetch(
+    new Request('https://gradusiq.example/api/proxy?target=me-canvas-calendar-refresh', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer t' },
+    }),
+  )
+  assert.equal(refreshed.status, 200)
+  assert.equal(seen[0].url, 'https://backend.example/api/v2/student/me/canvas-calendar/refresh')
+
+  const { handler: bad, seen: badSeen } = planningHandler()
+  const rejected = await bad.fetch(
+    new Request('https://gradusiq.example/api/proxy?target=me-canvas-calendar', { method: 'POST' }),
+  )
+  assert.equal(rejected.status, 400)
+  assert.equal(badSeen.length, 0)
+
+  const config = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'))
+  const rewrites = config.rewrites.map(({ source, destination }) => [source, destination])
+  const refreshIndex = rewrites.findIndex(([s]) => s === '/api/v2/student/me/canvas-calendar/refresh')
+  const baseIndex = rewrites.findIndex(([s]) => s === '/api/v2/student/me/canvas-calendar')
+  assert.equal(rewrites[refreshIndex][1], '/api/proxy?target=me-canvas-calendar-refresh')
+  assert.equal(rewrites[baseIndex][1], '/api/proxy?target=me-canvas-calendar')
+})
