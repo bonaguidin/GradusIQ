@@ -100,7 +100,7 @@ export function CourseDiscoveryPanel({
 
   return (
     <AnalysisPanel
-      title="Course Discovery"
+      title="Courses for your target role"
       invitation="Explore courses at your school that could build skills for your career goals."
       phase={phase}
       onRun={trigger}

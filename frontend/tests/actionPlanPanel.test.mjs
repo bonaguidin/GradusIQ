@@ -170,7 +170,7 @@ test('Action Plan preview: CTA lifecycle, ordering, dependency text, unconstrain
   // item, not inside Career.
   await page.getByRole('button', { name: 'Academic' }).click()
   await page.getByRole('button', { name: 'Course Discovery' }).click()
-  const panel = page.locator('.card.analysis-panel', { has: page.getByRole('heading', { name: 'Course Discovery' }) })
+  const panel = page.locator('.card.analysis-panel', { has: page.getByRole('heading', { name: 'Courses for your target role' }) })
 
   // ── CTA only appears once Course Discovery has succeeded ──────────────────
   assert.equal(await panel.getByRole('button', { name: 'Build my course path' }).count(), 0)

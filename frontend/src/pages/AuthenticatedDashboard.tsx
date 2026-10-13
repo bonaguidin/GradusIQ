@@ -729,9 +729,10 @@ export function AuthenticatedDashboard() {
 
             {activeSection === 'academic' && academicSubTab === 'course-discovery' && (
               <div className="stage-section">
-                {/* CourseDiscoveryPanel renders its own "Course Discovery"
-                    heading (via AnalysisPanel's title), so no page-level
-                    heading is added here -- that would just duplicate it. */}
+                {/* The page title every Academic sub-tab has; the panel's
+                    own card title names what it holds ("Courses for your
+                    target role") so the two don't repeat each other. */}
+                <h2 className="academic-section-heading">Course Discovery</h2>
                 <CourseDiscoveryPanel
                   targetRoles={dashboard.career.target_roles}
                   run={courseDiscoveryRun}
@@ -813,12 +814,12 @@ export function AuthenticatedDashboard() {
                   <><h2 className="career-section-heading">Career Profile</h2><div className="real-empty"><h3>Build your career profile</h3><p>Upload and confirm your resume before career facts appear here.</p><Link to="/resume" className="btn btn-primary btn-sm">Upload resume</Link></div></>
                 ) : (
                       <>
+                      <h2 className="career-section-heading">Career Profile</h2>
                       <ProfileChecklist
                         missing={missingDetails}
                         onJump={(field, trigger) => { requestField({ path: field.path, trigger }); }}
                       />
                       <div className="career-profile-block">
-                        <h2 className="career-section-heading">Career Profile</h2>
                         {/* Graduation and the majors are academic record, not
                             career record, so they arrive as props rather than
                             being dug out of the profile by the career component.

@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 import { ConfirmButton, useConfirmStatus } from '../components/ConfirmButton';
 import { useErrorFocus } from '../hooks/useErrorFocus';
+import { LoginPitch } from '../components/LoginPitch';
 import { INSTITUTIONS, todayIso, validateSignupForm } from '../lib/signupRules.mjs';
 
 /**
@@ -119,7 +120,8 @@ export function SignUpPage() {
   }
 
   return (
-    <div className="login-bg">
+    <div className="login-bg login-bg--split">
+      <LoginPitch />
       <div className="login-card">
         <div className="login-header">
           <h1 className="login-logo">GradusIQ</h1>

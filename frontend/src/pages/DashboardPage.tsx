@@ -661,6 +661,7 @@ function DemoDashboardPage() {
 
             {activeSection === 'academic' && academicSubTab === 'course-discovery' && (
               <div key="academic-course-discovery" className="stage-section">
+                <h2 className="academic-section-heading">Course Discovery</h2>
                 {career && career.target_roles.length > 0 && (
                   <CourseDiscoveryPanel targetRoles={career.target_roles} />
                 )}
@@ -736,12 +737,12 @@ function DemoDashboardPage() {
 
             {activeSection === 'career' && careerSubTab === 'profile' && (
               <div key="career-profile" className="stage-section career-subtab-panel">
+                <h2 className="career-section-heading">Career Profile</h2>
                 <ProfileChecklist
                   missing={missingDetails}
                   onJump={(field, trigger) => { requestField({ path: field.path, trigger }); }}
                 />
                 <div className="career-profile-block">
-                  <h2 className="career-section-heading">Career Profile</h2>
                   <CareerProfile
                     career={dashboard.career}
                     details={{

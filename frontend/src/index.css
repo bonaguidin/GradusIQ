@@ -8355,3 +8355,277 @@ label.profile-form-check { display: flex; flex-direction: row; align-items: cent
     padding: var(--sp-4) var(--sp-5);
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   SIGN-IN + MOBILE
+   Phase 5 of the visual elevation. The centered account shell (.login-bg /
+   .login-card) is shared by sign-in, sign-up, password reset, the resume
+   upload and the account-state screens, so restyling it here moves all of
+   them onto the white elevated card at once. It stays on the neutral
+   palette on purpose: no institution is known before sign-in (see
+   .login-form .btn-primary above).
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── the shell ── */
+.login-bg {
+  background:
+    radial-gradient(ellipse 70% 55% at 15% 0%, rgb(255 255 255 / 0.07), transparent 70%),
+    radial-gradient(ellipse 60% 50% at 100% 100%, rgb(255 255 255 / 0.04), transparent 70%),
+    var(--neutral-rail-bg);
+}
+
+.login-card {
+  max-width: 380px;
+  background: var(--surface-elevated);
+  border-radius: var(--radius-card);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.2), 0 24px 64px rgb(0 0 0 / 0.38);
+  animation: login-rise calc(var(--t-move) * 2) var(--ease-out) backwards;
+}
+
+/* The resume upload's wider card: .resume-card sits earlier in the file
+   than this block, so its width is restated here to keep winning. */
+.login-card.resume-card {
+  max-width: 440px;
+}
+
+@keyframes login-rise {
+  from { opacity: 0; transform: translateY(12px); }
+}
+
+/* The wordmark gets a mark: the same sparkle Ask GradusIQ uses, in the
+   neutral ink, on a quiet tile. Drawn in CSS so every screen that uses the
+   shell picks it up without a markup change. */
+.login-header {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: var(--sp-3);
+  align-items: center;
+  border-bottom: none;
+  padding-bottom: var(--sp-2);
+}
+
+.login-header::before {
+  content: "";
+  grid-row: span 2;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-chip);
+  background-color: var(--neutral-accent);
+  --sparkle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z'/%3E%3C/svg%3E");
+  -webkit-mask:
+    var(--sparkle) center / 20px 20px no-repeat exclude,
+    linear-gradient(#000 0 0);
+  mask:
+    var(--sparkle) center / 20px 20px no-repeat exclude,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+}
+
+.login-logo {
+  margin: 0;
+  font-size: var(--text-xl);
+}
+
+.login-subtitle {
+  margin: 2px 0 0;
+  font-size: var(--text-sm);
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* ── sign-in's demo footer ── */
+.login-demo {
+  margin-top: var(--sp-2);
+  padding: var(--sp-5) 0 var(--sp-2);
+  background: var(--paper);
+  border-top: 1px solid var(--line);
+}
+
+.login-demo-heading {
+  margin: 0;
+  padding: 0 var(--sp-8);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.login-demo-copy {
+  margin: var(--sp-1) 0 0;
+  padding: 0 var(--sp-8);
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.login-demo-form {
+  padding-top: var(--sp-4);
+}
+
+.login-demo .form-select,
+.login-demo .btn-ghost {
+  background-color: var(--surface-elevated);
+}
+
+/* "Forgot password?" belongs to the password field, so it sits right under
+   it on the right, not centered between the field and Sign in. */
+.login-form > .login-note {
+  margin-top: calc(var(--sp-2) * -1);
+  padding: 0;
+  text-align: right;
+}
+
+/* ── the pitch beside the form (sign-in and sign-up, wide windows) ── */
+.login-bg--split {
+  gap: clamp(var(--sp-8), 8vw, 120px);
+}
+
+.login-pitch {
+  display: none;
+  max-width: 400px;
+  color: rgb(255 255 255 / 0.92);
+  animation: login-rise calc(var(--t-move) * 2) var(--ease-out) 80ms backwards;
+}
+
+.login-pitch-eyebrow {
+  margin: 0 0 var(--sp-4);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgb(255 255 255 / 0.55);
+}
+
+.login-pitch-title {
+  margin: 0 0 var(--sp-6);
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  font-weight: 300;
+  line-height: 1.12;
+  letter-spacing: -0.015em;
+}
+
+.login-pitch-points {
+  display: grid;
+  gap: var(--sp-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-md);
+  color: rgb(255 255 255 / 0.7);
+}
+
+.login-pitch-points li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: var(--sp-3);
+  align-items: baseline;
+}
+
+.login-pitch-points li::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.55);
+  transform: translateY(-2px);
+}
+
+@media (min-width: 900px) {
+  .login-pitch {
+    display: block;
+  }
+}
+
+@media (max-width: 640px) {
+  .login-bg {
+    align-items: flex-start;
+    padding: var(--sp-8) var(--sp-4);
+  }
+
+  .login-demo-heading,
+  .login-demo-copy {
+    padding: 0 var(--sp-6);
+  }
+}
+
+/* ── Career Overview ──
+   The last tab still drawn as hairline columns on the bare page. The three
+   analysis summaries become cards like every other tab's sections, each
+   titled the way card titles are. */
+.career-overview-grid {
+  gap: var(--sp-4);
+  border-top: none;
+}
+
+.career-overview-summary,
+.career-overview-summary + .career-overview-summary {
+  padding: var(--sp-5) var(--sp-6);
+  background: var(--surface-elevated);
+  border: none;
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+.career-overview-summary h3 {
+  margin: 0 0 var(--sp-3);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.career-overview-summary p {
+  margin: 0;
+  color: var(--ink);
+  line-height: 1.55;
+}
+
+/* Career Profile now opens with its title, then the checklist, so the
+   record below no longer needs the wide gap it kept from the analysis
+   panels that used to sit above it. */
+.career-subtab-panel > .career-profile-block {
+  margin-top: var(--sp-6);
+}
+
+/* ── mobile ── */
+/* The projection note sat flush against the card under it. */
+.gpa-projection-note {
+  margin-bottom: var(--sp-4);
+}
+
+@media (max-width: 640px) {
+  /* Card headers with a long title and a button ("Refresh degree progress")
+     squeezed the button until its label clipped. The button now keeps its
+     size and drops under the title when the row runs out of room. */
+  .editable-section-header {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .editable-section-header > :first-child {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .editable-section-header > .btn,
+  .editable-section-actions {
+    flex-shrink: 0;
+  }
+
+  /* Two tiles a row on a phone; an odd one out takes the whole last row
+     instead of leaving half of it empty. */
+  .overview-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--sp-3);
+  }
+
+  .overview-stats > .overview-stat:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+}
