@@ -57,10 +57,17 @@ export function ChatPanel() {
   return (
     <section className="chat-panel" aria-label="Ask GradusIQ">
       <div className="chat-header">
-        <span className="chat-title">Ask <span translate="no">GradusIQ</span></span>
-        <span className="chat-sub">
-          Chat about your academics &amp; career — grounded in your profile and analysis.
+        <span className="chat-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" />
+          </svg>
         </span>
+        <div className="chat-heading">
+          <span className="chat-title">Ask <span translate="no">GradusIQ</span></span>
+          <span className="chat-sub">
+            Chat about your academics &amp; career — grounded in your profile and analysis.
+          </span>
+        </div>
       </div>
 
       <div className="chat-messages" ref={listRef} aria-live="polite">
@@ -78,7 +85,10 @@ export function ChatPanel() {
                   onClick={() => void submit(s)}
                   disabled={sending || !canSend}
                 >
-                  {s}
+                  <span>{s}</span>
+                  <svg className="chat-chip-arrow" aria-hidden="true" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 8h10M9 4l4 4-4 4" />
+                  </svg>
                 </button>
               ))}
             </div>
@@ -110,7 +120,7 @@ export function ChatPanel() {
         </div>
       )}
 
-      <form className="chat-input-row" onSubmit={onSubmit}>
+      <form className="chat-input-row chat-composer" onSubmit={onSubmit}>
         <input
           className="chat-input"
           type="text"
@@ -124,10 +134,13 @@ export function ChatPanel() {
         />
         <button
           type="submit"
-          className="btn btn-primary btn-sm"
+          className="btn btn-primary btn-sm chat-send"
           disabled={sending || !input.trim() || !canSend}
         >
-          {sending ? '…' : 'Send'}
+          <span>{sending ? '…' : 'Send'}</span>
+          <svg className="chat-send-arrow" aria-hidden="true" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M8 13V3M4 7l4-4 4 4" />
+          </svg>
         </button>
       </form>
     </section>

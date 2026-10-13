@@ -7913,3 +7913,166 @@ label.profile-form-check { display: flex; flex-direction: row; align-items: cent
     min-height: 0;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   OVERVIEW SHOWPIECE
+   The first screen after sign-in: the name leads, the chat sits right under
+   it, then the stat tiles and the two readiness cards. The headline figures
+   count up and the degree ring draws in once, the sections arrive one after
+   another, and every empty slot says what is missing and offers one way to
+   fill it. Reduced motion keeps all of it except the movement (the global
+   rule near the top of this file stops the animations, and AnimatedNumber
+   skips the count).
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.overview-page .overview-header {
+  margin-bottom: var(--sp-6);
+}
+
+.overview-page .overview-stats {
+  margin-bottom: var(--sp-6);
+}
+
+/* ── stat tiles ──
+   Label straight under its value, so when the ring tile's detail line makes
+   the row taller, the other tiles don't open a gap between the two. */
+.overview-stat {
+  position: relative;
+  justify-content: flex-start;
+  gap: var(--sp-2);
+}
+
+/* Degree Progress keeps its percentage in the number slot like its
+   neighbours; the ring rides in the tile's corner and draws in from empty. */
+.overview-stat--ring .degree-progress-ring {
+  position: absolute;
+  top: var(--sp-4);
+  right: var(--sp-5);
+}
+
+.degree-progress-ring-fill {
+  animation: ring-draw var(--t-data) var(--ease-out) backwards;
+}
+
+@keyframes ring-draw {
+  from { stroke-dashoffset: var(--ring-empty); }
+}
+
+/* A word in a tile (Profile Status, Standing) is a status, not a figure:
+   a small pill with a dot, in the readiness colours the rail already uses. */
+.overview-stat-status {
+  align-self: flex-start;
+  min-height: var(--text-2xl); /* the number slot's height, so labels line up */
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 3px var(--sp-3) 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-chip);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.overview-stat-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.overview-stat-status--ready {
+  color: var(--ready);
+  background: var(--ready-tint);
+  border-color: var(--ready-border);
+}
+
+.overview-stat-status--partial {
+  color: var(--gold-text);
+  background: var(--gold-tint);
+  border-color: var(--gold-line);
+}
+
+.overview-stat-status--minimal {
+  color: var(--muted);
+}
+
+/* ── empty states ──
+   Icon, one line, one action, in a quiet well inside the card. */
+.empty-block {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  column-gap: var(--sp-3);
+  row-gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--paper);
+  border-radius: var(--radius-chip);
+}
+
+.empty-block .empty-state {
+  padding: 0;
+  color: var(--ink);
+}
+
+.empty-block > :not(.empty-block-icon, .empty-state) {
+  grid-column: 2;
+  justify-self: start;
+}
+
+.empty-block-icon {
+  grid-row: span 2;
+  align-self: start;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--surface-elevated);
+  color: var(--accent);
+  box-shadow: 0 1px 2px rgb(var(--ink-rgb) / 0.08);
+}
+
+.empty-block:not(:has(> :nth-child(3))) .empty-block-icon {
+  grid-row: auto;
+  align-self: center;
+}
+
+/* ── entrance ──
+   The section already fades in as a whole; on Overview its parts follow one
+   after another, top to bottom, so the eye lands on the name first. */
+.overview-page > :not(.overview-stats, .overview-grid),
+.overview-page .overview-stat,
+.overview-page .overview-block {
+  animation: overview-rise calc(var(--t-move) * 2) var(--ease-out) backwards;
+  animation-delay: 420ms;
+}
+
+.overview-page > .overview-header { animation-delay: 0ms; }
+.overview-page > .chat-panel { animation-delay: 60ms; }
+.overview-page .overview-stat:nth-child(1) { animation-delay: 120ms; }
+.overview-page .overview-stat:nth-child(2) { animation-delay: 170ms; }
+.overview-page .overview-stat:nth-child(3) { animation-delay: 220ms; }
+.overview-page .overview-stat:nth-child(4) { animation-delay: 270ms; }
+.overview-page .overview-block:nth-child(1) { animation-delay: 330ms; }
+.overview-page .overview-block:nth-child(2) { animation-delay: 390ms; }
+
+@keyframes overview-rise {
+  from { opacity: 0; transform: translateY(10px); }
+}
+
+@media (max-width: 640px) {
+  .overview-stat--ring .degree-progress-ring {
+    top: var(--sp-3);
+    right: var(--sp-4);
+    width: 36px;
+    height: 36px;
+  }
+
+  .chat-composer {
+    padding-left: var(--sp-3);
+  }
+}

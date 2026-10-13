@@ -1,15 +1,20 @@
-const SIZE = 56;
+import type { CSSProperties } from 'react';
+import { AnimatedNumber } from './AnimatedNumber';
+
+const SIZE = 44;
 const STROKE = 5;
 const RADIUS = (SIZE - STROKE) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 /**
- * The stat row's 4th item -- a ring of satisfied-vs-total requirement groups
- * (leaf nodes only, see requirementProgress.mjs), with the "X of Y" detail
- * line the mockup calls for underneath. `total === 0` (no program evaluated
- * yet, or a program with no requirements) renders the same dash the other
- * three stats show for missing data, rather than a 0%-full or empty ring
- * that would read as "0 satisfied" instead of "not available."
+ * The stat row's 4th tile -- satisfied-vs-total requirement groups (leaf
+ * nodes only, see requirementProgress.mjs). The percentage sits in the same
+ * number slot as the other three tiles, with the ring beside it drawing in
+ * as the figure counts up, and the "X of Y" detail line underneath.
+ * `total === 0` (no program evaluated yet, or a program with no
+ * requirements) renders the same dash the other tiles show for missing
+ * data, rather than a 0%-full or empty ring that would read as "0
+ * satisfied" instead of "not available."
  */
 export function DegreeProgressRing({ satisfied, total }: { satisfied: number; total: number }) {
   if (total === 0) {
@@ -26,6 +31,11 @@ export function DegreeProgressRing({ satisfied, total }: { satisfied: number; to
 
   return (
     <div className="overview-stat overview-stat--ring">
+      <span className="overview-stat-value">
+        <AnimatedNumber value={pct} decimals={0} suffix="%" countIn />
+      </span>
+      <span className="overview-stat-label">Degree Progress</span>
+      <span className="overview-stat-detail">{satisfied} of {total} requirement groups satisfied</span>
       <svg
         className="degree-progress-ring"
         width={SIZE}
@@ -53,13 +63,10 @@ export function DegreeProgressRing({ satisfied, total }: { satisfied: number; to
           strokeLinecap="round"
           transform={`rotate(-90 ${SIZE / 2} ${SIZE / 2})`}
           className="degree-progress-ring-fill"
+          // The draw-in starts from an empty ring (index.css, ring-draw).
+          style={{ '--ring-empty': `${String(CIRCUMFERENCE)}px` } as CSSProperties}
         />
-        <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central" className="degree-progress-ring-pct">
-          {pct}%
-        </text>
       </svg>
-      <span className="overview-stat-label">Degree Progress</span>
-      <span className="overview-stat-detail">{satisfied} of {total} requirement groups satisfied</span>
     </div>
   );
 }
