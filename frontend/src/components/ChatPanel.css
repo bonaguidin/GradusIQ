@@ -18,10 +18,30 @@
 
 .chat-header {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  gap: var(--sp-3);
   padding-bottom: var(--sp-3);
   border-bottom: 1px solid var(--line);
+}
+
+.chat-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* The panel's mark: the one place on Overview the accent sits in a solid
+   shape, so the chat reads as the page's main tool rather than a notice. */
+.chat-mark {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-chip);
+  background: var(--accent-tint);
+  color: var(--accent);
 }
 
 .chat-title {
@@ -58,13 +78,18 @@
   gap: var(--sp-2);
 }
 
+/* Suggestions sit on the card's own white with an arrow, so they read as
+   things to ask rather than tinted labels. */
 .chat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
   font-family: var(--font-ui);
   font-size: var(--text-sm);
-  color: var(--accent);
-  background: var(--accent-tint);
+  color: var(--ink);
+  background: var(--surface-elevated);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: var(--radius-chip);
   padding: var(--sp-2) var(--sp-3);
   cursor: pointer;
   text-align: left;
@@ -72,6 +97,16 @@
 
 .chat-chip:hover:not(:disabled) {
   border-color: var(--accent);
+}
+
+.chat-chip-arrow {
+  flex-shrink: 0;
+  color: var(--accent);
+  transition: transform var(--t-quick) var(--ease-out);
+}
+
+.chat-chip:hover:not(:disabled) .chat-chip-arrow {
+  transform: translateX(2px);
 }
 
 .chat-chip:disabled {
@@ -130,21 +165,62 @@
   gap: var(--sp-2);
 }
 
+/* One composer: the field and Send share a single raised box, and the whole
+   box takes the focus ring, the way a message field does in a chat app. */
+.chat-composer {
+  align-items: center;
+  padding: 5px 5px 5px var(--sp-4);
+  background: var(--surface-elevated);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: 0 1px 2px rgb(var(--ink-rgb) / 0.06);
+  transition:
+    border-color var(--t-quick) var(--ease-out),
+    box-shadow var(--t-quick) var(--ease-out);
+}
+
+.chat-composer:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-tint);
+}
+
 .chat-input {
   flex: 1;
+  min-width: 0;
   font-family: var(--font-ui);
   font-size: var(--text-base);
   color: var(--ink);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: var(--sp-3) var(--sp-4);
+  background: transparent;
+  border: none;
+  padding: var(--sp-2) 0;
 }
 
 .chat-input:focus-visible {
   outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-tint);
+}
+
+/* Send is quiet until there is something to send, then takes the accent.
+   Before, it sat at half-opacity maroon and looked broken rather than idle. */
+.chat-send {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chat-send:disabled {
+  opacity: 1;
+  background: var(--paper);
+  border-color: var(--line);
+  color: var(--muted);
+}
+
+.chat-send-arrow {
+  transition: transform var(--t-quick) var(--ease-out);
+}
+
+.chat-send:not(:disabled):hover .chat-send-arrow {
+  transform: translateY(-1px);
 }
 
 .chat-error {

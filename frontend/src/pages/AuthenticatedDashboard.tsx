@@ -14,6 +14,8 @@ import { DashboardSuccessNotice } from '../components/DashboardSuccessNotice';
 import { CourseDiscoveryPanel } from '../components/CourseDiscoveryPanel';
 import { RequirementSatisfactionPanel } from '../components/RequirementSatisfactionPanel';
 import { DegreeProgressRing } from '../components/DegreeProgressRing';
+import { EmptyState } from '../components/EmptyState';
+import { StatusStat } from '../components/StatusStat';
 import { fetchRequirementSatisfaction, isSkippedRequirementSatisfaction } from '../api/requirementSatisfaction.mjs';
 import { countSatisfiedLeafGroups } from '../lib/requirementProgress.mjs';
 import { pickTopRole, pickBiggestGap } from '../lib/careerReadinessCards.mjs';
@@ -431,8 +433,7 @@ export function AuthenticatedDashboard() {
             <DashboardSuccessNotice />
 
             {activeSection === 'overview' && (
-              <div className="stage-section">
-                <ChatPanel />
+              <div className="stage-section overview-page">
                 <div className="overview-header">
                   <h1 className="overview-name">{displayName}</h1>
                   <div className="overview-vitals">
@@ -441,10 +442,11 @@ export function AuthenticatedDashboard() {
                     <span>{dashboard.institutionName ?? 'Institution not provided'}</span>
                   </div>
                 </div>
+                <ChatPanel />
                 <div className="overview-stats">
-                  <div className="overview-stat"><span className="overview-stat-value">{dashboard.officialGpa !== null ? formatFixed(dashboard.officialGpa, 2) : '—'}</span><span className="overview-stat-label">Official GPA</span></div>
-                  <div className="overview-stat"><span className="overview-stat-value">{dashboard.courses.length}</span><span className="overview-stat-label">Confirmed Courses</span></div>
-                  <div className="overview-stat"><span className="overview-stat-value readiness-state">{readiness}</span><span className="overview-stat-label">Profile Status</span></div>
+                  <div className="overview-stat"><span className="overview-stat-value"><AnimatedNumber value={dashboard.officialGpa} decimals={2} countIn /></span><span className="overview-stat-label">Official GPA</span></div>
+                  <div className="overview-stat"><span className="overview-stat-value"><AnimatedNumber value={dashboard.courses.length} decimals={0} countIn /></span><span className="overview-stat-label">Confirmed Courses</span></div>
+                  <StatusStat label="Profile Status" tone={readiness}>{readiness}</StatusStat>
                   <DegreeProgressRing satisfied={degreeProgress.satisfied} total={degreeProgress.total} />
                 </div>
                 <div className="overview-grid">
@@ -484,7 +486,12 @@ export function AuthenticatedDashboard() {
                             </button>
                           </div>
                         ) : (
-                          <p className="empty-state">No current term.</p>
+                          <EmptyState
+                            icon="calendar"
+                            action={<button type="button" className="btn btn-ghost btn-sm" onClick={() => navigateToAcademicSubTab('course-discovery')}>Plan your schedule</button>}
+                          >
+                            No current term.
+                          </EmptyState>
                         )}
                       </div>
                     </div>
@@ -504,10 +511,12 @@ export function AuthenticatedDashboard() {
                             </div>
                           </div>
                         ) : (
-                          <>
-                            <p className="empty-state">No role match yet.</p>
-                            <button type="button" className="btn btn-ghost btn-sm" onClick={() => navigateToCareerSubTab('intelligence')}>Open Role Fit</button>
-                          </>
+                          <EmptyState
+                            icon="target"
+                            action={<button type="button" className="btn btn-ghost btn-sm" onClick={() => navigateToCareerSubTab('intelligence')}>Open Role Fit</button>}
+                          >
+                            No role match yet.
+                          </EmptyState>
                         )}
                       </div>
                       <div>
@@ -522,10 +531,12 @@ export function AuthenticatedDashboard() {
                             </div>
                           </div>
                         ) : (
-                          <>
-                            <p className="empty-state">No readiness check yet.</p>
-                            <button type="button" className="btn btn-ghost btn-sm" onClick={() => navigateToCareerSubTab('intelligence')}>Open Readiness Check</button>
-                          </>
+                          <EmptyState
+                            icon="bars"
+                            action={<button type="button" className="btn btn-ghost btn-sm" onClick={() => navigateToCareerSubTab('intelligence')}>Open Readiness Check</button>}
+                          >
+                            No readiness check yet.
+                          </EmptyState>
                         )}
                       </div>
                     </div>
