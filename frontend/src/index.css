@@ -130,12 +130,15 @@
   --sp-10: 40px;
   --sp-12: 48px;
 
-  /* Radius — nearly flat; instrument feel */
-  --radius:    3px;
-  --radius-sm: 2px;
+  /* Radius — three steps, app-wide (Phase 2 surface system): --radius-sm
+     for badges and tags, --radius for controls (buttons, inputs, selects,
+     chips), --radius-card (below) for cards. Circles and pills use 50% and
+     999px directly; those are shapes, not a step on this scale. */
+  --radius:    6px;
+  --radius-sm: 4px;
 
   /* Button size — scales every button's type, padding and gap together.
-     Radius and border stay fixed so corners stay square at any size. */
+     Radius and border stay fixed so corners keep one shape at any size. */
   --btn-scale: 1.15;
 
   /* ── Career tab redesign tokens ──────────────────────────────────────────
@@ -171,12 +174,10 @@
      underlines read as unintentional, not as emphasis. */
   --tick-length: 28px;
 
-  /* Elevated card surface -- the one deliberate departure from the site's
-     flat instrument language, scoped to the Career tab's card-shaped
-     elements (analysis panels, snapshot cards, cert/project cards). Details/
-     Career Direction/Skills/Experience inside Profile stay borderless by
-     design (see the "hierarchy from type, not boxes" comment above .cp) and
-     are not touched by this token. */
+  /* Elevated card surface. Started on the Career tab and is now the default
+     card across the app (see "SURFACE SYSTEM" at the end of this file).
+     Details/Career Direction/Skills/Experience inside Profile stay borderless
+     by design (see the "hierarchy from type, not boxes" comment above .cp). */
   --surface-elevated: #FFFFFF;
   --shadow-card: 0 1px 2px rgb(var(--ink-rgb) / 0.05), 0 6px 20px rgb(var(--ink-rgb) / 0.07);
   --radius-card: 8px;
@@ -1223,7 +1224,7 @@ a {
   padding: var(--sp-2) var(--sp-3);
   border: 1px solid var(--line);
   border-radius: var(--radius-chip);
-  background: var(--surface);
+  background-color: var(--surface);
   color: var(--ink);
   font: inherit;
 }
@@ -1251,7 +1252,7 @@ a {
   padding: var(--sp-2) var(--sp-3);
   border: 1px solid var(--line);
   border-radius: var(--radius-chip);
-  background: var(--surface);
+  background-color: var(--surface);
   color: var(--ink);
   font: inherit;
 }
@@ -7767,4 +7768,148 @@ label.profile-form-check { display: flex; flex-direction: row; align-items: cent
   font-size: 0.8125rem;
   color: var(--error);
   margin: 0;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   SURFACE SYSTEM
+   One card for the whole app: the Career tab's white elevated card, which
+   the Overview and Academic tabs, Job Search and the shared .card class now
+   use too. Before this, three card styles sat side by side (none, white with
+   shadow, bordered) and a student met all three in one visit.
+
+   It lives at the end of the file on purpose: it restyles classes defined
+   further up, and source order is what lets it win without raising
+   specificity. Layout, spacing inside sections and every component's markup
+   stay as they were.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── the card ── */
+.card,
+.real-empty,
+.overview-block,
+.academic-overview-current,
+.academic-overview-canvas-calendar,
+.academic-overview-course-discovery,
+.academic-overview-grade-calculator {
+  background: var(--surface-elevated);
+  border: none;
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: var(--sp-5) var(--sp-6);
+}
+
+/* A card inside a card would stack two shadows, so the inner one becomes a
+   quiet inset well instead: the same corners, no lift. */
+:is(.overview-block, .academic-overview-current, .card) .theme-card {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-chip);
+  box-shadow: none;
+}
+
+/* Sections that used to be separated by --sp-8 of empty page now sit as
+   separate cards, which need less air between them. */
+.academic-overview-current,
+.academic-overview-canvas-calendar,
+.academic-overview-course-discovery,
+.academic-overview-grade-calculator {
+  margin-top: var(--sp-5);
+}
+
+.overview-grid {
+  gap: var(--sp-5);
+}
+
+/* ── card titles ──
+   The Career tab's label treatment: small caps label, short gold tick
+   underneath, in place of a hairline across the full width. */
+.overview-block-title,
+.term-courses-heading {
+  position: relative;
+  border-bottom: none;
+  padding-bottom: var(--sp-2);
+  margin-bottom: var(--sp-4);
+}
+
+.overview-block-title::after,
+.term-courses-heading::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: var(--tick-length);
+  height: 2px;
+  background: var(--gold);
+}
+
+/* ── stat tiles ──
+   The numbers at the top of Overview and Academic become tiles on the same
+   surface. auto-fit keeps four across on desktop and two across at phone
+   width without a separate breakpoint. */
+.overview-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: var(--sp-4);
+}
+
+.overview-stat {
+  background: var(--surface-elevated);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: var(--sp-4) var(--sp-5);
+  justify-content: space-between;
+  min-height: 5.5rem;
+}
+
+/* ── page headings ──
+   Tab titles move up a step toward the review screens' editorial headline,
+   and drop the full-width rule now that the content below sits on cards. */
+.academic-section-heading,
+.career-section-heading {
+  font-size: var(--text-2xl);
+  font-weight: 400;
+  line-height: 1.15;
+  border-bottom: none;
+  padding-bottom: 0;
+  margin-bottom: var(--sp-6);
+}
+
+.overview-header {
+  border-bottom: none;
+  padding-bottom: 0;
+  margin-bottom: var(--sp-8);
+}
+
+/* ── controls ──
+   The review screens' commit button never had a radius of its own, so it
+   stayed square while every other button picked up --radius. */
+.rv-commit-button {
+  border-radius: var(--radius);
+}
+
+/* Job Search's filters were unstyled browser selects. They take the shared
+   .form-select look (arrow, border, focus ring) at their own width. */
+.job-search-controls .form-select {
+  width: auto;
+  min-width: 9rem;
+  padding-right: 32px;
+}
+
+/* Phone width: the same cards with less padding, so a 390px screen keeps its
+   text column. */
+@media (max-width: 640px) {
+  .card,
+  .real-empty,
+  .overview-block,
+  .academic-overview-current,
+  .academic-overview-canvas-calendar,
+  .academic-overview-course-discovery,
+  .academic-overview-grade-calculator {
+    padding: var(--sp-4) var(--sp-5);
+  }
+
+  .overview-stat {
+    padding: var(--sp-3) var(--sp-4);
+    min-height: 0;
+  }
 }
