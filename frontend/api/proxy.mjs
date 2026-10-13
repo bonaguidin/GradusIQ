@@ -136,6 +136,10 @@ const ME_TARGETS = Object.assign(Object.create(null), {
   // course-discovery, professor-comments have no cache file).
   'me-analysis-cache': { method: 'GET', needsFeature: false, needsCacheFeature: true },
   'me-career-role-options': { method: 'GET', needsFeature: false },
+  // Canvas calendar feed: read, connect (PUT, JSON body with the feed URL),
+  // disconnect, and a forced re-sync on its own fixed path.
+  'me-canvas-calendar': { methods: ['GET', 'PUT', 'DELETE'], needsFeature: false },
+  'me-canvas-calendar-refresh': { method: 'POST', needsFeature: false },
   // Combined Job Search feed -- reads only, never a live vendor call. Every
   // param is optional: `role` (a cached old bundle's one-family shape),
   // `families` (comma list), `days`, `employer`, `cursor`. Each is
@@ -244,6 +248,8 @@ function meBackendPath(target, feature, reviewTable, recordId, searchQuery, term
   }
   if (target === 'me-analysis-cache') return `/api/v2/student/me/analysis-cache/${encodeURIComponent(feature)}`
   if (target === 'me-career-role-options') return '/api/v2/student/me/career-role-options'
+  if (target === 'me-canvas-calendar') return '/api/v2/student/me/canvas-calendar'
+  if (target === 'me-canvas-calendar-refresh') return '/api/v2/student/me/canvas-calendar/refresh'
   if (target === 'me-job-search') {
     // Every param optional -- only append what the caller actually sent, so
     // a bare request (no params) forwards to a bare backend URL rather than
@@ -325,6 +331,7 @@ export function createProxyHandler({ env = process.env, fetchImpl = globalThis.f
         method === 'POST' || method === 'GET' || method === 'PATCH' || method === 'DELETE' ||
         (method === 'PUT' &&
           (target === 'me-syllabus-grade-state' ||
+            target === 'me-canvas-calendar' ||
             target === 'me-schedule-choices' ||
             target === 'me-schedule-exclusions'))
       if (!supportedMethod) return jsonError(405, 'Method not allowed.')

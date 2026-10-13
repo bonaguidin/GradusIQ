@@ -7559,3 +7559,193 @@ label.profile-form-check { display: flex; flex-direction: row; align-items: cent
   .grade-entry-row { grid-template-columns: minmax(0, 1fr); gap: var(--sp-1); }
   .grade-card-grid { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ── Canvas calendar feed (Academic Overview) ─────────────────────────────── */
+
+.academic-overview-canvas-calendar {
+  margin-top: var(--sp-8);
+}
+
+.canvas-calendar-intro,
+.canvas-calendar-note {
+  color: var(--muted);
+  font-size: var(--text-sm);
+  margin: 0 0 var(--sp-3);
+}
+
+.canvas-calendar-note {
+  margin-top: var(--sp-3);
+}
+
+.canvas-calendar-steps {
+  margin: 0 0 var(--sp-3);
+  padding-left: 1.25rem;
+  font-size: var(--text-base);
+  display: grid;
+  gap: var(--sp-1);
+}
+
+.canvas-calendar-steps a {
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.canvas-calendar-form {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+}
+
+.canvas-calendar-form .form-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.canvas-calendar-warning {
+  font-size: var(--text-sm);
+  color: var(--ink);
+  border-left: 3px solid var(--accent-ghost-border);
+  background: var(--accent-tint);
+  padding: var(--sp-2) var(--sp-3);
+  margin: 0 0 var(--sp-3);
+}
+
+.canvas-calendar-days {
+  display: grid;
+  gap: var(--sp-4);
+}
+
+.canvas-calendar-day h4 {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 var(--sp-2);
+}
+
+.canvas-calendar-day ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--line);
+}
+
+.canvas-calendar-item {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr auto;
+  gap: var(--sp-3);
+  align-items: baseline;
+  padding: var(--sp-2) 0;
+  border-bottom: 1px solid var(--line);
+  font-size: var(--text-base);
+}
+
+.canvas-calendar-item.is-exam {
+  border-left: 3px solid var(--ink);
+  padding-left: var(--sp-2);
+}
+
+.canvas-calendar-time {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.canvas-calendar-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.canvas-calendar-title a {
+  color: inherit;
+}
+
+.canvas-calendar-title small {
+  display: block;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.canvas-calendar-badge {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  border: 1px solid var(--accent-ghost-border);
+  background: var(--accent-tint);
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+
+.canvas-calendar-footer {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.canvas-calendar-footer span {
+  margin-right: auto;
+}
+
+@media (max-width: 560px) {
+  .canvas-calendar-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .canvas-calendar-item {
+    grid-template-columns: 1fr auto;
+  }
+
+  .canvas-calendar-time {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Where-to-get-it steps and the drop target on the transcript upload page. */
+.rv-upload-source {
+  display: grid;
+  gap: 0.5rem;
+  padding: 1.5rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.rv-upload-source-steps {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-family: var(--font-ui);
+  font-size: 0.875rem;
+  line-height: 1.7;
+  color: var(--ink);
+}
+
+.rv-upload-source-link {
+  font-family: var(--font-ui);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--accent-text);
+  justify-self: start;
+}
+
+.rv-upload-drop {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: flex-start;
+  align-self: stretch;
+  padding: 1rem;
+  border: 1px dashed var(--line);
+}
+
+.rv-upload-drop.is-dragging {
+  border-color: var(--accent);
+  background: var(--accent-tint);
+}
+
+.rv-upload-drop-error {
+  font-family: var(--font-ui);
+  font-size: 0.8125rem;
+  color: var(--error);
+  margin: 0;
+}

@@ -2,10 +2,13 @@ import { useRef, useState } from 'react';
 import { uploadTranscript } from '../api/transcript';
 import { ProcessingStatus, processingLabel } from './ProcessingStatus';
 import type { TranscriptUploadResult } from '../lib/transcriptApi.mjs';
+import { GENERIC_TRANSCRIPT_STEPS, isAcceptedTranscriptFile, transcriptSourceFor } from '../lib/transcriptSources.mjs';
 
 export interface TranscriptUploadProps {
   accessToken: string;
   onUploaded(result: TranscriptUploadResult, fileName: string): void;
+  /** Home institution name, used to show where to download the transcript. */
+  institutionName?: string | null;
 }
 
 /**
@@ -47,11 +50,39 @@ const FAILURE_GUIDANCE: Record<string, { title: string; action: string }> = {
   },
 };
 
-export function TranscriptUpload({ accessToken, onUploaded }: TranscriptUploadProps) {
+export function TranscriptUpload({ accessToken, onUploaded, institutionName }: TranscriptUploadProps) {
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<TranscriptUploadResult | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const [dropError, setDropError] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
+  const source = transcriptSourceFor(institutionName);
+
+  /**
+   * A dropped file goes through the same <input> the picker uses, so submit
+   * and every test that drives #transcript-file see one code path. A drop
+   * skips the input's `accept` filter, so the extension is checked here.
+   */
+  function handleDrop(event: React.DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setDragging(false);
+    if (busy) return;
+    const dropped = event.dataTransfer.files[0];
+    if (!dropped) return;
+    if (!isAcceptedTranscriptFile(dropped.name)) {
+      setDropError('That file type is not supported. Drop a PDF or Word (.docx) file.');
+      return;
+    }
+    if (input.current) {
+      const transfer = new DataTransfer();
+      transfer.items.add(dropped);
+      input.current.files = transfer.files;
+    }
+    setDropError(null);
+    setFailure(null);
+    setFile(dropped);
+  }
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -83,10 +114,28 @@ export function TranscriptUpload({ accessToken, onUploaded }: TranscriptUploadPr
           <h1 className="rv-headline">Add your transcript.</h1>
           <p className="rv-standfirst">
             Upload an academic transcript and we&rsquo;ll read the courses off it. Nothing is saved
-            to your record until you&rsquo;ve checked every line. Direct Canvas &amp; Blackboard sync
-            is coming soon.
+            to your record until you&rsquo;ve checked every line.
           </p>
         </header>
+
+        {/* Finding the file is the slow part, not uploading it. Named steps
+            and a direct link for the student's own school; generic steps
+            otherwise. An unofficial transcript is enough. */}
+        <section className="rv-upload-source" aria-label="Where to get your transcript">
+          <h2 className="rv-upload-label">
+            {source ? `Get your unofficial transcript from ${source.portalName}` : 'Get your unofficial transcript'}
+          </h2>
+          <ol className="rv-upload-source-steps">
+            {(source?.steps ?? GENERIC_TRANSCRIPT_STEPS).map((step) => (
+              <li key={step}>{step}</li>
+            ))}
+          </ol>
+          {source && (
+            <a className="rv-upload-source-link" href={source.portalUrl} target="_blank" rel="noreferrer">
+              Open {source.portalName} ↗
+            </a>
+          )}
+        </section>
 
         <form onSubmit={submit} className="rv-upload">
           {/* The picker gives way to the processing panel rather than sitting
@@ -102,7 +151,15 @@ export function TranscriptUpload({ accessToken, onUploaded }: TranscriptUploadPr
               active
             />
           ) : (
-            <>
+            <div
+              className={dragging ? 'rv-upload-drop is-dragging' : 'rv-upload-drop'}
+              onDragOver={(event) => {
+                event.preventDefault();
+                setDragging(true);
+              }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={handleDrop}
+            >
               <label className="rv-upload-label" htmlFor="transcript-file">
                 Transcript file
               </label>
@@ -114,13 +171,15 @@ export function TranscriptUpload({ accessToken, onUploaded }: TranscriptUploadPr
                 onChange={(event) => {
                   setFile(event.target.files?.[0] ?? null);
                   setFailure(null);
+                  setDropError(null);
                 }}
               />
               <p className="rv-upload-help">
-                PDF or Word (.docx), up to 10 MB. Scanned documents without selectable text cannot
-                be read.
+                Choose the file or drop it here. PDF or Word (.docx), up to 10 MB. Scanned
+                documents without selectable text cannot be read.
               </p>
-            </>
+              {dropError && <p className="rv-upload-drop-error" role="alert">{dropError}</p>}
+            </div>
           )}
 
           {failure && (
