@@ -17,7 +17,7 @@
 create table canvas_calendar_feeds (
   id uuid primary key default gen_random_uuid(),
   student_id uuid not null unique references students (id) on delete cascade,
-  feed_url text not null check (feed_url ~ '^https://[^/]+/feeds/calendars/user_[A-Za-z0-9]+\.ics$'),
+  feed_url text not null check (feed_url ~ '^https://[^/]+/feeds/calendars/user_[A-Za-z0-9-]+\.ics$'),
   feed_host text not null,
   events jsonb not null default '[]'::jsonb check (jsonb_typeof(events) = 'array'),
   synced_at timestamptz null,

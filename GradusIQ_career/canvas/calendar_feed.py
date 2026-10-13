@@ -44,7 +44,7 @@ from ..transcript.store_helpers import rows_of
 
 TABLE = "canvas_calendar_feeds"
 
-FEED_PATH_RE = re.compile(r"^/feeds/calendars/user_[A-Za-z0-9]{16,}\.ics$")
+FEED_PATH_RE = re.compile(r"^/feeds/calendars/user_[A-Za-z0-9-]{16,}\.ics$")
 INSTRUCTURE_SUFFIX = ".instructure.com"
 
 FETCH_TIMEOUT_SECONDS = 15.0

@@ -87,6 +87,13 @@ def test_accepts_institution_host_and_normalizes_webcal():
     assert cf.validate_feed_url(f"  {webcal}  ", "canvas.tamu.edu") == FEED_URL
 
 
+def test_accepts_uuid_shaped_feed_tokens():
+    # Some Canvas instances issue feed tokens as hyphenated UUIDs rather than
+    # 40 alphanumerics. Seen on a real *.instructure.com test account.
+    url = "https://example.instructure.com/feeds/calendars/user_0f3c2a1e-1111-4222-8333-944455556666.ics"
+    assert cf.validate_feed_url(url, None) == url
+
+
 def test_accepts_instructure_subdomain_without_institution_host():
     url = f"https://smu.instructure.com/feeds/calendars/user_{TOKEN}.ics"
     assert cf.validate_feed_url(url, None) == url
