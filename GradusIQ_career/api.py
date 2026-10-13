@@ -24,6 +24,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator, Literal, Mapping
+from urllib.parse import urlsplit
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
@@ -52,6 +53,7 @@ from GradusIQ_career.profile_builder import (
     build_student_intelligence_profile,
     canonical_to_legacy_profile,
 )
+from GradusIQ_career.canvas import calendar_feed
 from GradusIQ_career.planning.planned import (
     PlannedCourseError,
     add_planned,
@@ -4203,6 +4205,129 @@ def get_me_technical_elective_candidates(request: Request) -> dict:
         raise HTTPException(
             status_code=502, detail="Technical elective options are unavailable."
         ) from exc
+
+
+# ── Canvas calendar feed ──────────────────────────────────────────────────────
+# The one Canvas source that needs no school approval: the student's own iCal
+# feed URL. See GradusIQ_career/canvas/calendar_feed.py. The feed URL is a
+# secret and is never echoed back -- responses carry only the host.
+
+
+class CanvasCalendarFeedRequest(BaseModel):
+    feed_url: str
+
+
+def _institution_canvas_host(client, institution_id: str) -> str | None:
+    try:
+        rows = (
+            client.table("institutions")
+            .select("canvas_host")
+            .eq("id", institution_id)
+            .execute()
+            .data
+        )
+    except Exception as exc:  # noqa: BLE001 -- RLS denial or transport
+        raise HTTPException(status_code=502, detail="Could not load institution.") from exc
+    return (rows[0].get("canvas_host") if rows else None) or None
+
+
+def _canvas_calendar_response(row: dict | None, canvas_host: str | None, now: datetime) -> dict:
+    if row is None:
+        return {"connected": False, "canvas_host": canvas_host, "events": []}
+    return {
+        "connected": True,
+        "canvas_host": canvas_host,
+        "feed_host": row.get("feed_host"),
+        "synced_at": row.get("synced_at"),
+        "last_error": row.get("last_error"),
+        "events": calendar_feed.upcoming(row.get("events") or [], now),
+    }
+
+
+def _load_canvas_calendar_row(client, student_id: str) -> dict | None:
+    try:
+        return calendar_feed.load_feed_row(client, student_id)
+    except Exception as exc:  # noqa: BLE001 -- RLS denial or transport
+        raise HTTPException(status_code=502, detail="Could not load your Canvas calendar.") from exc
+
+
+def _refresh_canvas_calendar(client, student_id: str, row: dict, canvas_host: str | None, now: datetime) -> dict:
+    """Re-sync a saved feed. A Canvas failure keeps the cached events and
+    records the error; it never fails the request."""
+    try:
+        events = calendar_feed.sync(row["feed_url"], canvas_host or row.get("feed_host"), now)
+        error = None
+    except (calendar_feed.FeedFetchError, calendar_feed.FeedUrlError) as exc:
+        events, error = None, str(exc)
+    try:
+        calendar_feed.record_sync(client, student_id, events=events, error=error, now=now)
+    except Exception:  # noqa: BLE001 -- the read still succeeds from cache
+        logger.warning("canvas calendar: could not record sync for a student", exc_info=True)
+    updated = dict(row, last_error=error)
+    if events is not None:
+        updated.update(events=events, synced_at=now.isoformat())
+    return updated
+
+
+@router.get(
+    "/api/v2/student/me/canvas-calendar",
+    dependencies=[Depends(authorize_proxy_request)],
+)
+def get_me_canvas_calendar(request: Request, refresh: bool = False) -> dict:
+    client = _session_client(request)
+    student_id = _resolve_session_student_id(client)
+    institution_id = _home_institution_id(client, student_id)
+    canvas_host = _institution_canvas_host(client, institution_id)
+    now = datetime.now(timezone.utc)
+
+    row = _load_canvas_calendar_row(client, student_id)
+    if row is not None and (refresh or calendar_feed.is_stale(row, now)):
+        row = _refresh_canvas_calendar(client, student_id, row, canvas_host, now)
+    return _canvas_calendar_response(row, canvas_host, now)
+
+
+@router.put(
+    "/api/v2/student/me/canvas-calendar",
+    dependencies=[Depends(authorize_proxy_request)],
+)
+def put_me_canvas_calendar(request: Request, body: CanvasCalendarFeedRequest) -> dict:
+    """Connect (or replace) the feed. Nothing is saved unless the first sync
+    succeeds, so a mistyped link never leaves a broken connection behind."""
+    client = _session_client(request)
+    student_id = _resolve_session_student_id(client)
+    institution_id = _home_institution_id(client, student_id)
+    canvas_host = _institution_canvas_host(client, institution_id)
+    now = datetime.now(timezone.utc)
+
+    try:
+        feed_url = calendar_feed.validate_feed_url(body.feed_url, canvas_host)
+        events = calendar_feed.sync(feed_url, canvas_host, now)
+    except calendar_feed.FeedUrlError as exc:
+        raise HTTPException(status_code=422, detail={"error": "invalid_feed_url", "message": str(exc)}) from exc
+    except calendar_feed.FeedFetchError as exc:
+        raise HTTPException(status_code=502, detail={"error": "feed_unreachable", "message": str(exc)}) from exc
+
+    try:
+        row = calendar_feed.save_feed_row(
+            client, student_id, feed_url=feed_url, host=urlsplit(feed_url).hostname or "", events=events, now=now
+        )
+    except Exception as exc:  # noqa: BLE001 -- RLS denial, constraint, transport
+        raise HTTPException(status_code=502, detail="Could not save your Canvas calendar.") from exc
+    return _canvas_calendar_response(row, canvas_host, now)
+
+
+@router.delete(
+    "/api/v2/student/me/canvas-calendar",
+    dependencies=[Depends(authorize_proxy_request)],
+)
+def delete_me_canvas_calendar(request: Request) -> dict:
+    client = _session_client(request)
+    student_id = _resolve_session_student_id(client)
+    try:
+        calendar_feed.delete_feed_row(client, student_id)
+    except Exception as exc:  # noqa: BLE001 -- RLS denial or transport
+        raise HTTPException(status_code=502, detail="Could not disconnect your Canvas calendar.") from exc
+    return {"connected": False, "events": []}
 
 
 # ── Degree planner: demo counterparts ─────────────────────────────────────────
