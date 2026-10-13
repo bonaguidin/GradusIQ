@@ -5,6 +5,7 @@ import {
   type JobSearchDays,
   type JobSearchFeedResult,
 } from '../api/jobSearch';
+import { SkeletonRows } from './Skeleton';
 
 interface JobSearchPanelProps {
   targetRoles: string[];
@@ -168,10 +169,7 @@ export function JobSearchPanel({ targetRoles, accessToken }: JobSearchPanelProps
           </div>
 
           {phase === 'loading' && cards.length === 0 && (
-            <div className="analysis-loading" role="status" aria-live="polite">
-              <span className="spinner" aria-hidden="true" />
-              <p>Checking cached postings…</p>
-            </div>
+            <SkeletonRows label="Checking cached postings…" variant="cards" />
           )}
 
           {phase === 'error' && <p className="analysis-empty">{errorMessage}</p>}
@@ -213,22 +211,36 @@ function JobCardView({ card }: { card: JobCard }) {
     .join(' · ');
 
   return (
-    <div className="theme-card">
-      <div className="theme-header">
-        <span className="theme-name">{card.title ?? 'Untitled posting'}</span>
+    <div className="theme-card job-card">
+      <span className="job-card-mark" aria-hidden="true">{employerInitials(card.employer ?? card.title)}</span>
+      <div className="job-card-body">
+        <div className="theme-header">
+          <span className="theme-name">{card.title ?? 'Untitled posting'}</span>
+          {card.posting_count > 1 && (
+            <span className="chip chip--count">{card.posting_count} postings</span>
+          )}
+        </div>
+        {details && <p className="theme-summary">{details}</p>}
         {card.family && <span className="chip chip--tag">{card.family}</span>}
-        {card.posting_count > 1 && (
-          <span className="chip chip--count">{card.posting_count} postings</span>
-        )}
       </div>
-      {details && <p className="theme-summary">{details}</p>}
       {card.url && (
-        <a href={card.url} target="_blank" rel="noreferrer" className="btn btn-ghost btn-sm">
+        <a href={card.url} target="_blank" rel="noreferrer" className="btn btn-ghost btn-sm job-card-link">
           View posting
         </a>
       )}
     </div>
   );
+}
+
+// Legal suffixes say nothing about who the employer is, so the mark skips
+// them: "Micron Technology, Inc." reads MT, not MI.
+const LEGAL_SUFFIXES = new Set(['inc', 'llc', 'ltd', 'corp', 'co', 'corporation', 'company', 'plc', 'lp']);
+
+function employerInitials(name: string | null): string {
+  const words = (name ?? '')
+    .split(/[^A-Za-z0-9]+/)
+    .filter((word) => word && !LEGAL_SUFFIXES.has(word.toLowerCase()));
+  return words.slice(0, 2).map((word) => word[0].toUpperCase()).join('') || '·';
 }
 
 function daysSince(isoDate: string | null): number | null {

@@ -7,6 +7,10 @@ const ICON_PATHS = {
   target: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 12h.01',
   // Rising bars: no readiness check yet.
   bars: 'M6 20v-6M12 20V10M18 20V4',
+  // An open book: no courses to show.
+  book: 'M12 6.5C10.5 5 8 4.5 4 4.5v13c4 0 6.5.5 8 2 1.5-1.5 4-2 8-2v-13c-4 0-6.5.5-8 2zM12 6.5v13',
+  // A path between two points: nothing to sequence or schedule.
+  route: 'M6 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM18 9a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM8 17h7a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h7',
 } as const;
 
 export type EmptyStateIcon = keyof typeof ICON_PATHS;

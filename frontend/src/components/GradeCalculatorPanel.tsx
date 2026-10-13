@@ -23,6 +23,7 @@ import {
   type SyllabusRule,
   type SyllabusThreshold,
 } from '../api/syllabusGradeProfiles';
+import { SkeletonRows } from './Skeleton';
 
 // How long after the last keystroke in a score field the live projection
 // waits before recalculating. The projection is computed server-side (the
@@ -975,10 +976,7 @@ export function GradeCalculatorPanel({ accessToken, courses, institutionName }: 
         {detailError && <p className="login-error" role="alert">{detailError}</p>}
 
         {!detail && !detailError && (
-          <div className="card" role="status" aria-live="polite">
-            <span className="spinner" aria-hidden="true" />
-            <p>Loading your grade calculator…</p>
-          </div>
+          <SkeletonRows label="Loading your grade calculator…" variant="cards" rows={2} />
         )}
 
         {detail && (

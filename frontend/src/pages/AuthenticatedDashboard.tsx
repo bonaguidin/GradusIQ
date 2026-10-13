@@ -572,7 +572,12 @@ export function AuthenticatedDashboard() {
                     <section className="academic-overview-current">
                       <h3 className="term-courses-heading">Current coursework</h3>
                       {academicOverviewCurrentCourses.length === 0 ? (
-                        <p className="empty-state">No in-progress coursework on record.</p>
+                        <EmptyState
+                          icon="calendar"
+                          action={<button type="button" className="btn btn-ghost btn-sm" onClick={() => navigateToAcademicSubTab('gpa-calculator')}>Plan this term</button>}
+                        >
+                          No in-progress coursework on record.
+                        </EmptyState>
                       ) : (
                         <>
                           {academicOverviewCurrentTermLabel && (
@@ -583,7 +588,9 @@ export function AuthenticatedDashboard() {
                               <div className="real-course-row" role="row" key={course.id}>
                                 <span role="cell"><strong>{course.course_code}</strong><small>{course.title ?? 'Untitled course'}</small></span>
                                 <span role="cell">{course.credit_hours} credits</span>
-                                <span role="cell">{course.letter_grade ?? 'In progress'}</span>
+                                <span role="cell">
+                                  {course.letter_grade ?? <span className="degree-schedule-badge degree-schedule-badge--in-progress">In progress</span>}
+                                </span>
                               </div>
                             ))}
                           </div>
@@ -596,53 +603,58 @@ export function AuthenticatedDashboard() {
                     {/* Compact reflection of the same run Course Discovery
                         itself shows (courseDiscoveryRun, lifted above) -- not
                         a second analysis or a second result store. */}
-                    <section className="academic-overview-course-discovery">
-                      <h3 className="term-courses-heading">Course Discovery</h3>
-                      {courseDiscoverySuccess ? (
-                        <>
-                          <p className="academic-overview-cd-role">For: {courseDiscoverySuccess.target_role}</p>
-                          <p className="academic-overview-cd-count">
-                            {courseDiscoverySuccess.verified_recommendations.length} recommended course
-                            {courseDiscoverySuccess.verified_recommendations.length === 1 ? '' : 's'}
-                          </p>
-                          {courseDiscoverySuccess.verified_recommendations.length > 0 && (
-                            <ul className="academic-overview-cd-list">
-                              {courseDiscoverySuccess.verified_recommendations.slice(0, 3).map((course) => (
-                                <li key={`${course.institution}:${course.course_code}`}>
-                                  <strong>{course.course_code}</strong> {course.title}
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-                          <button
-                            type="button"
-                            className="btn btn-ghost btn-sm"
-                            onClick={() => navigateToAcademicSubTab('course-discovery')}
-                          >
-                            View Course Discovery →
-                          </button>
-                        </>
-                      ) : (
+                    <div className="academic-overview-shortcuts">
+                      <section className="academic-overview-course-discovery">
+                        <h3 className="term-courses-heading">Course Discovery</h3>
+                        {courseDiscoverySuccess ? (
+                          <>
+                            <p className="academic-overview-cd-role">For: {courseDiscoverySuccess.target_role}</p>
+                            <p className="academic-overview-cd-count">
+                              {courseDiscoverySuccess.verified_recommendations.length} recommended course
+                              {courseDiscoverySuccess.verified_recommendations.length === 1 ? '' : 's'}
+                            </p>
+                            {courseDiscoverySuccess.verified_recommendations.length > 0 && (
+                              <ul className="academic-overview-cd-list">
+                                {courseDiscoverySuccess.verified_recommendations.slice(0, 3).map((course) => (
+                                  <li key={`${course.institution}:${course.course_code}`}>
+                                    <strong>{course.course_code}</strong> {course.title}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-sm"
+                              onClick={() => navigateToAcademicSubTab('course-discovery')}
+                            >
+                              View Course Discovery →
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <p className="academic-overview-shortcut-copy">Find courses at your school that build toward the roles you want.</p>
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-sm"
+                              onClick={() => navigateToAcademicSubTab('course-discovery')}
+                            >
+                              Discover courses that support your career goals →
+                            </button>
+                          </>
+                        )}
+                      </section>
+                      <section className="academic-overview-grade-calculator">
+                        <h3 className="term-courses-heading">Grade Calculator</h3>
+                        <p className="academic-overview-shortcut-copy">See what you need to reach your target grade in each course.</p>
                         <button
                           type="button"
                           className="btn btn-ghost btn-sm"
-                          onClick={() => navigateToAcademicSubTab('course-discovery')}
+                          onClick={() => navigateToAcademicSubTab('grade-calculator')}
                         >
-                          Discover courses that support your career goals →
+                          Open Grade Calculator →
                         </button>
-                      )}
-                    </section>
-                    <section className="academic-overview-grade-calculator">
-                      <h3 className="term-courses-heading">Grade Calculator</h3>
-                      <p className="empty-state">See what you need to reach your target grade in each course.</p>
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-sm"
-                        onClick={() => navigateToAcademicSubTab('grade-calculator')}
-                      >
-                        Open Grade Calculator →
-                      </button>
-                    </section>
+                      </section>
+                    </div>
                     <p className="academic-overview-status">
                       Academic status: {dashboard.completeness.academics.ready_for_academic_features ? 'Ready' : 'Incomplete'}
                     </p>

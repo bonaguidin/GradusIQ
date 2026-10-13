@@ -17,6 +17,7 @@ import type {
   DependencyOrderLimitation,
 } from '../types/analysis';
 import { AnalysisPanel, type AnalysisPhase } from './AnalysisPanel';
+import { EmptyState } from './EmptyState';
 
 export interface CourseDiscoveryRun {
   state: AnalysisRunState<FeatureResult<CourseDiscoveryData>>;
@@ -151,7 +152,7 @@ function CourseDiscoveryResults({ data, summary }: { data: CourseDiscoveryData; 
   if (!hasAny) {
     return (
       <div>
-        <p className="empty-state">No verified course recommendations found from the current evidence.</p>
+        <EmptyState icon="book">No verified course recommendations found from the current evidence.</EmptyState>
         {summary && <p className="course-discovery-meta">{summary}</p>}
       </div>
     );
@@ -519,7 +520,7 @@ function DependencyOrderView({
 
   return (
     <div>
-      {isEmpty && <p className="empty-state">No course actions to sequence yet.</p>}
+      {isEmpty && <EmptyState icon="route">No course actions to sequence yet.</EmptyState>}
 
       {order.ordered_node_ids.length > 0 && (
         <div className="course-discovery-section">

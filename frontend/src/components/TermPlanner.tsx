@@ -35,6 +35,8 @@ import {
 import type { AnalysisIdentity } from '../api/analysisApi.mjs';
 import { CourseSearchAdd } from './CourseSearchAdd';
 import { useSearchParamState } from '../hooks/useSearchParamState';
+import { SkeletonRows } from './Skeleton';
+import { EmptyState } from './EmptyState';
 
 /**
  * The Academic Record's term view: a term dropdown, that term's coursework, and
@@ -476,14 +478,14 @@ export function TermPlanner({ slug, accessToken, courses, onCourseRecordsChanged
     setPlanned((current) => current.filter((row) => row.id !== id));
   }
 
-  if (!termsLoaded) return <p className="term-planner-loading">Loading terms…</p>;
+  if (!termsLoaded) return <SkeletonRows label="Loading terms…" rows={4} />;
 
   if (terms.length === 0) {
     return (
-      <p className="empty-state">
+      <EmptyState icon="calendar">
         No terms on record yet. Upload a transcript, or check back once your institution&rsquo;s
         academic calendar is loaded.
-      </p>
+      </EmptyState>
     );
   }
 
