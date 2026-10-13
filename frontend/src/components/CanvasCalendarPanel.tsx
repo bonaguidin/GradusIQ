@@ -10,6 +10,8 @@ import {
   syncedLabel,
 } from '../lib/canvasCalendar.mjs';
 import type { CanvasCalendarResult } from '../lib/canvasCalendar.mjs';
+import { SkeletonRows } from './Skeleton';
+import { EmptyState } from './EmptyState';
 
 /**
  * Upcoming due dates and exams from the student's Canvas calendar feed.
@@ -79,7 +81,7 @@ export function CanvasCalendarPanel({ accessToken }: { accessToken: string }) {
     return (
       <section className="academic-overview-canvas-calendar">
         <h3 className="term-courses-heading">Coming up in Canvas</h3>
-        <p className="empty-state">Loading…</p>
+        <SkeletonRows label="Loading your Canvas calendar…" />
       </section>
     );
   }
@@ -140,7 +142,7 @@ export function CanvasCalendarPanel({ accessToken }: { accessToken: string }) {
       <h3 className="term-courses-heading">Coming up in Canvas</h3>
       {state.lastError && <p className="canvas-calendar-warning" role="status">{state.lastError}</p>}
       {groups.length === 0 ? (
-        <p className="empty-state">Nothing due in the next three weeks.</p>
+        <EmptyState icon="calendar">Nothing due in the next three weeks.</EmptyState>
       ) : (
         <div className="canvas-calendar-days">
           {groups.map((group) => (

@@ -8076,3 +8076,282 @@ label.profile-form-check { display: flex; flex-direction: row; align-items: cent
     padding-left: var(--sp-3);
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ACADEMIC + JOB SEARCH
+   Phase 4 of the visual elevation: the Academic pages and Job Search move
+   onto the card system, loading text becomes skeletons, and every
+   "nothing here yet" screen gets the same centered welcome.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── skeletons ──
+   SkeletonRows (components/Skeleton.tsx): a short title bar and a longer
+   line per row, breathing on the same opacity pulse as the analysis
+   loaders. Reduced motion stops the pulse (the global rule) and leaves the
+   shapes standing still. */
+.skeleton-block {
+  --skeleton-bar: rgb(var(--ink-rgb) / 0.08);
+}
+
+.skeleton-list {
+  display: grid;
+  gap: var(--sp-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.skeleton-item {
+  height: 30px;
+  background:
+    linear-gradient(var(--skeleton-bar) 0 0) 0 0 / 32% 11px,
+    linear-gradient(var(--skeleton-bar) 0 0) 0 21px / 74% 9px;
+  background-repeat: no-repeat;
+  animation: skeleton-pulse var(--t-pulse) ease-in-out infinite;
+}
+
+.skeleton-item:nth-child(2) { animation-delay: 120ms; }
+.skeleton-item:nth-child(3) { animation-delay: 240ms; }
+.skeleton-item:nth-child(4) { animation-delay: 360ms; }
+
+/* The cards variant stands in for a list of white cards (job postings, the
+   grade calculator): the card itself, with a mark and three lines in it. */
+.skeleton-block--cards .skeleton-list {
+  gap: var(--sp-3);
+}
+
+.skeleton-block--cards .skeleton-item {
+  height: auto;
+  padding: var(--sp-5) var(--sp-6);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  background: var(--surface-elevated);
+  /* The card stays solid white; only the shapes inside it breathe. */
+  animation: none;
+}
+
+.skeleton-block--cards .skeleton-item::before {
+  content: "";
+  display: block;
+  height: 58px;
+  background:
+    radial-gradient(circle closest-side, var(--skeleton-bar) 98%, transparent) 0 0 / 40px 40px,
+    linear-gradient(var(--skeleton-bar) 0 0) 56px 2px / 36% 12px,
+    linear-gradient(var(--skeleton-bar) 0 0) 56px 24px / 58% 9px,
+    linear-gradient(var(--skeleton-bar) 0 0) 56px 44px / 18% 14px;
+  background-repeat: no-repeat;
+  animation: skeleton-pulse var(--t-pulse) ease-in-out infinite;
+}
+
+.skeleton-block--cards .skeleton-item:nth-child(2)::before { animation-delay: 120ms; }
+.skeleton-block--cards .skeleton-item:nth-child(3)::before { animation-delay: 240ms; }
+
+/* ── the welcome empty ──
+   .real-empty is the screen a student sees before there is anything to
+   show (no transcript, no resume, no syllabus). It becomes a centered
+   welcome with a mark on top, so it reads as a starting point, not an
+   error. The mark is one element: an accent wash in a circle with the
+   sparkle drawn in full accent on top, both cut by the mask. */
+.real-empty {
+  display: grid;
+  justify-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-8) var(--sp-6);
+  text-align: center;
+}
+
+.real-empty::before {
+  content: "";
+  width: 48px;
+  height: 48px;
+  margin-bottom: var(--sp-2);
+  background: var(--accent);
+  --sparkle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z'/%3E%3C/svg%3E");
+  -webkit-mask:
+    var(--sparkle) center / 22px 22px no-repeat,
+    radial-gradient(circle closest-side, rgb(0 0 0 / 0.09) 98%, transparent);
+  mask:
+    var(--sparkle) center / 22px 22px no-repeat,
+    radial-gradient(circle closest-side, rgb(0 0 0 / 0.09) 98%, transparent);
+}
+
+.real-empty h3 {
+  margin: 0;
+  font-size: var(--text-lg);
+}
+
+.real-empty p {
+  max-width: 46ch;
+  margin: 0;
+  color: var(--muted);
+}
+
+.real-empty > :is(a, button) {
+  margin-top: var(--sp-3);
+}
+
+/* ── Academic Overview ── */
+/* The two shortcuts sit side by side as a pair of smaller cards, so they
+   read as "where to go next" rather than two more sections. */
+.academic-overview-shortcuts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-5);
+  margin-top: var(--sp-5);
+}
+
+.academic-overview-shortcuts > section {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin-top: 0;
+}
+
+.academic-overview-shortcuts > section > .btn:last-child {
+  margin-top: auto;
+}
+
+.academic-overview-shortcut-copy {
+  margin: 0 0 var(--sp-3);
+  color: var(--muted);
+  font-size: var(--text-base);
+}
+
+.real-course-row > span:nth-child(3) .degree-schedule-badge {
+  margin-top: 0;
+}
+
+.real-course-row > span:nth-child(2) {
+  color: var(--muted);
+}
+
+/* ── GPA Calculator ── */
+/* The term planner was the one Academic block still sitting on the bare
+   page; it takes the card like everything around it. */
+.term-planner {
+  padding: var(--sp-5) var(--sp-6);
+  background: var(--surface-elevated);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+/* ── Job Search ── */
+/* The filters gather into one toolbar card above the feed. */
+.job-search-controls {
+  align-items: flex-end;
+  padding: var(--sp-4) var(--sp-5);
+  background: var(--surface-elevated);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+.job-search-families legend {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.job-search-controls .chip {
+  border-radius: 999px;
+  transition: background-color var(--t-quick) var(--ease-out), border-color var(--t-quick) var(--ease-out), color var(--t-quick) var(--ease-out);
+}
+
+.job-search-controls .chip:hover {
+  border-color: rgb(var(--accent-rgb) / 0.45);
+}
+
+.job-search-controls .chip--on {
+  background: var(--accent-tint);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.job-search-controls .chip--on .chip-count {
+  color: inherit;
+}
+
+/* Each posting: employer mark, what and where, then the link. */
+.job-search-feed .theme-list {
+  gap: var(--sp-3);
+}
+
+.job-search-feed .job-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--sp-4);
+  padding: var(--sp-4) var(--sp-5);
+  background: var(--surface-elevated);
+  border: none;
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+.job-card-mark {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  align-self: start;
+  border-radius: var(--radius-chip);
+  background: var(--accent-tint);
+  color: var(--accent);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.job-card .theme-header {
+  justify-content: flex-start;
+  margin-bottom: var(--sp-1);
+}
+
+.job-card .theme-summary {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-base);
+}
+
+.job-card .chip {
+  margin: var(--sp-2) 0 0;
+}
+
+.job-card .chip--count {
+  margin: 0;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.job-search-feed .job-card-link {
+  margin-top: 0;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .academic-overview-shortcuts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .term-planner {
+    padding: var(--sp-4) var(--sp-5);
+  }
+
+  .real-empty {
+    padding: var(--sp-6) var(--sp-5);
+  }
+
+  .job-search-feed .job-card {
+    grid-template-columns: auto minmax(0, 1fr);
+    row-gap: var(--sp-3);
+  }
+
+  .job-search-feed .job-card-link {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .skeleton-block--cards .skeleton-item {
+    padding: var(--sp-4) var(--sp-5);
+  }
+}
