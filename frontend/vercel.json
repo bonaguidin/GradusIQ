@@ -216,6 +216,10 @@
       "destination": "/api/proxy?target=me-schedule-exclusions"
     },
     {
+      "source": "/api/v2/student/me/feedback",
+      "destination": "/api/proxy?target=me-feedback"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
