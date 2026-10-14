@@ -1582,3 +1582,36 @@ test('me-canvas-calendar carries GET, PUT and DELETE; refresh is a POST on its o
   assert.equal(rewrites[refreshIndex][1], '/api/proxy?target=me-canvas-calendar-refresh')
   assert.equal(rewrites[baseIndex][1], '/api/proxy?target=me-canvas-calendar')
 })
+
+// ── me-feedback: the bug/feature report pop-up ───────────────────────────────
+
+test('me-feedback forwards the multipart body byte-identical, with or without a session', async () => {
+  const calls = []
+  const handler = createProxyHandler({
+    env: ME_ENV,
+    fetchImpl: async (url, options) => {
+      calls.push({ url: url.toString(), options })
+      return Response.json({ status: 'sent' }, { status: 200 })
+    },
+  })
+  const contentType = 'multipart/form-data; boundary=----report'
+  const url = 'https://gradusiq.example/api/proxy?target=me-feedback'
+
+  await handler.fetch(new Request(url, {
+    method: 'POST',
+    headers: { Authorization: 'Bearer real-session-jwt', 'Content-Type': contentType },
+    body: BINARY_BODY,
+  }))
+  await handler.fetch(new Request(url, { method: 'POST', headers: { 'Content-Type': contentType }, body: BINARY_BODY }))
+  const wrongMethod = await handler.fetch(new Request(url, { method: 'GET' }))
+
+  assert.equal(wrongMethod.status, 400)
+  assert.equal(calls.length, 2)
+  for (const call of calls) {
+    assert.equal(call.url, 'https://backend.example/api/v2/student/me/feedback')
+    assert.equal(call.options.headers['Content-Type'], contentType)
+    assert.deepEqual(new Uint8Array(call.options.body), BINARY_BODY)
+  }
+  assert.equal(calls[0].options.headers.Authorization, 'Bearer real-session-jwt')
+  assert.equal(calls[1].options.headers.Authorization, undefined)
+})

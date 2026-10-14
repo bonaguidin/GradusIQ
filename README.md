@@ -79,6 +79,7 @@ GRADUSIQ_BACKEND_URL=https://your-render-service.example
 GRADUSIQ_PROXY_SECRET=<same-strong-random-value-as-render>
 VITE_SUPABASE_URL=https://your-project-ref.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=<publishable-anon-key>
+RESEND_API_KEY=<server-only-key>   # bug/feature report emails
 ```
 
 The two `VITE_`-prefixed values are read at import time by

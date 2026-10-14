@@ -10,6 +10,7 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 import { useUrlParams } from '../hooks/useUrlParams';
 import { GuidedTour } from '../components/GuidedTour';
+import { ReportIssueButton } from '../components/ReportIssueButton';
 import { DashboardSuccessNotice } from '../components/DashboardSuccessNotice';
 import { CourseDiscoveryPanel } from '../components/CourseDiscoveryPanel';
 import { RequirementSatisfactionPanel } from '../components/RequirementSatisfactionPanel';
@@ -414,6 +415,12 @@ export function AuthenticatedDashboard() {
             <span className="topbar-menu-icon" aria-hidden="true"><span /></span>
           </button>
           <h2 className="topbar-title">{NAV_ITEMS.find((item) => item.key === activeSection)?.label}</h2>
+          <ReportIssueButton
+            accessToken={accessToken}
+            defaultName={studentAccount.profile?.student.name ?? ''}
+            defaultEmail={session?.user?.email ?? ''}
+            pageLabel={NAV_ITEMS.find((item) => item.key === activeSection)?.label ?? 'Dashboard'}
+          />
           <button
             type="button"
             className="topbar-help"

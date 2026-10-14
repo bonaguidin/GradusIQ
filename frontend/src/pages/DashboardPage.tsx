@@ -30,6 +30,7 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 import { useUrlParams } from '../hooks/useUrlParams';
 import { GuidedTour } from '../components/GuidedTour';
+import { ReportIssueButton } from '../components/ReportIssueButton';
 import { AuthenticatedDashboard } from './AuthenticatedDashboard';
 import { AnimatedNumber } from '../components/AnimatedNumber';
 import { StatusStat } from '../components/StatusStat';
@@ -605,6 +606,7 @@ function DemoDashboardPage() {
             </span>
           </button>
           <h2 className="topbar-title">{SECTION_TITLES[activeSection]}</h2>
+          <ReportIssueButton pageLabel={`Demo: ${SECTION_TITLES[activeSection]}`} />
           <button
             type="button"
             className="topbar-help"
