@@ -841,6 +841,9 @@ test('career profile: Course Discovery role selector marks unsupported roles ins
   const aiOption = roleSelect.locator('option', { hasText: 'AI Engineer' })
   const mlOption = roleSelect.locator('option', { hasText: 'ML Engineer' })
   const roboticsOption = roleSelect.locator('option', { hasText: 'Robotics Engineer' })
+  // Every option starts enabled until the supported-roles request returns,
+  // so wait for that before reading the disabled state.
+  await roleSelect.locator('option:disabled').first().waitFor({ state: 'attached' })
 
   // Option text stays exactly the role name -- a long inline coverage
   // suffix here made native <select> intrinsic sizing overflow the row on
