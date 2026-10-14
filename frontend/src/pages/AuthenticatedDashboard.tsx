@@ -11,6 +11,14 @@ import { useFocusTrap } from '../hooks/useFocusTrap';
 import { useUrlParams } from '../hooks/useUrlParams';
 import { GuidedTour } from '../components/GuidedTour';
 import { ReportIssueButton } from '../components/ReportIssueButton';
+import { supabase } from '../lib/supabase';
+import {
+  TOUR_COMPLETED_METADATA_KEY,
+  needsAccountBackfill,
+  shouldAutoOpenTour,
+  tourCompletedOnAccount,
+  tourSeenStorageKey,
+} from '../lib/onboardingTour.mjs';
 import { DashboardSuccessNotice } from '../components/DashboardSuccessNotice';
 import { CourseDiscoveryPanel } from '../components/CourseDiscoveryPanel';
 import { RequirementSatisfactionPanel } from '../components/RequirementSatisfactionPanel';
@@ -84,17 +92,55 @@ const ACADEMIC_SUB_TAB_VALUES: AcademicSubTab[] = [
   'course-discovery',
 ];
 
-// First-run tour is remembered per user (localStorage), so it auto-shows once
-// and the "?" button replays it on demand. A profile field could hold this
-// later; localStorage keeps it demo-simple with no migration.
-const TOUR_SEEN_PREFIX = 'gradusiq_tour_seen_';
+// localStorage can throw (blocked storage, some private modes); the tour flag
+// is a convenience, so a failure just reads as "not seen in this browser".
+function readTourSeenInBrowser(userId: string): boolean {
+  try {
+    return localStorage.getItem(tourSeenStorageKey(userId)) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function writeTourSeenInBrowser(userId: string) {
+  try {
+    localStorage.setItem(tourSeenStorageKey(userId), '1');
+  } catch {
+    // Account metadata below is the durable copy.
+  }
+}
 
 export function AuthenticatedDashboard() {
   const { studentAccount, signOutSession, session, slug, reloadStudentProfile } = useAuth();
-  const tourSeenKey = session?.user?.id ? `${TOUR_SEEN_PREFIX}${session.user.id}` : null;
+  // First-run tour: auto-shows once per account (see onboardingTour.mjs for
+  // why completion lives in user_metadata), and the "?" button replays it.
+  const tourUserId = session?.user?.id ?? null;
+  const tourUserMetadata = session?.user?.user_metadata;
   const [tourOpen, setTourOpen] = useState<boolean>(() =>
-    tourSeenKey ? localStorage.getItem(tourSeenKey) !== '1' : false,
+    tourUserId
+      ? shouldAutoOpenTour({ userMetadata: tourUserMetadata, seenInBrowser: readTourSeenInBrowser(tourUserId) })
+      : false,
   );
+  // Best effort: a failed write leaves the browser copy in place, and the next
+  // close or sign-in tries again.
+  const recordTourCompletedOnAccount = useCallback(async () => {
+    const { error } = await supabase.auth.updateUser({
+      data: { [TOUR_COMPLETED_METADATA_KEY]: new Date().toISOString() },
+    });
+    if (error) console.warn('[AuthenticatedDashboard] could not save tour completion:', error.message);
+  }, []);
+  // Someone who finished the tour in this browser before completion moved to
+  // the account gets it copied up once, so other browsers stop showing it too.
+  // The ref keeps StrictMode's doubled effect from writing twice.
+  const tourBackfilledFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!tourUserId || tourBackfilledFor.current === tourUserId) return;
+    tourBackfilledFor.current = tourUserId;
+    if (needsAccountBackfill({ userMetadata: tourUserMetadata, seenInBrowser: readTourSeenInBrowser(tourUserId) })) {
+      void recordTourCompletedOnAccount();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per signed-in user
+  }, [tourUserId]);
   // The term view reads planned_courses and the catalog through the session
   // bearer token. Absent one, the section falls back to the flat course list
   // below rather than rendering an empty planner.
@@ -308,9 +354,12 @@ export function AuthenticatedDashboard() {
     setRailOpen(false);
   }
 
+  // Finishing, skipping, Escape and the end CTAs all count as done.
   function handleTourClose() {
     setTourOpen(false);
-    if (tourSeenKey) localStorage.setItem(tourSeenKey, '1');
+    if (!tourUserId) return;
+    writeTourSeenInBrowser(tourUserId);
+    if (!tourCompletedOnAccount(tourUserMetadata)) void recordTourCompletedOnAccount();
   }
 
   // The tour ends on these; each marks the tour seen (via onClose) then routes.
