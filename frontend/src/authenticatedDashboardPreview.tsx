@@ -178,7 +178,20 @@ if (careerMode === 'bare') {
   };
 }
 
-const session = { access_token: 'real-access-token' } as Session;
+// Opt-in via ?tour=: gives the session a signed-in user so the first-run tour
+// logic runs. `new` has never finished it; `done` finished it on another
+// device (recorded in user_metadata). Without the param there is no user, so
+// every existing mode above renders with no tour, exactly as before.
+const tourMode = new URLSearchParams(location.search).get('tour');
+const session = (tourMode
+  ? {
+      access_token: 'real-access-token',
+      user: {
+        id: 'user-real',
+        user_metadata: tourMode === 'done' ? { onboarding_tour_completed_at: '2026-10-01T00:00:00.000Z' } : {},
+      },
+    }
+  : { access_token: 'real-access-token' }) as Session;
 const context = {
   profile: null, slug: null, loading: false, profileLoading: false, sessionLoading: false,
   login: async () => {}, logout: () => {}, updateCareer: async () => {}, resetCareer: async () => {},
