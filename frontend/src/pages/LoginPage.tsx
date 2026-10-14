@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 import { useErrorFocus } from '../hooks/useErrorFocus';
+import { LoginPitch } from '../components/LoginPitch';
 
 const DEMO_STUDENTS = [
   { name: 'Jordan Reyes',  slug: 'jordanReyes'  },
@@ -63,7 +64,8 @@ export function LoginPage() {
   }
 
   return (
-    <div className="login-bg">
+    <div className="login-bg login-bg--split">
+      <LoginPitch />
       <div className="login-card">
         {/* Header — serif product name on white */}
         <div className="login-header">
@@ -147,56 +149,58 @@ export function LoginPage() {
           Don&apos;t have an account? <Link to="/signup">Sign up</Link>
         </p>
 
-        <p className="login-note">or explore a demo profile</p>
-
-        <form
-          onSubmit={(e) => { void handleSubmit(e); }}
-          className="login-form"
-        >
-          <div className="form-group">
-            <label htmlFor="student-select" className="form-label">
-              Student profile
-            </label>
-            <select
-              id="student-select"
-              name="student-select"
-              className="form-select"
-              value={selectedSlug}
-              onChange={(e) => setSelectedSlug(e.target.value)}
-              disabled={loading}
-            >
-              {DEMO_STUDENTS.map((s) => (
-                <option key={s.slug} value={s.slug}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {error && (
-            <p className="login-error" role="alert" tabIndex={-1} ref={errorRef}>
-              {error}
-            </p>
-          )}
-
-          <button
-            type="submit"
-            className="btn btn-ghost btn-full"
-            disabled={loading}
-            aria-busy={loading}
+        {/* The demo sits in its own quieter footer, so a student signing in
+            reads one form, and a visitor still finds the way in. */}
+        <section className="login-demo" aria-labelledby="login-demo-heading">
+          <h2 className="login-demo-heading" id="login-demo-heading">Or explore a demo</h2>
+          <p className="login-demo-copy">Pick a sample student to look around. Demo changes stay in this browser.</p>
+          <form
+            onSubmit={(e) => { void handleSubmit(e); }}
+            className="login-form login-demo-form"
           >
-            {loading ? (
-              <span className="btn-loading">
-                <span className="spinner-small" aria-hidden="true" />
-                Loading…
-              </span>
-            ) : (
-              'Enter Dashboard'
-            )}
-          </button>
-        </form>
+            <div className="form-group">
+              <label htmlFor="student-select" className="form-label">
+                Student profile
+              </label>
+              <select
+                id="student-select"
+                name="student-select"
+                className="form-select"
+                value={selectedSlug}
+                onChange={(e) => setSelectedSlug(e.target.value)}
+                disabled={loading}
+              >
+                {DEMO_STUDENTS.map((s) => (
+                  <option key={s.slug} value={s.slug}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-        <p className="login-note">Demo mode — select a student profile to explore</p>
+            {error && (
+              <p className="login-error" role="alert" tabIndex={-1} ref={errorRef}>
+                {error}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              className="btn btn-ghost btn-full"
+              disabled={loading}
+              aria-busy={loading}
+            >
+              {loading ? (
+                <span className="btn-loading">
+                  <span className="spinner-small" aria-hidden="true" />
+                  Loading…
+                </span>
+              ) : (
+                'Enter Dashboard'
+              )}
+            </button>
+          </form>
+        </section>
       </div>
     </div>
   );

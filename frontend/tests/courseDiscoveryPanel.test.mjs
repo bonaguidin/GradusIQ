@@ -209,7 +209,7 @@ test('Course Discovery panel: CTA, loading, three typed outcomes, empty/failure 
     status: 200,
     get body() { return featureResult(discoveryResult()) },
   }
-  const courseDiscoveryPanel = page.locator('.card.analysis-panel', { has: page.getByRole('heading', { name: 'Course Discovery' }) })
+  const courseDiscoveryPanel = page.locator('.card.analysis-panel', { has: page.getByRole('heading', { name: 'Courses for your target role' }) })
   const runButton = courseDiscoveryPanel.getByRole('button', { name: 'Run analysis' })
 
   // Delay this one response so the loading state is observable.
@@ -299,7 +299,7 @@ test('Course Discovery panel: CTA, loading, three typed outcomes, empty/failure 
   const options = await roleSelect.locator('option').allTextContents()
   assert.deepEqual(options, ['AI Engineer', 'ML Engineer', 'Robotics Engineer'])
   await roleSelect.selectOption('Robotics Engineer')
-  const multiRolePanel = page.locator('.card.analysis-panel', { has: page.getByRole('heading', { name: 'Course Discovery' }) })
+  const multiRolePanel = page.locator('.card.analysis-panel', { has: page.getByRole('heading', { name: 'Courses for your target role' }) })
   const requestCountBeforeClick = requestBodies.length
   await multiRolePanel.getByRole('button', { name: 'Run analysis' }).click()
   // A flat waitForTimeout(50) here raced two earlier "Re-run analysis"
@@ -325,7 +325,7 @@ test('Course Discovery panel: CTA, loading, three typed outcomes, empty/failure 
       missing_fields: [{ path: 'career.target_roles', label: 'Confirmed target role' }],
     },
   }
-  const noRolePanel = page.locator('.card.analysis-panel', { has: page.getByRole('heading', { name: 'Course Discovery' }) })
+  const noRolePanel = page.locator('.card.analysis-panel', { has: page.getByRole('heading', { name: 'Courses for your target role' }) })
   await noRolePanel.getByRole('button', { name: 'Run analysis' }).click()
   await noRolePanel.getByText('Confirmed target role').waitFor()
   await noRolePanel.getByRole('button', { name: 'Add this' }).waitFor()
@@ -345,7 +345,7 @@ test('Course Discovery panel: CTA, loading, three typed outcomes, empty/failure 
   await page.goto(`${origin}/authenticated-dashboard-preview.html?mode=complete`)
   await page.getByRole('button', { name: 'Academic' }).click()
   await page.getByRole('button', { name: 'Course Discovery' }).click()
-  const wideRunButton = page.locator('.card.analysis-panel', { has: page.getByRole('heading', { name: 'Course Discovery' }) }).getByRole('button', { name: 'Run analysis' })
+  const wideRunButton = page.locator('.card.analysis-panel', { has: page.getByRole('heading', { name: 'Courses for your target role' }) }).getByRole('button', { name: 'Run analysis' })
   await wideRunButton.click()
   await page.getByText('Recommended courses').waitFor()
   for (const width of [390, 834, 1280]) {

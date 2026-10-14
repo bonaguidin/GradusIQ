@@ -834,7 +834,7 @@ test('career profile: Course Discovery role selector marks unsupported roles ins
   await page.getByRole('button', { name: 'Academic' }).click()
   await page.getByRole('button', { name: 'Course Discovery' }).click()
 
-  const cdPanel = page.locator('.card.analysis-panel', { has: page.getByRole('heading', { name: 'Course Discovery' }) })
+  const cdPanel = page.locator('.card.analysis-panel', { has: page.getByRole('heading', { name: 'Courses for your target role' }) })
   const roleSelect = cdPanel.locator('#course-discovery-target-role')
   await roleSelect.waitFor()
 
