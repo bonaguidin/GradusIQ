@@ -198,6 +198,12 @@ The student validator checks the shared foundation fields, including academic
 record counts, career fields, and profile completeness gates used by the
 dashboard and future prompt/UI code.
 
+## Design standards
+
+Building a new page, tab or feature? Follow [docs/DESIGN.md](docs/DESIGN.md):
+the tokens, card surface, buttons, loading/empty/error states, motion and
+copy rules the app uses, with a checklist to run before opening a PR.
+
 ---
 
 ## Other commands
