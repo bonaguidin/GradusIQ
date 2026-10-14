@@ -21,6 +21,7 @@ import {
   removeRequirementSelection,
   replaceRequirementSelection,
 } from '../lib/degreeScheduleSelections.mjs';
+import { EmptyState } from './EmptyState';
 
 interface CourseRecordLike {
   id: string;
@@ -240,7 +241,7 @@ export function DegreeSchedulePanel({
               real session. */}
           {identity.slug ? (
             contentState === 'empty' ? (
-              <p className="empty-state">No deterministic courses currently need scheduling.</p>
+              <EmptyState icon="route">No deterministic courses currently need scheduling.</EmptyState>
             ) : (
               <DegreeScheduleTerms terms={schedule.terms} ariaLabel="Academic degree schedule" />
             )

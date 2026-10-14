@@ -32,6 +32,7 @@ import { useUrlParams } from '../hooks/useUrlParams';
 import { GuidedTour } from '../components/GuidedTour';
 import { AuthenticatedDashboard } from './AuthenticatedDashboard';
 import { AnimatedNumber } from '../components/AnimatedNumber';
+import { StatusStat } from '../components/StatusStat';
 import { formatFixed } from '../lib/format.mjs';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -158,9 +159,7 @@ function OverviewSection() {
   }
 
 return (
-  <div className="stage-section">
-    <ChatPanel />
-
+  <div className="stage-section overview-page">
     {/* Student identity — editorial serif */}
     <div className="overview-header">
         <h1 className="overview-name">{student.name}</h1>
@@ -177,26 +176,23 @@ return (
         </div>
       </div>
 
+      <ChatPanel />
+
       {/* Key stats in mono — the instrument feel */}
       <div className="overview-stats">
         <div className="overview-stat">
           <span className="overview-stat-value">
-            {student.gpa_current !== null ? formatFixed(student.gpa_current, 2) : '—'}
+            <AnimatedNumber value={student.gpa_current} decimals={2} countIn />
           </span>
           <span className="overview-stat-label">GPA</span>
         </div>
         <div className="overview-stat">
           <span className="overview-stat-value">
-            {courses.length}
+            <AnimatedNumber value={courses.length} decimals={0} countIn />
           </span>
           <span className="overview-stat-label">Courses</span>
         </div>
-        <div className="overview-stat">
-          <span className="overview-stat-value">
-            {student.classification}
-          </span>
-          <span className="overview-stat-label">Standing</span>
-        </div>
+        <StatusStat label="Standing">{student.classification}</StatusStat>
       </div>
 
       {/* Two-column grid: feature status + completion */}
@@ -665,6 +661,7 @@ function DemoDashboardPage() {
 
             {activeSection === 'academic' && academicSubTab === 'course-discovery' && (
               <div key="academic-course-discovery" className="stage-section">
+                <h2 className="academic-section-heading">Course Discovery</h2>
                 {career && career.target_roles.length > 0 && (
                   <CourseDiscoveryPanel targetRoles={career.target_roles} />
                 )}
@@ -740,12 +737,12 @@ function DemoDashboardPage() {
 
             {activeSection === 'career' && careerSubTab === 'profile' && (
               <div key="career-profile" className="stage-section career-subtab-panel">
+                <h2 className="career-section-heading">Career Profile</h2>
                 <ProfileChecklist
                   missing={missingDetails}
                   onJump={(field, trigger) => { requestField({ path: field.path, trigger }); }}
                 />
                 <div className="career-profile-block">
-                  <h2 className="career-section-heading">Career Profile</h2>
                   <CareerProfile
                     career={dashboard.career}
                     details={{

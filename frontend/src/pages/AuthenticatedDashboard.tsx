@@ -14,6 +14,8 @@ import { DashboardSuccessNotice } from '../components/DashboardSuccessNotice';
 import { CourseDiscoveryPanel } from '../components/CourseDiscoveryPanel';
 import { RequirementSatisfactionPanel } from '../components/RequirementSatisfactionPanel';
 import { DegreeProgressRing } from '../components/DegreeProgressRing';
+import { EmptyState } from '../components/EmptyState';
+import { StatusStat } from '../components/StatusStat';
 import { fetchRequirementSatisfaction, isSkippedRequirementSatisfaction } from '../api/requirementSatisfaction.mjs';
 import { countSatisfiedLeafGroups } from '../lib/requirementProgress.mjs';
 import { pickTopRole, pickBiggestGap } from '../lib/careerReadinessCards.mjs';
@@ -431,8 +433,7 @@ export function AuthenticatedDashboard() {
             <DashboardSuccessNotice />
 
             {activeSection === 'overview' && (
-              <div className="stage-section">
-                <ChatPanel />
+              <div className="stage-section overview-page">
                 <div className="overview-header">
                   <h1 className="overview-name">{displayName}</h1>
                   <div className="overview-vitals">
@@ -441,10 +442,11 @@ export function AuthenticatedDashboard() {
                     <span>{dashboard.institutionName ?? 'Institution not provided'}</span>
                   </div>
                 </div>
+                <ChatPanel />
                 <div className="overview-stats">
-                  <div className="overview-stat"><span className="overview-stat-value">{dashboard.officialGpa !== null ? formatFixed(dashboard.officialGpa, 2) : '—'}</span><span className="overview-stat-label">Official GPA</span></div>
-                  <div className="overview-stat"><span className="overview-stat-value">{dashboard.courses.length}</span><span className="overview-stat-label">Confirmed Courses</span></div>
-                  <div className="overview-stat"><span className="overview-stat-value readiness-state">{readiness}</span><span className="overview-stat-label">Profile Status</span></div>
+                  <div className="overview-stat"><span className="overview-stat-value"><AnimatedNumber value={dashboard.officialGpa} decimals={2} countIn /></span><span className="overview-stat-label">Official GPA</span></div>
+                  <div className="overview-stat"><span className="overview-stat-value"><AnimatedNumber value={dashboard.courses.length} decimals={0} countIn /></span><span className="overview-stat-label">Confirmed Courses</span></div>
+                  <StatusStat label="Profile Status" tone={readiness}>{readiness}</StatusStat>
                   <DegreeProgressRing satisfied={degreeProgress.satisfied} total={degreeProgress.total} />
                 </div>
                 <div className="overview-grid">
@@ -484,7 +486,12 @@ export function AuthenticatedDashboard() {
                             </button>
                           </div>
                         ) : (
-                          <p className="empty-state">No current term.</p>
+                          <EmptyState
+                            icon="calendar"
+                            action={<button type="button" className="btn btn-ghost btn-sm" onClick={() => navigateToAcademicSubTab('course-discovery')}>Plan your schedule</button>}
+                          >
+                            No current term.
+                          </EmptyState>
                         )}
                       </div>
                     </div>
@@ -504,10 +511,12 @@ export function AuthenticatedDashboard() {
                             </div>
                           </div>
                         ) : (
-                          <>
-                            <p className="empty-state">No role match yet.</p>
-                            <button type="button" className="btn btn-ghost btn-sm" onClick={() => navigateToCareerSubTab('intelligence')}>Open Role Fit</button>
-                          </>
+                          <EmptyState
+                            icon="target"
+                            action={<button type="button" className="btn btn-ghost btn-sm" onClick={() => navigateToCareerSubTab('intelligence')}>Open Role Fit</button>}
+                          >
+                            No role match yet.
+                          </EmptyState>
                         )}
                       </div>
                       <div>
@@ -522,10 +531,12 @@ export function AuthenticatedDashboard() {
                             </div>
                           </div>
                         ) : (
-                          <>
-                            <p className="empty-state">No readiness check yet.</p>
-                            <button type="button" className="btn btn-ghost btn-sm" onClick={() => navigateToCareerSubTab('intelligence')}>Open Readiness Check</button>
-                          </>
+                          <EmptyState
+                            icon="bars"
+                            action={<button type="button" className="btn btn-ghost btn-sm" onClick={() => navigateToCareerSubTab('intelligence')}>Open Readiness Check</button>}
+                          >
+                            No readiness check yet.
+                          </EmptyState>
                         )}
                       </div>
                     </div>
@@ -561,7 +572,12 @@ export function AuthenticatedDashboard() {
                     <section className="academic-overview-current">
                       <h3 className="term-courses-heading">Current coursework</h3>
                       {academicOverviewCurrentCourses.length === 0 ? (
-                        <p className="empty-state">No in-progress coursework on record.</p>
+                        <EmptyState
+                          icon="calendar"
+                          action={<button type="button" className="btn btn-ghost btn-sm" onClick={() => navigateToAcademicSubTab('gpa-calculator')}>Plan this term</button>}
+                        >
+                          No in-progress coursework on record.
+                        </EmptyState>
                       ) : (
                         <>
                           {academicOverviewCurrentTermLabel && (
@@ -572,7 +588,9 @@ export function AuthenticatedDashboard() {
                               <div className="real-course-row" role="row" key={course.id}>
                                 <span role="cell"><strong>{course.course_code}</strong><small>{course.title ?? 'Untitled course'}</small></span>
                                 <span role="cell">{course.credit_hours} credits</span>
-                                <span role="cell">{course.letter_grade ?? 'In progress'}</span>
+                                <span role="cell">
+                                  {course.letter_grade ?? <span className="degree-schedule-badge degree-schedule-badge--in-progress">In progress</span>}
+                                </span>
                               </div>
                             ))}
                           </div>
@@ -585,53 +603,58 @@ export function AuthenticatedDashboard() {
                     {/* Compact reflection of the same run Course Discovery
                         itself shows (courseDiscoveryRun, lifted above) -- not
                         a second analysis or a second result store. */}
-                    <section className="academic-overview-course-discovery">
-                      <h3 className="term-courses-heading">Course Discovery</h3>
-                      {courseDiscoverySuccess ? (
-                        <>
-                          <p className="academic-overview-cd-role">For: {courseDiscoverySuccess.target_role}</p>
-                          <p className="academic-overview-cd-count">
-                            {courseDiscoverySuccess.verified_recommendations.length} recommended course
-                            {courseDiscoverySuccess.verified_recommendations.length === 1 ? '' : 's'}
-                          </p>
-                          {courseDiscoverySuccess.verified_recommendations.length > 0 && (
-                            <ul className="academic-overview-cd-list">
-                              {courseDiscoverySuccess.verified_recommendations.slice(0, 3).map((course) => (
-                                <li key={`${course.institution}:${course.course_code}`}>
-                                  <strong>{course.course_code}</strong> {course.title}
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-                          <button
-                            type="button"
-                            className="btn btn-ghost btn-sm"
-                            onClick={() => navigateToAcademicSubTab('course-discovery')}
-                          >
-                            View Course Discovery →
-                          </button>
-                        </>
-                      ) : (
+                    <div className="academic-overview-shortcuts">
+                      <section className="academic-overview-course-discovery">
+                        <h3 className="term-courses-heading">Course Discovery</h3>
+                        {courseDiscoverySuccess ? (
+                          <>
+                            <p className="academic-overview-cd-role">For: {courseDiscoverySuccess.target_role}</p>
+                            <p className="academic-overview-cd-count">
+                              {courseDiscoverySuccess.verified_recommendations.length} recommended course
+                              {courseDiscoverySuccess.verified_recommendations.length === 1 ? '' : 's'}
+                            </p>
+                            {courseDiscoverySuccess.verified_recommendations.length > 0 && (
+                              <ul className="academic-overview-cd-list">
+                                {courseDiscoverySuccess.verified_recommendations.slice(0, 3).map((course) => (
+                                  <li key={`${course.institution}:${course.course_code}`}>
+                                    <strong>{course.course_code}</strong> {course.title}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-sm"
+                              onClick={() => navigateToAcademicSubTab('course-discovery')}
+                            >
+                              View Course Discovery →
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <p className="academic-overview-shortcut-copy">Find courses at your school that build toward the roles you want.</p>
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-sm"
+                              onClick={() => navigateToAcademicSubTab('course-discovery')}
+                            >
+                              Discover courses that support your career goals →
+                            </button>
+                          </>
+                        )}
+                      </section>
+                      <section className="academic-overview-grade-calculator">
+                        <h3 className="term-courses-heading">Grade Calculator</h3>
+                        <p className="academic-overview-shortcut-copy">See what you need to reach your target grade in each course.</p>
                         <button
                           type="button"
                           className="btn btn-ghost btn-sm"
-                          onClick={() => navigateToAcademicSubTab('course-discovery')}
+                          onClick={() => navigateToAcademicSubTab('grade-calculator')}
                         >
-                          Discover courses that support your career goals →
+                          Open Grade Calculator →
                         </button>
-                      )}
-                    </section>
-                    <section className="academic-overview-grade-calculator">
-                      <h3 className="term-courses-heading">Grade Calculator</h3>
-                      <p className="empty-state">See what you need to reach your target grade in each course.</p>
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-sm"
-                        onClick={() => navigateToAcademicSubTab('grade-calculator')}
-                      >
-                        Open Grade Calculator →
-                      </button>
-                    </section>
+                      </section>
+                    </div>
                     <p className="academic-overview-status">
                       Academic status: {dashboard.completeness.academics.ready_for_academic_features ? 'Ready' : 'Incomplete'}
                     </p>
@@ -706,9 +729,10 @@ export function AuthenticatedDashboard() {
 
             {activeSection === 'academic' && academicSubTab === 'course-discovery' && (
               <div className="stage-section">
-                {/* CourseDiscoveryPanel renders its own "Course Discovery"
-                    heading (via AnalysisPanel's title), so no page-level
-                    heading is added here -- that would just duplicate it. */}
+                {/* The page title every Academic sub-tab has; the panel's
+                    own card title names what it holds ("Courses for your
+                    target role") so the two don't repeat each other. */}
+                <h2 className="academic-section-heading">Course Discovery</h2>
                 <CourseDiscoveryPanel
                   targetRoles={dashboard.career.target_roles}
                   run={courseDiscoveryRun}
@@ -790,12 +814,12 @@ export function AuthenticatedDashboard() {
                   <><h2 className="career-section-heading">Career Profile</h2><div className="real-empty"><h3>Build your career profile</h3><p>Upload and confirm your resume before career facts appear here.</p><Link to="/resume" className="btn btn-primary btn-sm">Upload resume</Link></div></>
                 ) : (
                       <>
+                      <h2 className="career-section-heading">Career Profile</h2>
                       <ProfileChecklist
                         missing={missingDetails}
                         onJump={(field, trigger) => { requestField({ path: field.path, trigger }); }}
                       />
                       <div className="career-profile-block">
-                        <h2 className="career-section-heading">Career Profile</h2>
                         {/* Graduation and the majors are academic record, not
                             career record, so they arrive as props rather than
                             being dug out of the profile by the career component.

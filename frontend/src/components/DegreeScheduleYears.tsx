@@ -31,6 +31,7 @@ import type { DegreeScheduleSemester, DegreeScheduleTermDecision, DegreeSchedule
 import { displayTermKey, formatCredits } from '../lib/degreeSchedulePresentation.mjs';
 import type { TermPlan } from '../api/degreeSchedule.mjs';
 import { EditCoursesDialog } from './EditCoursesDialog';
+import { EmptyState } from './EmptyState';
 
 interface CourseRecordLike {
   id: string;
@@ -565,7 +566,7 @@ export function DegreeScheduleYears({
   const activeYearKey = activeYearKeyString ? Number(activeYearKeyString) : null;
 
   if (years.length === 0) {
-    return <p className="empty-state">No academic years on record or scheduled yet.</p>;
+    return <EmptyState icon="calendar">No academic years on record or scheduled yet.</EmptyState>;
   }
 
   const activeYear = years.find((year) => year.yearKey === activeYearKey) ?? years[0];

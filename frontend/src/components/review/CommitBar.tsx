@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReviewCounters } from '../../lib/resumeApi.mjs';
+import { ConfirmButton } from '../ConfirmButton';
 import { ConfirmingOverlay } from './ConfirmingOverlay';
 
 export interface CommitBarProps {
@@ -94,35 +95,20 @@ export function CommitBar({
               status
             )}
           </p>
-          <button
-            type="button"
-            className={`rv-commit-button${confirming ? ' is-loading' : ''}${justSaved ? ' is-success' : ''}${justFailed ? ' is-error' : ''}`}
+          <ConfirmButton
+            className="rv-commit-button"
+            status={justSaved ? 'success' : confirming ? 'loading' : justFailed ? 'error' : 'idle'}
             onClick={onConfirm}
-            disabled={confirming || justSaved || blocked !== null}
+            disabled={blocked !== null}
           >
-            {/* Text stays the real content (and the button's accessible name)
-                in every state -- is-loading/is-success/is-error only hide it
-                visually, replacing it with the spinner/check/cross below, so
-                a screen reader still hears "Saving…"/"Saved ✓" exactly as it
-                did before this existed. */}
-            <span className="rv-commit-label">
-              {justSaved
-                ? 'Saved ✓'
-                : confirming
-                  ? 'Saving…'
-                  : blocked
-                    ? 'Verification pending'
-                    : confirmLabel}
-            </span>
-            <span className="rv-commit-spinner" aria-hidden="true" />
-            <svg className="rv-commit-icon rv-commit-check" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M5 13l4 4L19 7" />
-            </svg>
-            <svg className="rv-commit-icon rv-commit-cross" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M6 6l12 12M18 6L6 18" />
-            </svg>
-            <span className="rv-commit-ring" aria-hidden="true" />
-          </button>
+            {justSaved
+              ? 'Saved ✓'
+              : confirming
+                ? 'Saving…'
+                : blocked
+                  ? 'Verification pending'
+                  : confirmLabel}
+          </ConfirmButton>
         </div>
       </div>
     </>

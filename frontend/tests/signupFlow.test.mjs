@@ -159,3 +159,21 @@ test('the signup page never provisions: AuthContext stays the single provisionin
   const callSites = context.split('resolveStudentAccountOnce(').length - 1
   assert.equal(callSites, 1, 'provisioning must be invoked from exactly one place')
 })
+
+test('Create account uses the shared confirm animation: a check before leaving, a shake on failure', { timeout: 45_000 }, async (t) => {
+  const page = await open(t, 'session')
+  await fillForm(page)
+  await page.getByRole('button', { name: 'Create account' }).click()
+  // The check holds before navigation, so it is on screen long enough to see.
+  await page.locator('button.confirm-anim.is-success').waitFor()
+  assert.equal(await page.getByRole('button', { name: 'Account created' }).count(), 1)
+  await page.getByRole('heading', { name: 'Dashboard reached' }).waitFor()
+
+  const failing = await open(t, 'error')
+  await fillForm(failing)
+  await failing.getByRole('button', { name: 'Create account' }).click()
+  await failing.locator('button.confirm-anim.is-error').waitFor()
+  // The shake settles back to the plain label on its own, ready for a retry.
+  await failing.locator('button.confirm-anim:not(.is-error)').waitFor()
+  assert.equal(await failing.getByRole('button', { name: 'Create account' }).isDisabled(), false)
+})

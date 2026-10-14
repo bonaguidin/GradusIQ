@@ -4,6 +4,7 @@ import { useErrorFocus } from '../../hooks/useErrorFocus';
 import { updateProfile, type ProfileChanges } from '../../api/profile';
 import type { MissingField } from '../../types/analysis';
 import type { StudentIntelligenceProfile } from '../../types/studentIntelligenceProfile';
+import { ConfirmButton, useConfirmStatus } from '../ConfirmButton';
 import { TagInput } from '../TagInput';
 import { TargetRolesEditor } from '../TargetRolesEditor';
 import { AiComfortOptions, aiComfortChanges } from './fields/AiComfortField';
@@ -75,6 +76,7 @@ export function ProfileCompletionForm({ profile, accessToken, missingFields = []
   const [interests, setInterests] = useState(initial.interests);
   const [anxiety, setAnxiety] = useState(initial.anxiety);
   const [saving, setSaving] = useState(false);
+  const confirm = useConfirmStatus();
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [failure, setFailure] = useState<string | null>(null);
   const missing = new Set(missingFields.map((field) => field.path));
@@ -117,7 +119,10 @@ export function ProfileCompletionForm({ profile, accessToken, missingFields = []
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (!validate()) return;
+    if (!validate()) {
+      confirm.fail();
+      return;
+    }
     const changes: ProfileChanges = {
       // Each field states its own change, so the sentinel, the joined
       // graduation string and the null-vs-'not_sure' distinction are decided
@@ -130,11 +135,14 @@ export function ProfileCompletionForm({ profile, accessToken, missingFields = []
     if (majorCurrent.trim() !== initial.majorCurrent) changes.major_current = majorCurrent.trim();
     if (JSON.stringify(targetRoles) !== JSON.stringify(initial.targetRoles)) changes.target_roles = targetRoles;
     if (JSON.stringify(interests) !== JSON.stringify(initial.interests)) changes.interests = interests;
-    setSaving(true); onSavingChange?.(true); setFailure(null);
+    setSaving(true); onSavingChange?.(true); setFailure(null); confirm.start();
     try {
       if (Object.keys(changes).length > 0) await updateProfile(accessToken, changes);
+      // onSaved closes the form, so the check plays before it does.
+      await confirm.succeed();
       await onSaved();
     } catch (error) {
+      confirm.fail();
       setFailure(error instanceof Error ? error.message : 'Your profile could not be saved.');
     } finally {
       setSaving(false); onSavingChange?.(false);
@@ -180,7 +188,7 @@ export function ProfileCompletionForm({ profile, accessToken, missingFields = []
       <p className="profile-form-note"><span className="profile-form-note-icon" aria-hidden="true">ⓘ</span><span>Skills and work experience are edited in <Link to="/resume">resume review</Link>.</span></p>
 
       {failure && <p className="profile-form-error" role="alert" tabIndex={-1} ref={failureRef}>{failure}</p>}
-      <div className="profile-form-actions"><button type="button" className="btn btn-ghost" onClick={onCancel} disabled={saving}>Cancel</button><button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Save changes'}</button></div>
+      <div className="profile-form-actions"><button type="button" className="btn btn-ghost" onClick={onCancel} disabled={saving}>Cancel</button><ConfirmButton type="submit" className="btn btn-primary" status={confirm.status} disabled={saving}>{confirm.status === 'success' ? 'Saved' : saving ? 'Saving…' : 'Save changes'}</ConfirmButton></div>
     </form>
   );
 }

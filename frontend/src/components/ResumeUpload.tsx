@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { uploadResume } from '../api/resume';
+import { ConfirmButton, useConfirmStatus } from './ConfirmButton';
 import { ProcessingStatus, processingLabel } from './ProcessingStatus';
 import { RESUME_TRUST_NOTE } from '../lib/processingStages.mjs';
 import type { NormalizedUpload } from '../lib/resumeApi.mjs';
@@ -52,6 +53,7 @@ function hintFor(kind: string): string | null {
 export function ResumeUpload({ accessToken, onUploaded }: ResumeUploadProps) {
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
+  const confirm = useConfirmStatus();
   const [failure, setFailure] = useState<NormalizedUpload | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -61,8 +63,10 @@ export function ResumeUpload({ accessToken, onUploaded }: ResumeUploadProps) {
 
     setBusy(true);
     setFailure(null);
+    confirm.start();
     const result = await uploadResume(accessToken, file);
     if (result.ok) {
+      await confirm.succeed();
       // `busy` is deliberately left true: onUploaded advances the page to the
       // review, and clearing it first would flash the idle form for a frame on
       // the way out. The processing timers are cleaned up by unmount.
@@ -71,6 +75,7 @@ export function ResumeUpload({ accessToken, onUploaded }: ResumeUploadProps) {
     }
     // Every failure -- parse, network, timeout -- lands here, which is what
     // guarantees the processing state cannot outlive the request.
+    confirm.fail();
     setFailure(result);
     setBusy(false);
   }
@@ -148,13 +153,14 @@ export function ResumeUpload({ accessToken, onUploaded }: ResumeUploadProps) {
             </div>
           )}
 
-          <button
+          <ConfirmButton
             type="submit"
             className="btn btn-primary btn-full"
+            status={confirm.status}
             disabled={!file || busy}
           >
-            {busy ? processingLabel('resume') : 'Upload resume'}
-          </button>
+            {confirm.status === 'success' ? 'Uploaded' : busy ? processingLabel('resume') : 'Upload resume'}
+          </ConfirmButton>
 
           {failure && !NOT_RETRYABLE.has(failure.kind) && (
             <button

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { connectCanvasCalendar, disconnectCanvasCalendar, fetchCanvasCalendar } from '../api/canvasCalendar';
+import { ConfirmButton, useConfirmStatus } from './ConfirmButton';
 import {
   canvasCalendarPageUrl,
   dayHeading,
@@ -9,6 +10,8 @@ import {
   syncedLabel,
 } from '../lib/canvasCalendar.mjs';
 import type { CanvasCalendarResult } from '../lib/canvasCalendar.mjs';
+import { SkeletonRows } from './Skeleton';
+import { EmptyState } from './EmptyState';
 
 /**
  * Upcoming due dates and exams from the student's Canvas calendar feed.
@@ -23,6 +26,7 @@ export function CanvasCalendarPanel({ accessToken }: { accessToken: string }) {
   const [feedUrl, setFeedUrl] = useState('');
   const [busy, setBusy] = useState<'connect' | 'refresh' | 'disconnect' | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const confirm = useConfirmStatus();
 
   useEffect(() => {
     let active = true;
@@ -38,16 +42,23 @@ export function CanvasCalendarPanel({ accessToken }: { accessToken: string }) {
     event.preventDefault();
     if (!feedUrl.trim()) {
       setFormError('Paste the Calendar Feed link from Canvas.');
+      confirm.fail();
       return;
     }
     setBusy('connect');
     setFormError(null);
+    confirm.start();
     const result = await connectCanvasCalendar(accessToken, feedUrl.trim());
-    setBusy(null);
     if (result.ok) {
+      // The connected view replaces this form, so the check plays first.
+      await confirm.succeed();
+      setBusy(null);
       setFeedUrl('');
       setState(result);
+      confirm.reset();
     } else {
+      setBusy(null);
+      confirm.fail();
       setFormError(result.message);
     }
   }
@@ -70,7 +81,7 @@ export function CanvasCalendarPanel({ accessToken }: { accessToken: string }) {
     return (
       <section className="academic-overview-canvas-calendar">
         <h3 className="term-courses-heading">Coming up in Canvas</h3>
-        <p className="empty-state">Loading…</p>
+        <SkeletonRows label="Loading your Canvas calendar…" />
       </section>
     );
   }
@@ -112,9 +123,9 @@ export function CanvasCalendarPanel({ accessToken }: { accessToken: string }) {
             onChange={(e) => setFeedUrl(e.target.value)}
             disabled={busy !== null}
           />
-          <button type="submit" className="btn btn-primary btn-sm" disabled={busy !== null}>
-            {busy === 'connect' ? 'Connecting…' : 'Connect'}
-          </button>
+          <ConfirmButton type="submit" className="btn btn-primary btn-sm" status={confirm.status} disabled={busy !== null}>
+            {confirm.status === 'success' ? 'Connected' : busy === 'connect' ? 'Connecting…' : 'Connect'}
+          </ConfirmButton>
         </form>
         {formError && <p className="login-error" role="alert">{formError}</p>}
         <p className="canvas-calendar-note">
@@ -131,7 +142,7 @@ export function CanvasCalendarPanel({ accessToken }: { accessToken: string }) {
       <h3 className="term-courses-heading">Coming up in Canvas</h3>
       {state.lastError && <p className="canvas-calendar-warning" role="status">{state.lastError}</p>}
       {groups.length === 0 ? (
-        <p className="empty-state">Nothing due in the next three weeks.</p>
+        <EmptyState icon="calendar">Nothing due in the next three weeks.</EmptyState>
       ) : (
         <div className="canvas-calendar-days">
           {groups.map((group) => (

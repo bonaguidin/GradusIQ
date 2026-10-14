@@ -834,13 +834,16 @@ test('career profile: Course Discovery role selector marks unsupported roles ins
   await page.getByRole('button', { name: 'Academic' }).click()
   await page.getByRole('button', { name: 'Course Discovery' }).click()
 
-  const cdPanel = page.locator('.card.analysis-panel', { has: page.getByRole('heading', { name: 'Course Discovery' }) })
+  const cdPanel = page.locator('.card.analysis-panel', { has: page.getByRole('heading', { name: 'Courses for your target role' }) })
   const roleSelect = cdPanel.locator('#course-discovery-target-role')
   await roleSelect.waitFor()
 
   const aiOption = roleSelect.locator('option', { hasText: 'AI Engineer' })
   const mlOption = roleSelect.locator('option', { hasText: 'ML Engineer' })
   const roboticsOption = roleSelect.locator('option', { hasText: 'Robotics Engineer' })
+  // Every option starts enabled until the supported-roles request returns,
+  // so wait for that before reading the disabled state.
+  await roleSelect.locator('option:disabled').first().waitFor({ state: 'attached' })
 
   // Option text stays exactly the role name -- a long inline coverage
   // suffix here made native <select> intrinsic sizing overflow the row on
