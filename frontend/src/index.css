@@ -8754,3 +8754,13 @@ label.profile-form-check { display: flex; flex-direction: row; align-items: cent
   cursor: default;
   opacity: 0.5;
 }
+
+/* GAP/FIT/SHIFT summaries link to their own Career Intelligence panel. */
+.career-readiness-link,
+.career-overview-summary-link {
+  margin-top: var(--sp-3);
+}
+
+.career-intelligence-section {
+  scroll-margin-top: var(--sp-6);
+}
