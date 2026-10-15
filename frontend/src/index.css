@@ -350,8 +350,91 @@ a {
 
 /* Rail — identity block */
 .rail-identity {
+  position: relative;
   padding: var(--sp-6) var(--sp-5) var(--sp-5);
   border-bottom: 1px solid var(--rail-line);
+}
+
+/* Monogram + name open the profile menu (AuthenticatedDashboard). */
+.rail-identity-button {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.rail-identity-button .rail-monogram {
+  transition: border-color var(--t-quick) var(--ease-out);
+}
+
+.rail-identity-button:hover .rail-monogram,
+.rail-identity-button[aria-expanded="true"] .rail-monogram {
+  border-color: var(--rail-text);
+}
+
+.rail-identity-button .rail-name {
+  display: block;
+  padding-right: var(--sp-5);
+}
+
+.rail-identity-caret {
+  position: absolute;
+  right: 0;
+  bottom: calc(var(--sp-1) + 6px);
+  color: var(--rail-muted);
+  transition: transform var(--t-quick) var(--ease-out);
+}
+
+.rail-identity-button[aria-expanded="true"] .rail-identity-caret {
+  transform: rotate(180deg);
+}
+
+.rail-profile-menu {
+  position: absolute;
+  left: var(--sp-4);
+  right: var(--sp-4);
+  top: calc(100% - var(--sp-3));
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  padding: var(--sp-1);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+}
+
+.rail-profile-menu > a,
+.rail-profile-menu > button {
+  display: block;
+  width: 100%;
+  padding: var(--sp-2) var(--sp-3);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  text-align: left;
+  text-decoration: none;
+  color: var(--ink);
+  background: none;
+  border: 0;
+  border-radius: calc(var(--radius) - 2px);
+  cursor: pointer;
+}
+
+.rail-profile-menu > a:hover,
+.rail-profile-menu > button:hover {
+  background: var(--accent-tint);
+}
+
+.rail-profile-menu :focus-visible {
+  outline-color: var(--accent);
 }
 
 .rail-monogram {

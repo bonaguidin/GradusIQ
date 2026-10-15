@@ -194,6 +194,30 @@ export function AuthenticatedDashboard() {
   // for an always-mounted element like this one.
   useFocusTrap(railRef, railOpen);
 
+  // Profile menu on the identity block (initials + name), the place students
+  // expect to find their profile. Closes on Escape or a click outside it.
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!profileMenuOpen) return undefined;
+    function onPointer(event: PointerEvent) {
+      if (!profileMenuRef.current?.contains(event.target as Node)) setProfileMenuOpen(false);
+    }
+    function onKey(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        event.stopPropagation();
+        setProfileMenuOpen(false);
+      }
+    }
+    document.addEventListener('pointerdown', onPointer);
+    window.addEventListener('keydown', onKey, true);
+    return () => {
+      document.removeEventListener('pointerdown', onPointer);
+      window.removeEventListener('keydown', onKey, true);
+    };
+  }, [profileMenuOpen]);
+
   const [fieldFocus, setFieldFocus] = useState<CareerFieldFocus | null>(null);
   const [profileSaved, setProfileSaved] = useState(false);
   const [degreeScheduleResult, setDegreeScheduleResult] = useState<DegreeScheduleResponse | null>(null);
@@ -381,9 +405,29 @@ export function AuthenticatedDashboard() {
       )}
       {railOpen && <div className="rail-overlay" onClick={closeRail} aria-hidden="true" />}
       <aside ref={railRef} tabIndex={-1} className={`rail${railOpen ? ' rail--open' : ''}`} aria-label="Dashboard navigation">
-        <div className="rail-identity">
-          <div className="rail-monogram" aria-hidden="true">{dashboard.initials || 'ST'}</div>
-          <div className="rail-name">{displayName}</div>
+        <div className="rail-identity" ref={profileMenuRef}>
+          <button
+            type="button"
+            className="rail-identity-button"
+            onClick={() => setProfileMenuOpen((open) => !open)}
+            aria-haspopup="menu"
+            aria-expanded={profileMenuOpen}
+            aria-controls="rail-profile-menu"
+          >
+            <span className="rail-monogram" aria-hidden="true">{dashboard.initials || 'ST'}</span>
+            <span className="rail-name">{displayName}</span>
+            <svg className="rail-identity-caret" aria-hidden="true" viewBox="0 0 12 8" width="10" height="7" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M1 1.5l5 5 5-5" />
+            </svg>
+          </button>
+          {profileMenuOpen && (
+            <div id="rail-profile-menu" className="rail-profile-menu" role="menu" aria-label="Profile">
+              <button type="button" role="menuitem" onClick={() => { setProfileMenuOpen(false); navigateToCareerSubTab('profile'); }}>Career Profile</button>
+              <Link role="menuitem" to="/transcript" onClick={() => setProfileMenuOpen(false)}>Update transcript</Link>
+              <Link role="menuitem" to="/resume" onClick={() => setProfileMenuOpen(false)}>Update resume</Link>
+              <button type="button" role="menuitem" onClick={() => { setProfileMenuOpen(false); void handleLogout(); }}>Log out</button>
+            </div>
+          )}
           <div className="rail-meta">
             <span>{dashboard.classification ?? 'Student'}</span>
             <span className="rail-dot" aria-hidden="true">·</span>
