@@ -164,6 +164,11 @@ const ME_TARGETS = Object.assign(Object.create(null), {
   // was widened for both, same reasoning as that one.
   'me-schedule-choices': { method: 'PUT', needsFeature: false },
   'me-schedule-exclusions': { method: 'PUT', needsFeature: false },
+  // Bug/feature report pop-up: multipart (text fields plus up to three
+  // screenshots), so it rides the binary branch like the uploads above. The
+  // backend accepts it with or without a session -- the demo dashboard has
+  // the same button -- and Authorization is forwarded only when sent.
+  'me-feedback': { method: 'POST', needsFeature: false, binary: true },
 })
 const ME_ANALYZE_FEATURES = new Set(['gap', 'fit', 'shift', 'professor-comments', 'course-discovery'])
 const ME_CACHE_FEATURES = new Set(['gap', 'fit', 'shift'])
@@ -265,6 +270,7 @@ function meBackendPath(target, feature, reviewTable, recordId, searchQuery, term
   }
   if (target === 'me-schedule-choices') return '/api/v2/student/me/schedule/choices'
   if (target === 'me-schedule-exclusions') return '/api/v2/student/me/schedule/exclusions'
+  if (target === 'me-feedback') return '/api/v2/student/me/feedback'
   if (target === 'me-planned-courses') {
     // The only forwarded query string besides search. Built here from a
     // validated UUID rather than by copying the inbound search params, so a

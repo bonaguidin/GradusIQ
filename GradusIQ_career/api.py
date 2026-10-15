@@ -54,6 +54,7 @@ from GradusIQ_career.profile_builder import (
     canonical_to_legacy_profile,
 )
 from GradusIQ_career.canvas import calendar_feed
+from GradusIQ_career.feedback import report as feedback_report
 from GradusIQ_career.planning.planned import (
     PlannedCourseError,
     add_planned,
@@ -4569,6 +4570,122 @@ def post_me_schedule_career_optimize(
     return response.model_dump(mode="json")
 
 
+
+# ---------------------------------------------------------------------------
+# Bug and feature reports (the pop-up behind the topbar bug icon).
+#
+# The one /me route that does NOT require a session: the public demo
+# dashboard has the same button, and a demo visitor's bug report is worth
+# having. A session, when one is sent, is verified and attached to the email
+# so the team can trust the account line; the typed email is only ever used
+# as Reply-To. See GradusIQ_career/feedback/report.py for the spam controls.
+# ---------------------------------------------------------------------------
+
+FEEDBACK_ACCOUNT_LIMIT = (5, 3600.0)
+FEEDBACK_ANONYMOUS_LIMIT = (10, 3600.0)
+_FEEDBACK_ANONYMOUS_KEY = "anonymous"
+
+
+def _verified_feedback_account(request: Request) -> tuple[str, str] | None:
+    """(user id, account email) for a valid session, else None. Never raises:
+    a report from an expired session is still a report, just an unverified one."""
+    header = request.headers.get("Authorization", "")
+    if not header.startswith(BEARER_PREFIX):
+        return None
+    token = header[len(BEARER_PREFIX):].strip()
+    if not token:
+        return None
+    try:
+        client = build_client_for_token(token)
+        user = client.auth.get_user(token).user
+    except Exception:  # noqa: BLE001 -- unverifiable means anonymous, not an error
+        return None
+    if user is None or not getattr(user, "id", None):
+        return None
+    return str(user.id), str(getattr(user, "email", "") or "")
+
+
+@router.post(
+    "/api/v2/student/me/feedback",
+    dependencies=[Depends(authorize_proxy_request)],
+)
+def post_me_feedback(
+    request: Request,
+    kind: str = Form(...),
+    description: str = Form(...),
+    email: str = Form(...),
+    name: str | None = Form(None),
+    page: str | None = Form(None),
+    user_agent: str | None = Form(None),
+    website: str | None = Form(None),
+    screenshots: list[UploadFile] = File(default=[]),
+) -> dict:
+    # Honeypot: the form hides this field, so only a bot fills it. Report
+    # success and send nothing.
+    if website and website.strip():
+        return {"status": "sent"}
+
+    account = _verified_feedback_account(request)
+    if account is not None:
+        limiter = request.app.state.feedback_account_limiter
+        limiter_key = account[0]
+    else:
+        limiter = request.app.state.feedback_anonymous_limiter
+        limiter_key = _FEEDBACK_ANONYMOUS_KEY
+    if not limiter.allow(limiter_key):
+        raise HTTPException(
+            status_code=429,
+            detail="You've sent several reports recently. Please try again in a little while.",
+        )
+
+    files: list[tuple[str | None, bytes]] = []
+    for upload in screenshots:
+        try:
+            files.append(
+                (upload.filename, upload.file.read(feedback_report.MAX_SCREENSHOT_BYTES + 1))
+            )
+        except Exception as exc:  # noqa: BLE001 -- a truncated upload stream
+            raise HTTPException(status_code=400, detail="Could not read a screenshot.") from exc
+        finally:
+            upload.file.close()
+
+    try:
+        report = feedback_report.Report(
+            kind=feedback_report.validate_kind(kind),
+            description=feedback_report.validate_description(description),
+            name=feedback_report.validate_name(name),
+            email=feedback_report.validate_email(email),
+            page=feedback_report.validate_context(page),
+            user_agent=feedback_report.validate_context(user_agent),
+            screenshots=feedback_report.validate_screenshots(files),
+            account_id=account[0] if account else None,
+            account_email=(account[1] or None) if account else None,
+        )
+    except feedback_report.ReportValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    try:
+        feedback_report.send_report(
+            report,
+            api_key=os.getenv("RESEND_API_KEY", "").strip(),
+            to_address=os.getenv("GRADUSIQ_REPORT_TO", "").strip() or feedback_report.DEFAULT_REPORT_TO,
+            from_address=os.getenv("GRADUSIQ_REPORT_FROM", "").strip() or feedback_report.DEFAULT_REPORT_FROM,
+        )
+    except feedback_report.ReportNotConfiguredError as exc:
+        logger.error("Report not sent: RESEND_API_KEY is not set.")
+        raise HTTPException(
+            status_code=503,
+            detail="Reports aren't set up yet. Please email gradus@gradusiq.com instead.",
+        ) from exc
+    except feedback_report.ReportDeliveryError as exc:
+        logger.error("Report not sent: %s", exc)
+        raise HTTPException(
+            status_code=502,
+            detail="We couldn't send your report just now. Please try again in a minute.",
+        ) from exc
+    return {"status": "sent"}
+
+
 def create_app(config: APIConfig | None = None) -> FastAPI:
     # Fail the deploy, not the first request: a placeholder model ID would
     # otherwise surface as an opaque 502 (chat) or a silent status="failed"
@@ -4592,6 +4709,12 @@ def create_app(config: APIConfig | None = None) -> FastAPI:
     )
     application.state.ai_concurrency = AIConcurrencyGate(active_config.max_concurrent_ai_requests)
     application.state.career_optimization = CareerOptimizationCoordinator()
+    application.state.feedback_account_limiter = feedback_report.KeyedRateLimiter(
+        *FEEDBACK_ACCOUNT_LIMIT
+    )
+    application.state.feedback_anonymous_limiter = feedback_report.KeyedRateLimiter(
+        *FEEDBACK_ANONYMOUS_LIMIT
+    )
     application.add_middleware(
         CORSMiddleware,
         allow_origins=list(active_config.allowed_origins),

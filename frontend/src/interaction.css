@@ -246,10 +246,12 @@ button.tour-skip:hover:not(:disabled) {
 /* Component stylesheets load after this file, so these are element-qualified
    to outrank their own transition rules rather than edit them. */
 button.chat-chip { --press-scale: 0.96; }
-button.topbar-help { --press-scale: 0.9; }
+button.topbar-help,
+button.topbar-report { --press-scale: 0.9; }
 
 button.chat-chip,
-button.topbar-help {
+button.topbar-help,
+button.topbar-report {
   transition:
     background-color var(--t-quick) var(--ease-out),
     border-color var(--t-quick) var(--ease-out),
@@ -258,7 +260,8 @@ button.topbar-help {
 }
 
 button.chat-chip:active:not(:disabled),
-button.topbar-help:active {
+button.topbar-help:active,
+button.topbar-report:active {
   transform: scale(var(--press-scale));
   transition:
     background-color var(--t-quick) var(--ease-out),
@@ -466,7 +469,8 @@ button.topbar-help:active {
   .btn:active:not(:disabled):not([aria-disabled="true"]),
   .rv-commit-button:active:not(:disabled),
   button.chat-chip:active:not(:disabled),
-  button.topbar-help:active {
+  button.topbar-help:active,
+  button.topbar-report:active {
     transform: none;
   }
 

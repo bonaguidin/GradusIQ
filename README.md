@@ -79,6 +79,7 @@ GRADUSIQ_BACKEND_URL=https://your-render-service.example
 GRADUSIQ_PROXY_SECRET=<same-strong-random-value-as-render>
 VITE_SUPABASE_URL=https://your-project-ref.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=<publishable-anon-key>
+RESEND_API_KEY=<server-only-key>   # bug/feature report emails
 ```
 
 The two `VITE_`-prefixed values are read at import time by
@@ -197,6 +198,12 @@ All academic and career features should build on the same JSON record in
 The student validator checks the shared foundation fields, including academic
 record counts, career fields, and profile completeness gates used by the
 dashboard and future prompt/UI code.
+
+## Design standards
+
+Building a new page, tab or feature? Follow [docs/DESIGN.md](docs/DESIGN.md):
+the tokens, card surface, buttons, loading/empty/error states, motion and
+copy rules the app uses, with a checklist to run before opening a PR.
 
 ---
 
