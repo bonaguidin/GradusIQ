@@ -348,6 +348,31 @@ a {
   display: none;
 }
 
+/* Rail — brand row: the GradusIQ "G" mark and wordmark, above the student. */
+.rail-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-5) var(--sp-5) 0;
+}
+
+.rail-brand-mark {
+  width: 22px;
+  height: 24px;
+  flex-shrink: 0;
+  background-color: var(--rail-text);
+  -webkit-mask: url("/brand/gradusiq-mark.png") center / contain no-repeat;
+  mask: url("/brand/gradusiq-mark.png") center / contain no-repeat;
+}
+
+.rail-brand-name {
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  font-weight: 400;
+  color: var(--rail-text);
+  letter-spacing: 0.01em;
+}
+
 /* Rail — identity block */
 .rail-identity {
   position: relative;
@@ -8475,9 +8500,9 @@ label.profile-form-check { display: flex; flex-direction: row; align-items: cent
   from { opacity: 0; transform: translateY(12px); }
 }
 
-/* The wordmark gets a mark: the same sparkle Ask GradusIQ uses, in the
-   neutral ink, on a quiet tile. Drawn in CSS so every screen that uses the
-   shell picks it up without a markup change. */
+/* The wordmark gets the GradusIQ "G" mark. Drawn in CSS so every screen
+   that uses the shell picks it up without a markup change, and painted
+   through a mask in the neutral accent, since no school is known yet. */
 .login-header {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -8490,18 +8515,11 @@ label.profile-form-check { display: flex; flex-direction: row; align-items: cent
 .login-header::before {
   content: "";
   grid-row: span 2;
-  width: 40px;
+  width: 36px;
   height: 40px;
-  border-radius: var(--radius-chip);
   background-color: var(--neutral-accent);
-  --sparkle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z'/%3E%3C/svg%3E");
-  -webkit-mask:
-    var(--sparkle) center / 20px 20px no-repeat exclude,
-    linear-gradient(#000 0 0);
-  mask:
-    var(--sparkle) center / 20px 20px no-repeat exclude,
-    linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
+  -webkit-mask: url("/brand/gradusiq-mark.png") center / contain no-repeat;
+  mask: url("/brand/gradusiq-mark.png") center / contain no-repeat;
 }
 
 .login-logo {

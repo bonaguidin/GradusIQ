@@ -421,6 +421,10 @@ export function AuthenticatedDashboard() {
       )}
       {railOpen && <div className="rail-overlay" onClick={closeRail} aria-hidden="true" />}
       <aside ref={railRef} tabIndex={-1} className={`rail${railOpen ? ' rail--open' : ''}`} aria-label="Dashboard navigation">
+        <div className="rail-brand">
+          <span className="rail-brand-mark" aria-hidden="true" />
+          <span className="rail-brand-name" translate="no">GradusIQ</span>
+        </div>
         <div className="rail-identity" ref={profileMenuRef}>
           <button
             type="button"
