@@ -512,6 +512,10 @@ function DemoDashboardPage() {
         className={`rail${railOpen ? ' rail--open' : ''}`}
         aria-label="Dashboard navigation"
       >
+        <div className="rail-brand">
+          <span className="rail-brand-mark" aria-hidden="true" />
+          <span className="rail-brand-name" translate="no">GradusIQ</span>
+        </div>
         {/* Identity */}
         <div className="rail-identity">
           <div className="rail-monogram" aria-hidden="true">
