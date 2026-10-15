@@ -59,8 +59,8 @@ test('placeholder copy is set upright, not as italic filler', async () => {
 test('overview readiness gaps offer the way to fill them', async () => {
   const dashboard = await read('pages/AuthenticatedDashboard.tsx')
   assert.doesNotMatch(dashboard, /Not yet available — run/)
-  assert.match(dashboard, /onClick=\{\(\) => navigateToCareerSubTab\('intelligence'\)\}>Open Role Fit</)
-  assert.match(dashboard, /onClick=\{\(\) => navigateToCareerSubTab\('intelligence'\)\}>Open Readiness Check</)
+  assert.match(dashboard, /onClick=\{\(\) => openIntelligencePanel\('fit'\)\}>Open Role Fit</)
+  assert.match(dashboard, /onClick=\{\(\) => openIntelligencePanel\('gap'\)\}>Open Readiness Check</)
 })
 
 test('the old CampusIQ name appears nowhere in code outside comments', async () => {
