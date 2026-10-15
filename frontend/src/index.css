@@ -8764,3 +8764,14 @@ label.profile-form-check { display: flex; flex-direction: row; align-items: cent
 .career-intelligence-section {
   scroll-margin-top: var(--sp-6);
 }
+
+/* The Skills editor holds two TagInputs, so unlike a single-list row its
+   editors' own labels are what tell Technical from Soft. */
+.cp-field-edit .cp-skills-edit {
+  display: grid;
+  gap: var(--sp-4);
+}
+
+.cp-field-edit .cp-skills-edit .tag-input-field > .form-label {
+  display: block;
+}
