@@ -56,6 +56,18 @@ if (mode === 'academic' || mode === 'minimal') {
 }
 if (mode !== 'complete') profile.completeness.overall = mode === 'minimal' ? 'minimal' : 'partial';
 
+// Opt-in via ?gpaHistory=1: five terms of GPA history, the last one projected
+// from current grades, so the GPA-by-term chart and Overview sparkline render.
+if (new URLSearchParams(location.search).get('gpaHistory') === '1') {
+  profile.academics.gpa.by_term = [
+    { term_id: 'h1', term_key: '2024-Fall', label: 'Fall 2024', term_gpa: 3.4, cumulative_gpa: 3.4, gpa_hours: 15, projected: false },
+    { term_id: 'h2', term_key: '2025-Spring', label: 'Spring 2025', term_gpa: 3.1, cumulative_gpa: 3.25, gpa_hours: 15, projected: false },
+    { term_id: 'h3', term_key: '2025-Fall', label: 'Fall 2025', term_gpa: 3.75, cumulative_gpa: 3.42, gpa_hours: 15, projected: false },
+    { term_id: 'h4', term_key: '2026-Spring', label: 'Spring 2026', term_gpa: 3.6, cumulative_gpa: 3.46, gpa_hours: 16, projected: false },
+    { term_id: 'h5', term_key: '2026-Fall', label: 'Fall 2026', term_gpa: 3.85, cumulative_gpa: 3.54, gpa_hours: 15, projected: true },
+  ];
+}
+
 // Additive and opt-in via ?currentTerm=inprogress, same pattern as ?career=
 // below -- every mode above still renders exactly as it did without this
 // param. Adds a second, in-progress term/course on top of whatever `mode`

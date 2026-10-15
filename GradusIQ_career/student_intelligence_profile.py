@@ -58,6 +58,25 @@ class AcademicCourse(ContractModel):
     source: str
 
 
+class TermGpaPoint(ContractModel):
+    """One term on the GPA-by-term chart.
+
+    term_gpa covers only that term's courses; cumulative_gpa covers every
+    confirmed course up to and including it (plus term-less transfer/exam
+    rows), so the last completed point's cumulative equals the official GPA.
+    A term holding in-progress courses is computed in the 'projected' scope
+    from their current grades and flagged projected.
+    """
+
+    term_id: str
+    term_key: str
+    label: str
+    term_gpa: float
+    cumulative_gpa: float | None = None
+    gpa_hours: float
+    projected: bool = False
+
+
 class GpaProfile(ContractModel):
     official: float | None = None
     projected: float | None = None
@@ -68,6 +87,8 @@ class GpaProfile(ContractModel):
     # courses." / "Enter current grades to see your projected GPA." copy
     # without the frontend re-deriving it from the course list.
     in_progress_with_current_grade_count: int = 0
+    # Chronological; terms with no GPA-counting grade are left out.
+    by_term: list[TermGpaPoint] = Field(default_factory=list)
     source: Literal["gpa_service"] = "gpa_service"
 
 

@@ -6,6 +6,7 @@ import type {
   CanonicalProvenance,
   RepeatExclusion,
   StudentIntelligenceProfile,
+  TermGpaPoint,
 } from '../types/studentIntelligenceProfile';
 
 export interface AuthenticatedDashboardViewModel {
@@ -21,6 +22,7 @@ export interface AuthenticatedDashboardViewModel {
   officialGpa: number | null;
   projectedGpa: number | null;
   inProgressWithCurrentGradeCount: number;
+  gpaByTerm: TermGpaPoint[];
   completedHours: number;
   inProgressHours: number;
   earnedHours: number;
@@ -57,6 +59,7 @@ export function buildDashboardViewModel(
     officialGpa: profile.academics.gpa.official,
     projectedGpa: profile.academics.gpa.projected,
     inProgressWithCurrentGradeCount: profile.academics.gpa.in_progress_with_current_grade_count,
+    gpaByTerm: profile.academics.gpa.by_term ?? [],
     completedHours: profile.academics.summary.completed_hours,
     inProgressHours: profile.academics.summary.in_progress_hours,
     earnedHours: profile.academics.summary.earned_hours,
