@@ -5,6 +5,7 @@ import { ConfirmButton, useConfirmStatus } from '../components/ConfirmButton';
 import { useErrorFocus } from '../hooks/useErrorFocus';
 import { LoginPitch } from '../components/LoginPitch';
 import { INSTITUTIONS, todayIso, validateSignupForm } from '../lib/signupRules.mjs';
+import { PasswordInput } from '../components/PasswordInput';
 
 /**
  * Account creation, which ends in one of two places depending on a project
@@ -173,10 +174,9 @@ export function SignUpPage() {
             <label htmlFor="signup-password" className="form-label">
               Password
             </label>
-            <input
+            <PasswordInput
               id="signup-password"
               name="new-password"
-              type="password"
               className="form-input"
               value={password}
               onChange={(e) => setPassword(e.target.value)}

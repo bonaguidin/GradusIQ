@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 import { useErrorFocus } from '../hooks/useErrorFocus';
 import { Spinner } from '../auth/AccountStateScreens';
+import { PasswordInput } from '../components/PasswordInput';
 
 /**
  * Landed on via the emailed link. supabase-js's `detectSessionInUrl` (on by
@@ -101,9 +102,8 @@ export function ResetPasswordConfirmPage() {
             <label htmlFor="new-password" className="form-label">
               New password
             </label>
-            <input
+            <PasswordInput
               id="new-password"
-              type="password"
               className="form-input"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
@@ -117,9 +117,8 @@ export function ResetPasswordConfirmPage() {
             <label htmlFor="confirm-password" className="form-label">
               Confirm new password
             </label>
-            <input
+            <PasswordInput
               id="confirm-password"
-              type="password"
               className="form-input"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
