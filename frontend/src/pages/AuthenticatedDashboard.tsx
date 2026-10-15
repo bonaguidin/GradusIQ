@@ -45,6 +45,7 @@ import { ProfileChecklist } from '../components/career/ProfileChecklist';
 import { ProfileCompletionContext, type ProfileFieldRequest } from '../components/profile/ProfileCompletionContext';
 import { AnimatedNumber } from '../components/AnimatedNumber';
 import { formatFixed } from '../lib/format.mjs';
+import { GpaSparkline, GpaTrendChart } from '../components/GpaTrendChart';
 import { countLabel } from '../lib/countLabel.mjs';
 import { buildDashboardViewModel } from '../data/dashboardViewModel';
 import { missingChecklistFields } from '../lib/profileChecklist';
@@ -564,7 +565,7 @@ export function AuthenticatedDashboard() {
                 </div>
                 <ChatPanel />
                 <div className="overview-stats">
-                  <div className="overview-stat"><span className="overview-stat-value"><AnimatedNumber value={dashboard.officialGpa} decimals={2} countIn /></span><span className="overview-stat-label">Official GPA</span></div>
+                  <div className="overview-stat"><span className="overview-stat-value"><AnimatedNumber value={dashboard.officialGpa} decimals={2} countIn /></span><span className="overview-stat-label">Official GPA</span><GpaSparkline points={dashboard.gpaByTerm} onOpen={() => navigateToAcademicSubTab('gpa-calculator')} /></div>
                   <div className="overview-stat"><span className="overview-stat-value"><AnimatedNumber value={dashboard.courses.length} decimals={0} countIn /></span><span className="overview-stat-label">Confirmed Courses</span></div>
                   <StatusStat label="Profile Status" tone={readiness}>{readiness}</StatusStat>
                   <DegreeProgressRing satisfied={degreeProgress.satisfied} total={degreeProgress.total} />
@@ -807,6 +808,7 @@ export function AuthenticatedDashboard() {
                         ? `Based on current grades in ${dashboard.inProgressWithCurrentGradeCount} in-progress course${dashboard.inProgressWithCurrentGradeCount === 1 ? '' : 's'}.`
                         : 'Enter current grades to see your projected GPA.'}
                     </p>
+                    <GpaTrendChart points={dashboard.gpaByTerm} onSelectTerm={(termKey) => setParams({ term: termKey })} />
                     {/* The flat all-courses list is replaced by the term view:
                         one term at a time, chosen from a dropdown that opens on
                         the upcoming term. The GPA/hours stats above stay

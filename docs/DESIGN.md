@@ -441,6 +441,7 @@ in the area; don't copy them.
 | 2026-10-13 | White elevated cards are the house surface style. | Noah |
 | 2026-10-13 | Dark mode is out of scope for now. | Noah |
 | 2026-10-14 | The demo dashboard stays a separate page that shares the Overview look. | Noah |
+| 2026-10-15 | GPA history: the full term-by-term chart lives on the GPA Calculator, and Overview only gets a small sparkline. Term GPA is drawn as points, not bars, so the axis can start near the lowest GPA. | Noah |
 
 Add a row when a design decision is made, so the next person doesn't
 relitigate it.

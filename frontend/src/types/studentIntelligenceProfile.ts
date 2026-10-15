@@ -28,6 +28,8 @@ export interface StudentIntelligenceProfile {
       projected: number | null;
       computable: boolean;
       in_progress_with_current_grade_count: number;
+      // Oldest first. Optional: the demo profile and older payloads omit it.
+      by_term?: TermGpaPoint[];
       source: 'gpa_service';
     };
     repeat_exclusions: RepeatExclusion[];
@@ -123,4 +125,14 @@ export interface MeProfile {
   };
   career: unknown;
   intelligence_profile: StudentIntelligenceProfile;
+}
+
+export interface TermGpaPoint {
+  term_id: string;
+  term_key: string;
+  label: string;
+  term_gpa: number;
+  cumulative_gpa: number | null;
+  gpa_hours: number;
+  projected: boolean;
 }

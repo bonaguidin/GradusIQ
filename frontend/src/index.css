@@ -8810,3 +8810,220 @@ label.profile-form-check { display: flex; flex-direction: row; align-items: cent
 .cp-field-edit .cp-skills-edit .tag-input-field > .form-label {
   display: block;
 }
+
+/* ── GPA by term ──
+   Term GPA in the accent, cumulative in muted ink: two series, no new hue.
+   The in-progress term is projected from current grades, so its segment is
+   dashed and its dot hollow. See components/GpaTrendChart.tsx. */
+.gpa-trend {
+  margin-top: var(--sp-5);
+  margin-bottom: var(--sp-5);
+}
+
+.gpa-trend-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--sp-3);
+}
+
+.gpa-trend-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.gpa-trend-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.gpa-trend-key {
+  display: inline-block;
+  width: 16px;
+  height: 0;
+  border-top: 2px solid var(--accent);
+}
+
+.gpa-trend-key--cumulative {
+  border-top-color: var(--muted);
+}
+
+.gpa-trend-key--projected {
+  border-top-style: dashed;
+}
+
+.gpa-trend-plot {
+  position: relative;
+}
+
+.gpa-trend-svg {
+  display: block;
+  max-width: 100%;
+  overflow: visible;
+}
+
+.gpa-trend-grid {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.gpa-trend-tick,
+.gpa-trend-axis {
+  font-family: var(--font-data);
+  font-size: var(--text-xs);
+  fill: var(--muted);
+}
+
+.gpa-trend-value {
+  font-family: var(--font-data);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  fill: var(--ink);
+}
+
+.gpa-trend-line {
+  fill: none;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.gpa-trend-line--term {
+  stroke: var(--accent);
+}
+
+.gpa-trend-line--cumulative {
+  stroke: var(--muted);
+}
+
+.gpa-trend-line--projected {
+  stroke-dasharray: 5 4;
+}
+
+.gpa-trend-point {
+  cursor: pointer;
+  outline: none;
+}
+
+.gpa-trend-hit {
+  fill: transparent;
+}
+
+.gpa-trend-point--active .gpa-trend-hit {
+  fill: rgb(var(--ink-rgb) / 0.04);
+}
+
+.gpa-trend-dot {
+  fill: var(--accent);
+  stroke: var(--surface-elevated);
+  stroke-width: 2;
+  transition: r var(--t-quick) var(--ease-out);
+}
+
+.gpa-trend-point--projected .gpa-trend-dot {
+  fill: var(--surface-elevated);
+  stroke: var(--accent);
+}
+
+.gpa-trend-point--active .gpa-trend-dot {
+  r: 7;
+}
+
+.gpa-trend-point:focus-visible .gpa-trend-dot {
+  stroke: var(--accent);
+  stroke-width: 3;
+}
+
+.gpa-trend-tooltip {
+  position: absolute;
+  z-index: 2;
+  transform: translate(-50%, calc(-100% - var(--sp-3)));
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  min-width: 10rem;
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--surface-elevated);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  font-size: var(--text-sm);
+  color: var(--muted);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* Near either edge the tooltip hangs inward so it stays inside the card. */
+.gpa-trend-tooltip--end {
+  transform: translate(calc(-100% + var(--sp-4)), calc(-100% - var(--sp-3)));
+}
+
+.gpa-trend-tooltip--start {
+  transform: translate(calc(-1 * var(--sp-4)), calc(-100% - var(--sp-3)));
+}
+
+.gpa-trend-tooltip strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.gpa-trend-tooltip b {
+  font-family: var(--font-data);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.gpa-trend-note {
+  color: var(--muted);
+  font-size: var(--text-sm);
+  margin: var(--sp-4) 0;
+}
+
+/* Overview: the cumulative trend rides in the GPA tile's corner. */
+.gpa-sparkline {
+  position: absolute;
+  top: var(--sp-3);
+  right: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--sp-1);
+  padding: 0;
+  background: none;
+  border: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.gpa-sparkline-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.gpa-sparkline-line--projected {
+  stroke-dasharray: 3 3;
+}
+
+.gpa-sparkline-dot {
+  fill: var(--accent);
+}
+
+.gpa-sparkline-link {
+  font-size: var(--text-xs);
+  color: var(--accent-text);
+}
+
+.gpa-sparkline:hover .gpa-sparkline-link,
+.gpa-sparkline:focus-visible .gpa-sparkline-link {
+  text-decoration: underline;
+}
