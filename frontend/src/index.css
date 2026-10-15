@@ -6870,6 +6870,23 @@ a {
   margin-left: auto;
 }
 
+/* The term the planner opens on (in progress, else upcoming) and its year
+   carry a small accent dot, so "now" stays findable after clicking away; the
+   Current term button in .term-meta jumps back to it. */
+.term-home-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: var(--sp-2);
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: middle;
+}
+
+.term-season-tab--active .term-home-dot {
+  background: var(--on-accent);
+}
+
 .term-badge {
   font-size: 0.6875rem;
   letter-spacing: 0.08em;

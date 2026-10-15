@@ -269,6 +269,16 @@ export function TermPlanner({ slug, accessToken, courses, onCourseRecordsChanged
     [terms, selectedKey],
   );
 
+  // "Now" for the jump-back button and the tab marker is the same term the
+  // planner opens on (pickDefaultTermKey: the in-progress term, else the
+  // upcoming one), so the button always returns to where the page started.
+  const homeTerm = useMemo(
+    () => terms.find((term) => term.key === defaultTermKey) ?? null,
+    [terms, defaultTermKey],
+  );
+  const homeYearKey = homeTerm ? termAcademicYearKey(homeTerm.year, homeTerm.season) : null;
+  const homeLabel = homeTerm && termStatus(homeTerm, today) === 'in_progress' ? 'Current term' : 'Upcoming term';
+
   // Years, then the terms inside the active one -- replaces the flat
   // dropdown with the same year-tab pattern Degree Schedule already uses.
   // `terms` arrives pre-sorted (normalizeTermsPayload), so each bucket's own
@@ -548,10 +558,11 @@ export function TermPlanner({ slug, accessToken, courses, onCourseRecordsChanged
               id={`term-year-tab-${yearKey}`}
               aria-selected={activeYearKey === yearKey}
               aria-controls="term-detail-panel"
-              className={`academic-tab${activeYearKey === yearKey ? ' academic-tab--active' : ''}`}
+              className={`academic-tab${activeYearKey === yearKey ? ' academic-tab--active' : ''}${homeYearKey === yearKey ? ' term-tab--home' : ''}`}
               onClick={() => selectYear(yearKey)}
             >
               {termAcademicYearLabel(yearKey)}
+              {homeYearKey === yearKey && <span className="term-home-dot" aria-hidden="true" />}
             </button>
           ))}
         </div>
@@ -565,15 +576,25 @@ export function TermPlanner({ slug, accessToken, courses, onCourseRecordsChanged
               id={`term-season-tab-${term.key}`}
               aria-selected={selectedKey === term.key}
               aria-controls="term-detail-panel"
-              className={`term-season-tab${selectedKey === term.key ? ' term-season-tab--active' : ''}`}
+              className={`term-season-tab${selectedKey === term.key ? ' term-season-tab--active' : ''}${defaultTermKey === term.key ? ' term-tab--home' : ''}`}
               onClick={() => setSelectedKey(term.key)}
             >
               {term.season}
+              {defaultTermKey === term.key && <span className="term-home-dot" aria-hidden="true" />}
             </button>
           ))}
         </div>
 
         <div className="term-meta">
+          {homeTerm && selectedKey !== homeTerm.key && (
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm term-home-button"
+              onClick={() => setSelectedKey(homeTerm.key)}
+            >
+              {homeLabel}
+            </button>
+          )}
           {statusLabel && <span className={`term-badge term-badge--${status}`}>{statusLabel}</span>}
           {dateRange
             ? <span className="term-dates">{dateRange}</span>

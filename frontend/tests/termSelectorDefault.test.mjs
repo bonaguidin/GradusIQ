@@ -227,4 +227,13 @@ test('GPA Calculator term selector defaults to the in-progress term and survives
   await page.locator('.real-course-row--planned .planned-badge').first().waitFor()
   await page.getByText(/not counted in GPA or hours/i).waitFor()
   assert.equal(await activeTermKey(), '2027-Spring')
+
+  // 6. The in-progress term (and its year) carry the "now" dot, and the
+  //    Current term button jumps back to it from another term, then hides.
+  assert.equal(await page.locator('.term-season-tabs .term-tab--home').getAttribute('id'), 'term-season-tab-2026-Fall')
+  assert.equal(await page.locator('.academic-tabs .term-tab--home').getAttribute('id'), 'term-year-tab-2026')
+  const homeButton = page.getByRole('button', { name: 'Current term' })
+  await homeButton.click()
+  assert.equal(await activeTermKey(), '2026-Fall')
+  await homeButton.waitFor({ state: 'detached' })
 })
