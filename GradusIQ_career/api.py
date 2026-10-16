@@ -1426,11 +1426,18 @@ def _clean_profile_text(value: str | None, field: str) -> str | None:
     return cleaned
 
 
+# Skills lists come from resume parsing, which keeps up to
+# resume.parser.MAX_LIST_ENTRIES of them; a lower cap here would make any
+# Career Profile skills edit fail for a student whose resume filled the list.
+_PROFILE_LIST_MAX_ITEMS = {"skills_technical": 100, "skills_soft": 100}
+
+
 def _clean_profile_list(value: list[str] | None, field: str) -> list[str] | None:
     if value is None:
         return None
     cleaned = [item.strip() for item in value if item.strip()]
-    if len(cleaned) > 30 or any(len(item) > 120 for item in cleaned):
+    max_items = _PROFILE_LIST_MAX_ITEMS.get(field, 30)
+    if len(cleaned) > max_items or any(len(item) > 120 for item in cleaned):
         raise HTTPException(status_code=422, detail=f"{field} contains too many or overly long items.")
     return list(dict.fromkeys(cleaned))
 

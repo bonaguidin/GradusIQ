@@ -261,3 +261,63 @@ def test_compatibility_adapter_supports_an_incomplete_profile():
     assert legacy["career"] is None
     assert legacy["courses"] == []
     assert legacy["student"]["id"] == SID
+
+
+def _gpa_history_tables():
+    value = tables()
+    value["grade_point_map"] += [
+        {"institution_id": IID, "letter": "B", "points": 3.0, "counts_toward_gpa": True, "counts_toward_credit": True},
+        {"institution_id": IID, "letter": "C", "points": 2.0, "counts_toward_gpa": True, "counts_toward_credit": True},
+    ]
+    # Listed out of order on purpose: points come back chronological.
+    value["academic_terms"] = [
+        {"id": "term-c", "student_id": SID, "institution_id": IID, "label": "Fall 2026", "year": 2026, "season": "Fall", "sequence": 3},
+        {"id": "term-a", "student_id": SID, "institution_id": IID, "label": "Fall 2025", "year": 2025, "season": "Fall", "sequence": 1},
+        {"id": "term-b", "student_id": SID, "institution_id": IID, "label": "Spring 2026", "year": 2026, "season": "Spring", "sequence": 2},
+    ]
+
+    def course(cid, term, grade, status="completed", hours=3, **extra):
+        return {
+            "id": cid, "student_id": SID, "term_id": term, "institution_id": IID,
+            "course_code": cid.upper(), "title": None, "credit_hours": hours,
+            "letter_grade": grade, "credit_type": "resident", "status": status,
+            "source": "transcript_parse", "confirmed_at": CONFIRMED,
+            "excluded_from_gpa_by": None, **extra,
+        }
+
+    value["course_records"] = [
+        course("a1", "term-a", "A"),
+        course("a2", "term-a", "C", excluded_from_gpa_by="b1"),
+        course("b1", "term-b", "B"),
+        course("c1", "term-c", "A", status="in_progress"),
+        course("c2", "term-c", None, status="in_progress"),
+    ]
+    return value
+
+
+def test_gpa_by_term_is_chronological_and_follows_gpa_rules():
+    result = build(_gpa_history_tables())
+    points = result.academics.gpa.by_term
+
+    assert [p.term_key for p in points] == ["2025-Fall", "2026-Spring", "2026-Fall"]
+    # The repeated C is excluded from Fall 2025 just as from Official GPA.
+    assert [p.term_gpa for p in points] == [4.0, 3.0, 4.0]
+    assert [p.cumulative_gpa for p in points] == [4.0, 3.5, 3.67]
+    assert [p.projected for p in points] == [False, False, True]
+    # The last completed term's cumulative is the official GPA, and the
+    # projected term's cumulative is the projected GPA.
+    assert points[1].cumulative_gpa == result.academics.gpa.official
+    assert points[2].cumulative_gpa == result.academics.gpa.projected
+
+
+def test_gpa_by_term_skips_terms_without_counting_grades():
+    value = _gpa_history_tables()
+    value["course_records"] = [r for r in value["course_records"] if r["id"] != "c1"]
+    points = build(value).academics.gpa.by_term
+    assert [p.term_key for p in points] == ["2025-Fall", "2026-Spring"]
+
+
+def test_gpa_by_term_is_empty_without_a_grade_map():
+    value = _gpa_history_tables()
+    value["grade_point_map"] = []
+    assert build(value).academics.gpa.by_term == []

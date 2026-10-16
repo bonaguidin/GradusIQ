@@ -17,6 +17,7 @@ export function ChatPanel() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const realName = studentAccount.profile?.intelligence_profile.identity.name;
   const firstName = (profile?.student?.name ?? realName)?.split(' ')[0] ?? 'there';
@@ -82,7 +83,10 @@ export function ChatPanel() {
                   key={s}
                   type="button"
                   className="chat-chip"
-                  onClick={() => void submit(s)}
+                  onClick={() => {
+                    inputRef.current?.focus();
+                    void submit(s);
+                  }}
                   disabled={sending || !canSend}
                 >
                   <span>{s}</span>
@@ -121,14 +125,17 @@ export function ChatPanel() {
       )}
 
       <form className="chat-input-row chat-composer" onSubmit={onSubmit}>
+        {/* Stays enabled while a reply is pending so focus never drops after Enter;
+            submit() ignores sends until the reply lands. */}
         <input
+          ref={inputRef}
           className="chat-input"
           type="text"
           name="chat-message"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Ask about your grades, gaps, roles…"
-          disabled={sending || !canSend}
+          disabled={!canSend}
           aria-label="Message GradusIQ"
           autoComplete="off"
         />

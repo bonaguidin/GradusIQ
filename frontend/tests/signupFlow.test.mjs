@@ -59,7 +59,7 @@ async function open(t, mode) {
 async function fillForm(page, email = 'newstudent@example.com') {
   await page.getByLabel('Full name').fill('Deepak Murali')
   await page.getByLabel('Email').fill(email)
-  await page.getByLabel('Password').fill('a-strong-password')
+  await page.getByLabel('Password', { exact: true }).fill('a-strong-password')
   await page.getByLabel('Date of birth').fill('2000-04-12')
   await page.getByLabel('Institution').selectOption(TAMU_ID)
 }

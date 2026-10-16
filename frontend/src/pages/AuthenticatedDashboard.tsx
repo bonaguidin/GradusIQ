@@ -45,6 +45,7 @@ import { ProfileChecklist } from '../components/career/ProfileChecklist';
 import { ProfileCompletionContext, type ProfileFieldRequest } from '../components/profile/ProfileCompletionContext';
 import { AnimatedNumber } from '../components/AnimatedNumber';
 import { formatFixed } from '../lib/format.mjs';
+import { GpaSparkline, GpaTrendChart } from '../components/GpaTrendChart';
 import { countLabel } from '../lib/countLabel.mjs';
 import { buildDashboardViewModel } from '../data/dashboardViewModel';
 import { missingChecklistFields } from '../lib/profileChecklist';
@@ -63,6 +64,7 @@ const NAV_ITEMS: Array<{ key: NavSection; label: string }> = [
 const SECTION_VALUES: NavSection[] = ['overview', 'academic', 'career'];
 
 type CareerSubTab = 'overview' | 'intelligence' | 'job-search' | 'profile';
+type IntelligencePanel = 'fit' | 'gap' | 'shift';
 
 const CAREER_SUB_TABS: Array<{ key: CareerSubTab; label: string }> = [
   { key: 'intelligence', label: 'Career Intelligence' },
@@ -194,6 +196,30 @@ export function AuthenticatedDashboard() {
   // for an always-mounted element like this one.
   useFocusTrap(railRef, railOpen);
 
+  // Profile menu on the identity block (initials + name), the place students
+  // expect to find their profile. Closes on Escape or a click outside it.
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!profileMenuOpen) return undefined;
+    function onPointer(event: PointerEvent) {
+      if (!profileMenuRef.current?.contains(event.target as Node)) setProfileMenuOpen(false);
+    }
+    function onKey(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        event.stopPropagation();
+        setProfileMenuOpen(false);
+      }
+    }
+    document.addEventListener('pointerdown', onPointer);
+    window.addEventListener('keydown', onKey, true);
+    return () => {
+      document.removeEventListener('pointerdown', onPointer);
+      window.removeEventListener('keydown', onKey, true);
+    };
+  }, [profileMenuOpen]);
+
   const [fieldFocus, setFieldFocus] = useState<CareerFieldFocus | null>(null);
   const [profileSaved, setProfileSaved] = useState(false);
   const [degreeScheduleResult, setDegreeScheduleResult] = useState<DegreeScheduleResponse | null>(null);
@@ -303,6 +329,16 @@ export function AuthenticatedDashboard() {
     [setParams],
   );
 
+  // GAP/FIT/SHIFT summaries on Overview and Career Overview link straight to
+  // their own panel on Career Intelligence, not just the top of that tab.
+  const [intelligenceTarget, setIntelligenceTarget] = useState<IntelligencePanel | null>(null);
+
+  useEffect(() => {
+    if (!intelligenceTarget || activeSection !== 'career' || careerSubTab !== 'intelligence') return;
+    document.getElementById(`career-intelligence-${intelligenceTarget}`)?.scrollIntoView({ block: 'start' });
+    setIntelligenceTarget(null);
+  }, [intelligenceTarget, activeSection, careerSubTab]);
+
   if (!dashboard) return null;
 
   const displayName = dashboard.name ?? 'Student';
@@ -354,6 +390,11 @@ export function AuthenticatedDashboard() {
     setRailOpen(false);
   }
 
+  function openIntelligencePanel(panel: IntelligencePanel) {
+    navigateToCareerSubTab('intelligence');
+    setIntelligenceTarget(panel);
+  }
+
   // Finishing, skipping, Escape and the end CTAs all count as done.
   function handleTourClose() {
     setTourOpen(false);
@@ -381,9 +422,33 @@ export function AuthenticatedDashboard() {
       )}
       {railOpen && <div className="rail-overlay" onClick={closeRail} aria-hidden="true" />}
       <aside ref={railRef} tabIndex={-1} className={`rail${railOpen ? ' rail--open' : ''}`} aria-label="Dashboard navigation">
-        <div className="rail-identity">
-          <div className="rail-monogram" aria-hidden="true">{dashboard.initials || 'ST'}</div>
-          <div className="rail-name">{displayName}</div>
+        <div className="rail-brand">
+          <span className="rail-brand-mark" aria-hidden="true" />
+          <span className="rail-brand-name" translate="no">GradusIQ</span>
+        </div>
+        <div className="rail-identity" ref={profileMenuRef}>
+          <button
+            type="button"
+            className="rail-identity-button"
+            onClick={() => setProfileMenuOpen((open) => !open)}
+            aria-haspopup="menu"
+            aria-expanded={profileMenuOpen}
+            aria-controls="rail-profile-menu"
+          >
+            <span className="rail-monogram" aria-hidden="true">{dashboard.initials || 'ST'}</span>
+            <span className="rail-name">{displayName}</span>
+            <svg className="rail-identity-caret" aria-hidden="true" viewBox="0 0 12 8" width="10" height="7" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M1 1.5l5 5 5-5" />
+            </svg>
+          </button>
+          {profileMenuOpen && (
+            <div id="rail-profile-menu" className="rail-profile-menu" role="menu" aria-label="Profile">
+              <button type="button" role="menuitem" onClick={() => { setProfileMenuOpen(false); navigateToCareerSubTab('profile'); }}>Career Profile</button>
+              <Link role="menuitem" to="/transcript" onClick={() => setProfileMenuOpen(false)}>Update transcript</Link>
+              <Link role="menuitem" to="/resume" onClick={() => setProfileMenuOpen(false)}>Update resume</Link>
+              <button type="button" role="menuitem" onClick={() => { setProfileMenuOpen(false); void handleLogout(); }}>Log out</button>
+            </div>
+          )}
           <div className="rail-meta">
             <span>{dashboard.classification ?? 'Student'}</span>
             <span className="rail-dot" aria-hidden="true">·</span>
@@ -500,7 +565,7 @@ export function AuthenticatedDashboard() {
                 </div>
                 <ChatPanel />
                 <div className="overview-stats">
-                  <div className="overview-stat"><span className="overview-stat-value"><AnimatedNumber value={dashboard.officialGpa} decimals={2} countIn /></span><span className="overview-stat-label">Official GPA</span></div>
+                  <div className="overview-stat"><span className="overview-stat-value"><AnimatedNumber value={dashboard.officialGpa} decimals={2} countIn /></span><span className="overview-stat-label">Official GPA</span><GpaSparkline points={dashboard.gpaByTerm} onOpen={() => navigateToAcademicSubTab('gpa-calculator')} /></div>
                   <div className="overview-stat"><span className="overview-stat-value"><AnimatedNumber value={dashboard.courses.length} decimals={0} countIn /></span><span className="overview-stat-label">Confirmed Courses</span></div>
                   <StatusStat label="Profile Status" tone={readiness}>{readiness}</StatusStat>
                   <DegreeProgressRing satisfied={degreeProgress.satisfied} total={degreeProgress.total} />
@@ -565,11 +630,12 @@ export function AuthenticatedDashboard() {
                               <span className="theme-name">{topRole.role}</span>
                               <span className={`fit-badge fit-badge--${topRole.fit_level}`}>{FIT_LEVEL_LABEL[topRole.fit_level]}</span>
                             </div>
+                            <button type="button" className="btn btn-ghost btn-sm career-readiness-link" onClick={() => openIntelligencePanel('fit')}>See Role Fit</button>
                           </div>
                         ) : (
                           <EmptyState
                             icon="target"
-                            action={<button type="button" className="btn btn-ghost btn-sm" onClick={() => navigateToCareerSubTab('intelligence')}>Open Role Fit</button>}
+                            action={<button type="button" className="btn btn-ghost btn-sm" onClick={() => openIntelligencePanel('fit')}>Open Role Fit</button>}
                           >
                             No role match yet.
                           </EmptyState>
@@ -585,11 +651,12 @@ export function AuthenticatedDashboard() {
                                 {biggestGap.priority === 'must' ? 'Must-Have' : 'Nice-to-Have'}
                               </span>
                             </div>
+                            <button type="button" className="btn btn-ghost btn-sm career-readiness-link" onClick={() => openIntelligencePanel('gap')}>See all skill gaps</button>
                           </div>
                         ) : (
                           <EmptyState
                             icon="bars"
-                            action={<button type="button" className="btn btn-ghost btn-sm" onClick={() => navigateToCareerSubTab('intelligence')}>Open Readiness Check</button>}
+                            action={<button type="button" className="btn btn-ghost btn-sm" onClick={() => openIntelligencePanel('gap')}>Open Readiness Check</button>}
                           >
                             No readiness check yet.
                           </EmptyState>
@@ -741,6 +808,7 @@ export function AuthenticatedDashboard() {
                         ? `Based on current grades in ${dashboard.inProgressWithCurrentGradeCount} in-progress course${dashboard.inProgressWithCurrentGradeCount === 1 ? '' : 's'}.`
                         : 'Enter current grades to see your projected GPA.'}
                     </p>
+                    <GpaTrendChart points={dashboard.gpaByTerm} onSelectTerm={(termKey) => setParams({ term: termKey })} />
                     {/* The flat all-courses list is replaced by the term view:
                         one term at a time, chosen from a dropdown that opens on
                         the upcoming term. The GPA/hours stats above stay
@@ -832,13 +900,14 @@ export function AuthenticatedDashboard() {
                     </div>
                     <div className="career-overview-grid">
                       {([
-                        ['Role Fit', fitRun.state],
-                        ['Readiness', gapRun.state],
-                        ['Trend Guidance', shiftRun.state],
-                      ] as const).map(([label, state]) => (
+                        ['Role Fit', 'fit', fitRun.state],
+                        ['Readiness', 'gap', gapRun.state],
+                        ['Trend Guidance', 'shift', shiftRun.state],
+                      ] as const).map(([label, panel, state]) => (
                         <section className="career-overview-summary" key={label}>
                           <h3>{label}</h3>
                           <p>{state.phase === 'done' ? state.result.summary : state.phase === 'loading' ? 'Analysis in progress.' : state.phase === 'transport-error' ? 'Analysis unavailable.' : 'No analysis has been run yet.'}</p>
+                          <button type="button" className="btn btn-ghost btn-sm career-overview-summary-link" onClick={() => openIntelligencePanel(panel)} aria-label={`View ${label} details`}>View details</button>
                         </section>
                       ))}
                     </div>
@@ -851,9 +920,9 @@ export function AuthenticatedDashboard() {
               <div className="stage-section career-subtab-panel career-intelligence">
                 <h2 className="career-section-heading">Career Intelligence</h2>
                 <p className="career-intelligence-role">Target role: <strong>{dashboard.career.target_roles[0] ?? 'Not provided'}</strong></p>
-                <section className="career-intelligence-section"><ErrorBoundary><FitAnalysisPanel run={fitRun} /></ErrorBoundary></section>
-                <section className="career-intelligence-section"><ErrorBoundary><GapAnalysisPanel run={gapRun} /></ErrorBoundary></section>
-                <section className="career-intelligence-section"><ErrorBoundary><ShiftAnalysisPanel run={shiftRun} /></ErrorBoundary></section>
+                <section id="career-intelligence-fit" className="career-intelligence-section"><ErrorBoundary><FitAnalysisPanel run={fitRun} /></ErrorBoundary></section>
+                <section id="career-intelligence-gap" className="career-intelligence-section"><ErrorBoundary><GapAnalysisPanel run={gapRun} /></ErrorBoundary></section>
+                <section id="career-intelligence-shift" className="career-intelligence-section"><ErrorBoundary><ShiftAnalysisPanel run={shiftRun} /></ErrorBoundary></section>
               </div>
             )}
 

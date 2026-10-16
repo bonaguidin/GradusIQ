@@ -3,6 +3,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 import { useErrorFocus } from '../hooks/useErrorFocus';
 import { LoginPitch } from '../components/LoginPitch';
+import { PasswordInput } from '../components/PasswordInput';
 
 const DEMO_STUDENTS = [
   { name: 'Jordan Reyes',  slug: 'jordanReyes'  },
@@ -105,10 +106,9 @@ export function LoginPage() {
             <label htmlFor="login-password" className="form-label">
               Password
             </label>
-            <input
+            <PasswordInput
               id="login-password"
               name="current-password"
-              type="password"
               className="form-input"
               value={password}
               onChange={(e) => setPassword(e.target.value)}

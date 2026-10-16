@@ -400,6 +400,8 @@ def test_profile_edit_is_partial_owned_and_refreshes_confirmation(client, monkey
         {"expected_graduation": "Winter 2029"},
         {"ai_anxiety_level": "extreme"},
         {"major_intended": "   "},
+        {"target_roles": [f"Role {i}" for i in range(31)]},
+        {"skills_technical": [f"Skill {i}" for i in range(101)]},
     ],
 )
 def test_profile_edit_rejects_invalid_values_before_writing(client, monkeypatch, payload):
@@ -409,6 +411,21 @@ def test_profile_edit_rejects_invalid_values_before_writing(client, monkeypatch,
 
     assert response.status_code == 422
     assert not any(call[1] in {"update", "insert"} for call in database.calls)
+
+
+def test_profile_edit_accepts_skill_lists_as_long_as_resume_parsing_keeps(client, monkeypatch):
+    # Resume parsing stores up to 100 skills; a Career Profile skills edit for
+    # that student must save, not 422 on the 30-item cap other lists keep.
+    database = _patch_profile_edit(monkeypatch)
+    skills = [f"Skill {i}" for i in range(100)]
+
+    response = _call(client, "patch", "/api/v2/student/me/profile", {"skills_technical": skills})
+
+    assert response.status_code == 200
+    career_update = next(
+        call for call in database.calls if call[:2] == ("career_profiles", "update")
+    )
+    assert career_update[2]["skills_technical"] == skills
 
 
 @pytest.mark.parametrize("feature", ["gap", "fit", "shift", "professor-comments"])

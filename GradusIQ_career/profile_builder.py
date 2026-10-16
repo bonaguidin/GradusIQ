@@ -27,7 +27,10 @@ from GradusIQ_career.academics.gpa import (
     GradeMapRow,
     Institution,
     compute_both,
+    compute_gpa,
 )
+from GradusIQ_career.planning.term_view import term_key
+from GradusIQ_career.transcript.terms import SEASON_ORDER
 from GradusIQ_career.student_intelligence_profile import (
     AcademicCompleteness,
     AcademicCourse,
@@ -45,6 +48,7 @@ from GradusIQ_career.student_intelligence_profile import (
     RepeatExclusionProfile,
     Skills,
     StudentIntelligenceProfile,
+    TermGpaPoint,
 )
 
 # Matches academics/gpa.py's reason string exactly -- one vocabulary for
@@ -236,6 +240,61 @@ def _course_record(row: Mapping[str, Any]) -> CourseRecord:
     )
 
 
+def _term_order(row: Mapping[str, Any]) -> tuple[int, int, int]:
+    season = str(row.get("season") or "").strip().title()
+    return (int(row.get("year") or 0), SEASON_ORDER.get(season, 99), int(row.get("sequence") or 0))
+
+
+def _gpa_by_term(
+    confirmed_courses: Sequence[Mapping[str, Any]],
+    term_rows: Sequence[Mapping[str, Any]],
+    institution: Institution,
+    grade_map: Mapping[str, GradeMapRow],
+) -> list[TermGpaPoint]:
+    """Term and running-cumulative GPA, one point per term, oldest first.
+
+    Every figure goes through compute_gpa, so repeat exclusions, transfer and
+    exam rules and grade mapping match the headline Official/Projected GPA.
+    A term with in-progress courses uses the 'projected' scope (current
+    grades); every other term uses 'official'. Rows with no term (transfer,
+    exam credit) count toward the cumulative from the first point on.
+    """
+    records_by_term: dict[str, list[CourseRecord]] = {}
+    running: list[CourseRecord] = []
+    for row in confirmed_courses:
+        record = _course_record(row)
+        term_id = row.get("term_id")
+        if term_id:
+            records_by_term.setdefault(str(term_id), []).append(record)
+        else:
+            running.append(record)
+
+    points: list[TermGpaPoint] = []
+    for term in sorted(term_rows, key=_term_order):
+        term_records = records_by_term.get(str(term["id"]), [])
+        if not term_records:
+            continue
+        running.extend(term_records)
+        projected = any(record.status == "in_progress" for record in term_records)
+        mode = "projected" if projected else "official"
+        term_result = compute_gpa(term_records, institution, dict(grade_map), mode=mode)
+        if term_result.gpa is None:
+            continue
+        cumulative = compute_gpa(list(running), institution, dict(grade_map), mode=mode)
+        points.append(
+            TermGpaPoint(
+                term_id=str(term["id"]),
+                term_key=term_key(term.get("year"), term.get("season")),
+                label=term.get("label") or term_key(term.get("year"), term.get("season")),
+                term_gpa=term_result.gpa,
+                cumulative_gpa=cumulative.gpa,
+                gpa_hours=term_result.gpa_hours,
+                projected=projected,
+            )
+        )
+    return points
+
+
 def build_student_intelligence_profile(
     client: Any, student_id: str
 ) -> StudentIntelligenceProfile:
@@ -269,6 +328,7 @@ def build_student_intelligence_profile(
     confirmed_terms = [row for row in term_rows if row.get("id") in confirmed_term_ids]
 
     both = None
+    by_term: list[TermGpaPoint] = []
     if institution_row:
         grade_rows = (
             client.table("grade_point_map")
@@ -301,6 +361,7 @@ def build_student_intelligence_profile(
             both = compute_both(
                 [_course_record(row) for row in confirmed_courses], institution, grade_map
             )
+            by_term = _gpa_by_term(confirmed_courses, confirmed_terms, institution, grade_map)
 
     career = Career(
         confirmed=career_confirmed,
@@ -327,6 +388,7 @@ def build_student_intelligence_profile(
             for row in confirmed_courses
             if row.get("status") == "in_progress" and row.get("letter_grade")
         ),
+        by_term=by_term,
     )
     academics = Academics(
         summary=AcademicSummary(

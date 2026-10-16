@@ -326,7 +326,7 @@ test('career profile: details rows report graduation, majors and AI comfort', { 
  * about the dialog; they are about what the fields do with the data, which is
  * why the same claims survive the move.
  */
-test('career profile: six units save independently, inline', { timeout: 45_000 }, async (t) => {
+test('career profile: seven units save independently, inline', { timeout: 45_000 }, async (t) => {
   const patches = []
   let failAiSave = false
   const apiPlugin = { name: 'profile-api', configureServer(server) { server.middlewares.use((request, response, next) => {
@@ -358,9 +358,9 @@ test('career profile: six units save independently, inline', { timeout: 45_000 }
     .locator('.cp-detail-unit, .cp-field, .cp-detail:not(.cp-detail--stack)')
     .filter({ has: page.getByRole('heading', { name: label, exact: true }) })
 
-  // ── Six independently editable units, each with the same explicit shell.
-  assert.equal(await page.locator('.cp .editable-section').count(), 6)
-  for (const label of ['Expected graduation', 'Current major', 'Intended major', 'Target roles', 'Interests', 'AI comfort']) {
+  // ── Seven independently editable units, each with the same explicit shell.
+  assert.equal(await page.locator('.cp .editable-section').count(), 7)
+  for (const label of ['Expected graduation', 'Current major', 'Intended major', 'Target roles', 'Interests', 'Technical and soft skills', 'AI comfort']) {
     assert.equal(await row(label).getByRole('button', { name: 'Edit' }).count(), 1, `${label} is not editable`)
   }
 
@@ -489,6 +489,20 @@ test('career profile: six units save independently, inline', { timeout: 45_000 }
   await comfort.getByRole('button', { name: 'Edit' }).waitFor()
   assert.deepEqual(patches.at(-1), { ai_anxiety_level: 'high' })
   assert.equal(await page.evaluate(() => document.body.dataset.profileReloaded), 'yes')
+
+  // ── Skills: adding a technical skill saves that list alone, keeping the
+  // existing ones; the untouched soft list is not rewritten.
+  const skills = row('Technical and soft skills')
+  await skills.getByRole('button', { name: 'Edit' }).click()
+  const technicalBefore = await skills.getByLabel('Technical skills').locator('xpath=ancestor::div[contains(@class,"tag-input-container")]').locator('.tag-chip').allInnerTexts()
+  await skills.getByLabel('Technical skills').fill('Rust')
+  await skills.getByLabel('Technical skills').press('Enter')
+  await skills.getByRole('button', { name: 'Save' }).click()
+  await skills.getByRole('button', { name: 'Edit' }).waitFor()
+  const skillsPatch = patches.at(-1)
+  assert.deepEqual(Object.keys(skillsPatch), ['skills_technical'])
+  assert.equal(skillsPatch.skills_technical.at(-1), 'Rust')
+  assert.equal(skillsPatch.skills_technical.length, technicalBefore.length + 1)
 
   // Every save wrote exactly one key: the units are genuinely independent.
   assert.deepEqual(patches.map((patch) => Object.keys(patch).length), patches.map(() => 1))

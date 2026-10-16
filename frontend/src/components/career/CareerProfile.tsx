@@ -25,6 +25,7 @@ import {
 } from '../profile/fields/MajorField';
 import { ProjectCard } from './ProjectCard';
 import { SkillCloud } from './SkillCloud';
+import { TagInput } from '../TagInput';
 
 /**
  * What a field needs to save itself, or null when nothing here can be edited.
@@ -63,6 +64,20 @@ export interface CareerFieldFocus {
  */
 function sameList(a: string[], b: string[]): boolean {
   return a.length === b.length && a.every((entry, index) => entry === b[index]);
+}
+
+/** The two student-editable skill lists, saved as skills_technical / skills_soft. */
+interface SkillLists {
+  technical: string[];
+  soft: string[];
+}
+
+/** Only the lists that changed, so an untouched one is not rewritten. */
+function skillsChanges(draft: SkillLists, saved: SkillLists): ProfileChanges {
+  const changes: ProfileChanges = {};
+  if (!sameList(draft.technical, saved.technical)) changes.skills_technical = draft.technical;
+  if (!sameList(draft.soft, saved.soft)) changes.skills_soft = draft.soft;
+  return changes;
 }
 
 /**
@@ -114,6 +129,7 @@ export function CareerProfile({
   const model = buildCareerViewModel(career);
   const { direction, counts } = model;
   const supportedRoles = useSupportedTargetRoles();
+  const skillLists: SkillLists = { technical: career.skills.technical, soft: career.skills.soft };
 
   // The read-only renderings, named once so the editable and read-only paths
   // cannot drift into showing two different things for the same data.
@@ -218,11 +234,40 @@ export function CareerProfile({
           "Show 30 more" expand-in-place behaviour inside SkillCloud is
           untouched, only the outer container changed. */}
       <Section title="Skills" count={counts.skills}>
-        {counts.skills > 0 ? (
-          <SkillCloud groups={model.skillGroups} total={counts.skills} />
-        ) : (
-          <Absence line="No skills confirmed yet." />
-        )}
+        <FieldSlot
+          label="Technical and soft skills"
+          path="career.skills"
+          focus={focus}
+          wrapperClass="cp-field"
+          labelClass="cp-subhead"
+          editing={editing}
+          editLabel={counts.skills > 0 ? 'Edit' : 'Add skills'}
+          value={skillLists}
+          toChanges={(draft) => skillsChanges(draft, skillLists)}
+          display={
+            counts.skills > 0 ? (
+              <SkillCloud groups={model.skillGroups} total={counts.skills} />
+            ) : (
+              <Absence line="No skills confirmed yet." />
+            )
+          }
+          edit={(draft, setDraft) => (
+            <div className="cp-skills-edit">
+              <TagInput
+                label="Technical skills"
+                value={draft.technical}
+                onChange={(technical) => setDraft({ ...draft, technical })}
+                placeholder="Add a skill and press Enter…"
+              />
+              <TagInput
+                label="Soft skills"
+                value={draft.soft}
+                onChange={(soft) => setDraft({ ...draft, soft })}
+                placeholder="Add a skill and press Enter…"
+              />
+            </div>
+          )}
+        />
       </Section>
 
       {/* Experience: full-width vertical list, not a half-width column. */}
