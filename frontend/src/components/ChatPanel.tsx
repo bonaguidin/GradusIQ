@@ -10,7 +10,7 @@ const SUGGESTIONS = [
   'How ready am I for an internship right now?',
 ];
 
-export function ChatPanel() {
+export function ChatPanel({ autoFocus = false }: { autoFocus?: boolean } = {}) {
   const { slug, profile, session, studentAccount } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -22,6 +22,12 @@ export function ChatPanel() {
   const realName = studentAccount.profile?.intelligence_profile.identity.name;
   const firstName = (profile?.student?.name ?? realName)?.split(' ')[0] ?? 'there';
   const canSend = Boolean(slug || session?.access_token);
+
+  useEffect(() => {
+    if (!autoFocus) return;
+    inputRef.current?.focus({ preventScroll: true });
+    inputRef.current?.scrollIntoView({ block: 'center' });
+  }, [autoFocus]);
 
   useEffect(() => {
     const el = listRef.current;

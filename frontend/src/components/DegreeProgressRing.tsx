@@ -16,7 +16,15 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
  * data, rather than a 0%-full or empty ring that would read as "0
  * satisfied" instead of "not available."
  */
-export function DegreeProgressRing({ satisfied, total }: { satisfied: number; total: number }) {
+const BURST_RAYS = 12;
+
+/**
+ * `celebrate` adds the requirement-done burst (RequirementCelebration.tsx):
+ * once the ring has drawn in, a gold ring and sparks fly off it and the tile
+ * gives the confirm button's slam. Decorative only, so it is aria-hidden and
+ * disappears under reduced motion; the message beside it carries the news.
+ */
+export function DegreeProgressRing({ satisfied, total, celebrate = false }: { satisfied: number; total: number; celebrate?: boolean }) {
   if (total === 0) {
     return (
       <div className="overview-stat overview-stat--ring">
@@ -30,7 +38,7 @@ export function DegreeProgressRing({ satisfied, total }: { satisfied: number; to
   const offset = CIRCUMFERENCE * (1 - satisfied / total);
 
   return (
-    <div className="overview-stat overview-stat--ring">
+    <div className={`overview-stat overview-stat--ring${celebrate ? ' is-celebrating' : ''}`}>
       <span className="overview-stat-value">
         <AnimatedNumber value={pct} decimals={0} suffix="%" countIn />
       </span>
@@ -67,6 +75,14 @@ export function DegreeProgressRing({ satisfied, total }: { satisfied: number; to
           style={{ '--ring-empty': `${String(CIRCUMFERENCE)}px` } as CSSProperties}
         />
       </svg>
+      {celebrate && (
+        <span className="req-burst" aria-hidden="true">
+          <span className="req-burst-ring" />
+          {Array.from({ length: BURST_RAYS }, (_, i) => (
+            <span key={i} className="req-burst-spark" style={{ '--spark-angle': `${String((360 / BURST_RAYS) * i)}deg` } as CSSProperties} />
+          ))}
+        </span>
+      )}
     </div>
   );
 }

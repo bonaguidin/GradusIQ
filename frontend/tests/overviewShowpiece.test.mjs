@@ -15,7 +15,7 @@ test('Overview opens with the name, then the chat, then the stat tiles', async (
     const start = page.indexOf('stage-section overview-page')
     assert.ok(start > 0, `${path} marks its Overview section`)
     const header = page.indexOf('className="overview-header"', start)
-    const chat = page.indexOf('<ChatPanel />', start)
+    const chat = page.indexOf('<ChatPanel', start)
     const stats = page.indexOf('className="overview-stats"', start)
     assert.ok(header < chat && chat < stats, path)
   }
@@ -55,7 +55,10 @@ test('Overview empty slots use the shared block: icon, one line, one action', as
 
 test('the Overview entrance and ring draw only animate, so reduced motion keeps everything visible', async () => {
   const css = await read('index.css')
-  const block = css.slice(css.indexOf('OVERVIEW SHOWPIECE'))
+  // Up to the celebration block: its burst is decoration that starts hidden
+  // on purpose and is removed outright under reduced motion
+  // (requirementCelebration.test.mjs checks that).
+  const block = css.slice(css.indexOf('OVERVIEW SHOWPIECE'), css.indexOf('REQUIREMENT CELEBRATION'))
   // `backwards` holds the start frame only while an animation runs; with
   // animations off (the global reduced-motion rule) nothing starts hidden.
   assert.match(block, /animation: overview-rise [^;]*backwards;/)
