@@ -378,6 +378,53 @@ def test_delivery_failure_is_a_502(monkeypatch, no_session):
     assert "domain" not in response.json()["detail"]
 
 
+def test_delivery_failure_logs_the_status_code_and_nothing_else(monkeypatch, no_session, caplog):
+    transport = httpx.MockTransport(
+        lambda _r: httpx.Response(
+            403, json={"message": "student@example.edu is not a verified sender; key re_secret_key"}
+        )
+    )
+    real_send = feedback_report.send_report
+    monkeypatch.setattr(
+        api.feedback_report,
+        "send_report",
+        lambda report, **kwargs: real_send(report, transport=transport, **kwargs),
+    )
+    monkeypatch.setenv("RESEND_API_KEY", "re_secret_key")
+
+    with caplog.at_level("ERROR", logger=api.logger.name):
+        response = make_client().post("/api/v2/student/me/feedback", data=VALID_FORM)
+
+    assert response.status_code == 502
+    logged = " ".join(record.getMessage() for record in caplog.records)
+    assert "403" in logged
+    assert "student@example.edu" not in logged
+    assert "re_secret_key" not in logged
+    assert "verified sender" not in logged
+    assert all(record.exc_info is None for record in caplog.records)
+
+
+def test_unreachable_provider_logs_no_provider_detail(monkeypatch, no_session, caplog):
+    def refuse(_request):
+        raise httpx.ConnectError("connect failed for https://api.resend.com/emails")
+
+    real_send = feedback_report.send_report
+    monkeypatch.setattr(
+        api.feedback_report,
+        "send_report",
+        lambda report, **kwargs: real_send(report, transport=httpx.MockTransport(refuse), **kwargs),
+    )
+    monkeypatch.setenv("RESEND_API_KEY", "re_test_key")
+
+    with caplog.at_level("ERROR", logger=api.logger.name):
+        response = make_client().post("/api/v2/student/me/feedback", data=VALID_FORM)
+
+    assert response.status_code == 502
+    logged = " ".join(record.getMessage() for record in caplog.records)
+    assert "unreachable" in logged
+    assert "api.resend.com" not in logged
+
+
 def test_requires_proxy_secret(sent, no_session):
     config = api.APIConfig(
         proxy_secret=TEST_PROXY_SECRET,
@@ -444,8 +491,10 @@ def test_send_report_posts_plain_text_with_reply_to_and_attachments():
 
 def test_send_report_raises_on_provider_error():
     transport = httpx.MockTransport(lambda _r: httpx.Response(403, json={"message": "nope"}))
-    with pytest.raises(feedback_report.ReportDeliveryError):
+    with pytest.raises(feedback_report.ReportDeliveryError) as raised:
         feedback_report.send_report(_report(), api_key="re_key", transport=transport)
+    assert raised.value.status_code == 403
+    assert "nope" not in str(raised.value)
 
 
 def test_send_report_requires_a_key():

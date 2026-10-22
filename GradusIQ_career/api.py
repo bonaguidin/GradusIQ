@@ -4834,7 +4834,12 @@ def post_me_feedback(
             detail="Reports aren't set up yet. Please email gradus@gradusiq.com instead.",
         ) from exc
     except feedback_report.ReportDeliveryError as exc:
-        logger.error("Report not sent: %s", exc)
+        # Status code only: the exception text and the provider's body are
+        # not logged (see ReportDeliveryError).
+        logger.error(
+            "Report not sent: email service status %s",
+            exc.status_code if exc.status_code is not None else "unreachable",
+        )
         raise HTTPException(
             status_code=502,
             detail="We couldn't send your report just now. Please try again in a minute.",
