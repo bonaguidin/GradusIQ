@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import base64
 import json
+import tempfile
 from types import SimpleNamespace
 
 import httpx
@@ -177,6 +178,59 @@ def test_too_many_screenshots_is_rejected(sent, no_session):
     response = make_client().post("/api/v2/student/me/feedback", data=VALID_FORM, files=files)
     assert response.status_code == 422
     assert sent == []
+
+
+def test_too_many_screenshots_are_rejected_without_reading_any(sent, no_session, monkeypatch):
+    # Starlette only writes uploads while parsing; the handler is the sole
+    # reader, so any read() means a file was buffered before the count check.
+    reads: list[int] = []
+    original = tempfile.SpooledTemporaryFile.read
+
+    def spy(self, *args):
+        reads.append(1)
+        return original(self, *args)
+
+    monkeypatch.setattr(tempfile.SpooledTemporaryFile, "read", spy)
+    files = [("screenshots", (f"s{i}.png", PNG, "image/png")) for i in range(feedback_report.MAX_SCREENSHOTS + 3)]
+    response = make_client().post("/api/v2/student/me/feedback", data=VALID_FORM, files=files)
+
+    assert response.status_code == 422
+    assert str(feedback_report.MAX_SCREENSHOTS) in response.json()["detail"]
+    assert reads == []
+    assert sent == []
+
+
+def test_body_over_the_cap_is_413_before_parsing(sent, no_session):
+    body = b"x" * (api.MAX_FEEDBACK_BODY_BYTES + 1)
+    response = make_client().post(
+        "/api/v2/student/me/feedback",
+        content=body,
+        headers={"Content-Type": "multipart/form-data; boundary=zzz"},
+    )
+    assert response.status_code == 413
+    assert sent == []
+
+
+def test_streamed_body_over_the_cap_is_413_without_content_length(sent, no_session):
+    def chunks():
+        chunk = b"x" * 65536
+        for _ in range(api.MAX_FEEDBACK_BODY_BYTES // len(chunk) + 2):
+            yield chunk
+
+    response = make_client().post(
+        "/api/v2/student/me/feedback",
+        content=chunks(),
+        headers={"Content-Type": "multipart/form-data; boundary=zzz"},
+    )
+    assert response.status_code == 413
+    assert sent == []
+
+
+def test_cap_applies_only_to_the_feedback_route(sent, no_session):
+    # A normal report just under the cap still goes through.
+    files = [("screenshots", ("a.png", PNG + b"\x00" * 1_000_000, "image/png"))]
+    response = make_client().post("/api/v2/student/me/feedback", data=VALID_FORM, files=files)
+    assert response.status_code == 200, response.text
 
 
 def test_oversized_screenshot_is_rejected(sent, no_session):

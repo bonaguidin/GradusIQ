@@ -4592,6 +4592,79 @@ FEEDBACK_ACCOUNT_LIMIT = (5, 3600.0)
 FEEDBACK_ANONYMOUS_LIMIT = (10, 3600.0)
 _FEEDBACK_ANONYMOUS_KEY = "anonymous"
 
+FEEDBACK_ROUTE_PATH = "/api/v2/student/me/feedback"
+# Three screenshots at their total cap plus generous room for the text fields
+# and multipart framing. The route is open to anonymous callers, so the body is
+# bounded before the multipart parser buffers any of it.
+MAX_FEEDBACK_BODY_BYTES = feedback_report.MAX_TOTAL_SCREENSHOT_BYTES + 256 * 1024
+
+
+class _BodySizeLimitMiddleware:
+    """Answers 413 for a POST to `path` whose body exceeds `max_bytes`.
+
+    Checks Content-Length up front, and counts bytes as they stream in for
+    clients that send none (chunked), so neither form can slip past.
+    """
+
+    def __init__(self, app, *, path: str, max_bytes: int) -> None:
+        self.app = app
+        self.path = path
+        self.max_bytes = max_bytes
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http" or scope["path"] != self.path or scope["method"] != "POST":
+            await self.app(scope, receive, send)
+            return
+
+        declared = dict(scope["headers"]).get(b"content-length")
+        if declared is not None:
+            try:
+                too_big = int(declared) > self.max_bytes
+            except ValueError:
+                too_big = True
+            if too_big:
+                await self._reject(send)
+                return
+
+        received = 0
+        exceeded = False
+
+        async def counting_receive():
+            nonlocal received, exceeded
+            if exceeded:
+                return {"type": "http.disconnect"}
+            message = await receive()
+            if message["type"] == "http.request":
+                received += len(message.get("body", b""))
+                if received > self.max_bytes:
+                    # FastAPI turns an exception raised while parsing the body
+                    # into its own 400, so signal a disconnect instead and
+                    # replace whatever the app answers with the 413 below.
+                    exceeded = True
+                    return {"type": "http.disconnect"}
+            return message
+
+        async def guarded_send(message):
+            if not exceeded:
+                await send(message)
+
+        await self.app(scope, counting_receive, guarded_send)
+        if exceeded:
+            await self._reject(send)
+
+    @staticmethod
+    async def _reject(send) -> None:
+        body = b'{"detail":"Request body is too large."}'
+        await send({
+            "type": "http.response.start",
+            "status": 413,
+            "headers": [
+                (b"content-type", b"application/json"),
+                (b"content-length", str(len(body)).encode()),
+            ],
+        })
+        await send({"type": "http.response.body", "body": body})
+
 
 def _verified_feedback_account(request: Request) -> tuple[str, str] | None:
     """(user id, account email) for a valid session, else None. Never raises:
@@ -4613,7 +4686,7 @@ def _verified_feedback_account(request: Request) -> tuple[str, str] | None:
 
 
 @router.post(
-    "/api/v2/student/me/feedback",
+    FEEDBACK_ROUTE_PATH,
     dependencies=[Depends(authorize_proxy_request)],
 )
 def post_me_feedback(
@@ -4643,6 +4716,16 @@ def post_me_feedback(
         raise HTTPException(
             status_code=429,
             detail="You've sent several reports recently. Please try again in a little while.",
+        )
+
+    # Count before reading: a caller can attach far more files than the form
+    # allows, and each read below buffers up to a full screenshot.
+    if len(screenshots) > feedback_report.MAX_SCREENSHOTS:
+        for upload in screenshots:
+            upload.file.close()
+        raise HTTPException(
+            status_code=422,
+            detail=f"Attach at most {feedback_report.MAX_SCREENSHOTS} screenshots.",
         )
 
     files: list[tuple[str | None, bytes]] = []
@@ -4721,6 +4804,11 @@ def create_app(config: APIConfig | None = None) -> FastAPI:
     )
     application.state.feedback_anonymous_limiter = feedback_report.KeyedRateLimiter(
         *FEEDBACK_ANONYMOUS_LIMIT
+    )
+    application.add_middleware(
+        _BodySizeLimitMiddleware,
+        path=FEEDBACK_ROUTE_PATH,
+        max_bytes=MAX_FEEDBACK_BODY_BYTES,
     )
     application.add_middleware(
         CORSMiddleware,
