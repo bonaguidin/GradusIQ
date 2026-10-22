@@ -329,12 +329,22 @@ class _ProfileEditQuery:
         self.payload = payload
         return self
 
+    def delete(self):
+        self.operation = "delete"
+        return self
+
     def eq(self, field, value):
         self.filters.append((field, value))
         return self
 
+    def in_(self, field, values):
+        self.filters.append((field, tuple(values)))
+        return self
+
     def execute(self):
         self.owner.calls.append((self.table, self.operation, self.payload, self.filters))
+        if self.table == "student_analysis_cache" and self.owner.fail_cache_delete:
+            raise RuntimeError("cache unavailable")
         if self.table == "students" and self.operation == "select":
             data = [{"id": STUDENT_UUID}]
         elif self.table == "career_profiles" and self.operation == "select":
@@ -347,6 +357,7 @@ class _ProfileEditQuery:
 class _ProfileEditClient:
     def __init__(self):
         self.calls = []
+        self.fail_cache_delete = False
 
     def table(self, table):
         return _ProfileEditQuery(self, table)
@@ -426,6 +437,51 @@ def test_profile_edit_accepts_skill_lists_as_long_as_resume_parsing_keeps(client
         call for call in database.calls if call[:2] == ("career_profiles", "update")
     )
     assert career_update[2]["skills_technical"] == skills
+
+
+def _cache_deletes(database):
+    return [call for call in database.calls if call[:2] == ("student_analysis_cache", "delete")]
+
+
+@pytest.mark.parametrize("field", ["skills_technical", "skills_soft"])
+def test_skills_edit_drops_the_cached_gap_and_fit_results(client, monkeypatch, field):
+    # GAP and FIT read the skills lists but the cache key is only the role
+    # set, so without this the old results keep being served after an edit.
+    database = _patch_profile_edit(monkeypatch)
+
+    response = _call(client, "patch", "/api/v2/student/me/profile", {field: ["Rust"]})
+
+    assert response.status_code == 200
+    deletes = _cache_deletes(database)
+    assert len(deletes) == 1
+    filters = deletes[0][3]
+    assert ("student_id", STUDENT_UUID) in filters
+    assert ("feature", ("gap", "fit")) in filters
+    # Only after the edit itself was written.
+    order = [call[:2] for call in database.calls]
+    assert order.index(("career_profiles", "update")) < order.index(("student_analysis_cache", "delete"))
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [{"major_intended": "N/A"}, {"interests": ["Robotics"]}, {"ai_anxiety_level": "low"}],
+)
+def test_edits_that_gap_and_fit_do_not_read_keep_the_cache(client, monkeypatch, payload):
+    database = _patch_profile_edit(monkeypatch)
+
+    assert _call(client, "patch", "/api/v2/student/me/profile", payload).status_code == 200
+
+    assert _cache_deletes(database) == []
+
+
+def test_a_failed_cache_invalidation_does_not_fail_the_saved_edit(client, monkeypatch):
+    database = _patch_profile_edit(monkeypatch)
+    database.fail_cache_delete = True
+
+    response = _call(client, "patch", "/api/v2/student/me/profile", {"skills_technical": ["Rust"]})
+
+    assert response.status_code == 200
+    assert _cache_deletes(database)
 
 
 @pytest.mark.parametrize("feature", ["gap", "fit", "shift", "professor-comments"])

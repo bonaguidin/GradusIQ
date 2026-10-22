@@ -1133,6 +1133,33 @@ def _write_analysis_cache(
         pass
 
 
+# The career-profile fields GAP and FIT read as the student's skills
+# (profile_builder maps them to career.skills_self_reported). The cache key
+# holds only the target-role set, so an edit to these has to drop the stored
+# results explicitly or GET .../analysis-cache keeps serving the old ones.
+_SKILL_FIELDS = {"skills_technical", "skills_soft"}
+_SKILL_DEPENDENT_FEATURES = ["gap", "fit"]
+
+
+def _invalidate_analysis_cache(client, student_id: str, features: list[str]) -> None:
+    """Drop this student's cached results for `features`.
+
+    Best effort, like the write: the profile edit has already succeeded. A
+    failure is logged rather than raised, and costs only a stale cached card
+    until the student re-runs the analysis.
+    """
+    try:
+        (
+            client.table("student_analysis_cache")
+            .delete()
+            .eq("student_id", student_id)
+            .in_("feature", features)
+            .execute()
+        )
+    except Exception:  # noqa: BLE001 -- must not fail an edit that already saved
+        logger.warning("Could not invalidate cached analyses after a profile edit.")
+
+
 def _read_analysis_cache(
     client, student_id: str, feature: str, target_role: str | None
 ) -> dict | None:
@@ -1793,6 +1820,9 @@ def update_me_profile(request: Request, body: ProfileUpdateRequest) -> dict:
         raise
     except Exception as exc:  # noqa: BLE001 -- RLS, constraint, or transport
         raise HTTPException(status_code=502, detail="Could not update your profile.") from exc
+
+    if supplied & _SKILL_FIELDS:
+        _invalidate_analysis_cache(client, student_id, _SKILL_DEPENDENT_FEATURES)
 
     canonical = build_student_intelligence_profile(client, student_id)
     legacy = canonical_to_legacy_profile(canonical)
