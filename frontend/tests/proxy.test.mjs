@@ -1615,3 +1615,45 @@ test('me-feedback forwards the multipart body byte-identical, with or without a 
   assert.equal(calls[0].options.headers.Authorization, 'Bearer real-session-jwt')
   assert.equal(calls[1].options.headers.Authorization, undefined)
 })
+
+test('me-feedback forwards the client address for the per-IP limit, and only when it looks like one', async () => {
+  const calls = []
+  const handler = createProxyHandler({
+    env: ME_ENV,
+    fetchImpl: async (url, options) => {
+      calls.push(options.headers)
+      return Response.json({ status: 'sent' }, { status: 200 })
+    },
+  })
+  const url = 'https://gradusiq.example/api/proxy?target=me-feedback'
+  const send = (headers) => handler.fetch(new Request(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'multipart/form-data; boundary=----report', ...headers },
+    body: BINARY_BODY,
+  }))
+
+  await send({ 'x-forwarded-for': '203.0.113.5, 10.0.0.1' })
+  await send({ 'x-real-ip': '2001:db8::1' })
+  await send({ 'x-forwarded-for': 'not an address; drop table' })
+  await send({})
+
+  assert.equal(calls[0]['X-GradusIQ-Client-IP'], '203.0.113.5')
+  assert.equal(calls[1]['X-GradusIQ-Client-IP'], '2001:db8::1')
+  assert.equal(calls[2]['X-GradusIQ-Client-IP'], undefined)
+  assert.equal(calls[3]['X-GradusIQ-Client-IP'], undefined)
+})
+
+test('other targets never get a client address header', async () => {
+  const calls = []
+  const handler = createProxyHandler({
+    env: ME_ENV,
+    fetchImpl: async (url, options) => {
+      calls.push(options.headers)
+      return Response.json({}, { status: 200 })
+    },
+  })
+  await handler.fetch(new Request('https://gradusiq.example/api/proxy?target=me-terms', {
+    headers: { Authorization: 'Bearer t', 'x-forwarded-for': '203.0.113.5' },
+  }))
+  assert.equal(calls[0]['X-GradusIQ-Client-IP'], undefined)
+})

@@ -4590,7 +4590,15 @@ def post_me_schedule_career_optimize(
 
 FEEDBACK_ACCOUNT_LIMIT = (5, 3600.0)
 FEEDBACK_ANONYMOUS_LIMIT = (10, 3600.0)
+# Per client address, whether or not a session is sent. Checked first and
+# without recording a hit, so a flood is refused before any Supabase call.
+FEEDBACK_IP_LIMIT = (10, 3600.0)
 _FEEDBACK_ANONYMOUS_KEY = "anonymous"
+# Set by the Vercel proxy from the platform-supplied client address. Only
+# trusted because authorize_proxy_request has already verified the shared
+# secret by the time a route reads it.
+CLIENT_IP_HEADER = "X-GradusIQ-Client-IP"
+_IP_PATTERN = re.compile(r"^[0-9a-fA-F:.]{3,45}$")
 
 FEEDBACK_ROUTE_PATH = "/api/v2/student/me/feedback"
 # Three screenshots at their total cap plus generous room for the text fields
@@ -4666,6 +4674,16 @@ class _BodySizeLimitMiddleware:
         await send({"type": "http.response.body", "body": body})
 
 
+def _feedback_client_key(request: Request) -> str:
+    """The address the per-IP limit counts. Falls back to the socket peer,
+    which behind the proxy is the proxy itself, so a missing header degrades
+    to one shared bucket rather than to no limit."""
+    forwarded = request.headers.get(CLIENT_IP_HEADER, "").strip()
+    if _IP_PATTERN.match(forwarded):
+        return forwarded
+    return request.client.host if request.client else "unknown"
+
+
 def _verified_feedback_account(request: Request) -> tuple[str, str] | None:
     """(user id, account email) for a valid session, else None. Never raises:
     a report from an expired session is still a report, just an unverified one."""
@@ -4683,6 +4701,13 @@ def _verified_feedback_account(request: Request) -> tuple[str, str] | None:
     if user is None or not getattr(user, "id", None):
         return None
     return str(user.id), str(getattr(user, "email", "") or "")
+
+
+def _feedback_rate_limited() -> HTTPException:
+    return HTTPException(
+        status_code=429,
+        detail="You've sent several reports recently. Please try again in a little while.",
+    )
 
 
 @router.post(
@@ -4705,18 +4730,13 @@ def post_me_feedback(
     if website and website.strip():
         return {"status": "sent"}
 
-    account = _verified_feedback_account(request)
-    if account is not None:
-        limiter = request.app.state.feedback_account_limiter
-        limiter_key = account[0]
-    else:
-        limiter = request.app.state.feedback_anonymous_limiter
-        limiter_key = _FEEDBACK_ANONYMOUS_KEY
-    if not limiter.allow(limiter_key):
-        raise HTTPException(
-            status_code=429,
-            detail="You've sent several reports recently. Please try again in a little while.",
-        )
+    # The per-IP limit goes first and records nothing yet: a flooding client
+    # is refused before the Supabase lookup below, and a report that fails
+    # validation never costs its sender quota.
+    ip_key = _feedback_client_key(request)
+    ip_limiter = request.app.state.feedback_ip_limiter
+    if not ip_limiter.would_allow(ip_key):
+        raise _feedback_rate_limited()
 
     # Count before reading: a caller can attach far more files than the form
     # allows, and each read below buffers up to a full screenshot.
@@ -4740,7 +4760,7 @@ def post_me_feedback(
             upload.file.close()
 
     try:
-        report = feedback_report.Report(
+        fields = dict(
             kind=feedback_report.validate_kind(kind),
             description=feedback_report.validate_description(description),
             name=feedback_report.validate_name(name),
@@ -4748,11 +4768,27 @@ def post_me_feedback(
             page=feedback_report.validate_context(page),
             user_agent=feedback_report.validate_context(user_agent),
             screenshots=feedback_report.validate_screenshots(files),
-            account_id=account[0] if account else None,
-            account_email=(account[1] or None) if account else None,
         )
     except feedback_report.ReportValidationError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    account = _verified_feedback_account(request)
+    if account is not None:
+        backstop = request.app.state.feedback_account_limiter
+        backstop_key = account[0]
+    else:
+        backstop = request.app.state.feedback_anonymous_limiter
+        backstop_key = _FEEDBACK_ANONYMOUS_KEY
+    # Quota is spent only now that the report is valid. The shared limiter is
+    # the backstop behind the per-IP one.
+    if not (ip_limiter.allow(ip_key) and backstop.allow(backstop_key)):
+        raise _feedback_rate_limited()
+
+    report = feedback_report.Report(
+        **fields,
+        account_id=account[0] if account else None,
+        account_email=(account[1] or None) if account else None,
+    )
 
     try:
         feedback_report.send_report(
@@ -4804,6 +4840,9 @@ def create_app(config: APIConfig | None = None) -> FastAPI:
     )
     application.state.feedback_anonymous_limiter = feedback_report.KeyedRateLimiter(
         *FEEDBACK_ANONYMOUS_LIMIT
+    )
+    application.state.feedback_ip_limiter = feedback_report.KeyedRateLimiter(
+        *FEEDBACK_IP_LIMIT
     )
     application.add_middleware(
         _BodySizeLimitMiddleware,

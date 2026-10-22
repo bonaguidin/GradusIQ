@@ -272,6 +272,94 @@ def test_signed_in_rate_limit_is_per_account(sent, monkeypatch):
     ).status_code == 200
 
 
+def ip_headers(address, **extra):
+    return {api.CLIENT_IP_HEADER: address, **extra}
+
+
+def test_ip_limit_refuses_before_any_session_lookup(sent, monkeypatch):
+    monkeypatch.setattr(api, "FEEDBACK_IP_LIMIT", (2, 3600.0))
+    lookups: list[str] = []
+
+    def counting_client(token):
+        lookups.append(token)
+        user = SimpleNamespace(id=f"user-{len(lookups)}", email="o@tamu.edu")
+        return SimpleNamespace(auth=SimpleNamespace(get_user=lambda _t: SimpleNamespace(user=user)))
+
+    monkeypatch.setattr(api, "build_client_for_token", counting_client)
+    client = make_client()
+    headers = ip_headers("203.0.113.7", Authorization="Bearer t")
+    for _ in range(2):
+        assert client.post("/api/v2/student/me/feedback", data=VALID_FORM, headers=headers).status_code == 200
+    assert len(lookups) == 2
+
+    response = client.post("/api/v2/student/me/feedback", data=VALID_FORM, headers=headers)
+
+    assert response.status_code == 429
+    assert len(lookups) == 2  # refused without calling Supabase
+    assert len(sent) == 2
+
+
+def test_ip_limit_is_per_address(sent, no_session, monkeypatch):
+    monkeypatch.setattr(api, "FEEDBACK_IP_LIMIT", (1, 3600.0))
+    client = make_client()
+    path = "/api/v2/student/me/feedback"
+    assert client.post(path, data=VALID_FORM, headers=ip_headers("203.0.113.1")).status_code == 200
+    assert client.post(path, data=VALID_FORM, headers=ip_headers("203.0.113.1")).status_code == 429
+    assert client.post(path, data=VALID_FORM, headers=ip_headers("203.0.113.2")).status_code == 200
+
+
+def test_invalid_reports_do_not_spend_ip_quota(sent, no_session, monkeypatch):
+    monkeypatch.setattr(api, "FEEDBACK_IP_LIMIT", (2, 3600.0))
+    client = make_client()
+    path = "/api/v2/student/me/feedback"
+    headers = ip_headers("203.0.113.9")
+    for _ in range(6):
+        bad = client.post(path, data={**VALID_FORM, "description": "short"}, headers=headers)
+        assert bad.status_code == 422
+    for _ in range(2):
+        assert client.post(path, data=VALID_FORM, headers=headers).status_code == 200
+    assert client.post(path, data=VALID_FORM, headers=headers).status_code == 429
+
+
+def test_oversized_screenshot_count_does_not_spend_ip_quota(sent, no_session, monkeypatch):
+    monkeypatch.setattr(api, "FEEDBACK_IP_LIMIT", (1, 3600.0))
+    client = make_client()
+    path = "/api/v2/student/me/feedback"
+    headers = ip_headers("203.0.113.10")
+    files = [("screenshots", (f"s{i}.png", PNG, "image/png")) for i in range(4)]
+    assert client.post(path, data=VALID_FORM, files=files, headers=headers).status_code == 422
+    assert client.post(path, data=VALID_FORM, headers=headers).status_code == 200
+
+
+def test_shared_anonymous_limit_still_backstops_many_addresses(sent, no_session):
+    client = make_client()
+    path = "/api/v2/student/me/feedback"
+    limit = api.FEEDBACK_ANONYMOUS_LIMIT[0]
+    for index in range(limit):
+        response = client.post(path, data=VALID_FORM, headers=ip_headers(f"198.51.100.{index + 1}"))
+        assert response.status_code == 200
+    assert client.post(path, data=VALID_FORM, headers=ip_headers("198.51.100.200")).status_code == 429
+
+
+def test_malformed_client_ip_header_falls_back_to_the_peer(sent, no_session, monkeypatch):
+    monkeypatch.setattr(api, "FEEDBACK_IP_LIMIT", (1, 3600.0))
+    client = make_client()
+    path = "/api/v2/student/me/feedback"
+    assert client.post(path, data=VALID_FORM, headers=ip_headers("not an ip!")).status_code == 200
+    # A different junk value cannot buy a fresh bucket.
+    assert client.post(path, data=VALID_FORM, headers=ip_headers("also junk!")).status_code == 429
+
+
+def test_keyed_limiter_would_allow_does_not_record():
+    now = [0.0]
+    limiter = feedback_report.KeyedRateLimiter(1, 10.0, clock=lambda: now[0])
+    assert limiter.would_allow("k") and limiter.would_allow("k")
+    assert limiter.allow("k")
+    assert not limiter.would_allow("k")
+    now[0] = 11.0
+    assert limiter.would_allow("k")
+
+
 def test_missing_api_key_is_a_clear_503(monkeypatch, no_session):
     monkeypatch.delenv("RESEND_API_KEY", raising=False)
     response = make_client().post("/api/v2/student/me/feedback", data=VALID_FORM)

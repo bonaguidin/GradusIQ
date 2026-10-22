@@ -282,6 +282,16 @@ class KeyedRateLimiter:
     _hits: dict[str, deque] = field(default_factory=dict)
     _lock: threading.Lock = field(default_factory=threading.Lock)
 
+    def would_allow(self, key: str) -> bool:
+        """Whether `allow(key)` would succeed right now, without recording a hit."""
+        cutoff = self.clock() - self.window_seconds
+        with self._lock:
+            hits = self._hits.get(key)
+            if not hits:
+                return True
+            recent = sum(1 for hit in hits if hit > cutoff)
+            return recent < self.limit
+
     def allow(self, key: str) -> bool:
         now = self.clock()
         cutoff = now - self.window_seconds
