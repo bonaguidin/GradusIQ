@@ -49,6 +49,28 @@ test('narrow plots thin the term labels but always label the latest term', () =>
   assert.equal(narrow.points.at(-1).axisLabel, "Fall '29")
 })
 
+test('the sparkline does not stretch a 3.50 to 3.51 change into a full-height swing', () => {
+  const height = 28
+  const pad = 3
+  const line = sparklinePoints(
+    [point('2025-Spring', 3.5, 3.5), point('2025-Fall', 3.51, 3.51), point('2026-Spring', 3.51, 3.51)],
+    { width: 96, height, pad },
+  )
+  const ys = line.solid.split(' ').map((pair) => Number(pair.split(',')[1]))
+  const swing = Math.abs(ys[0] - ys[1])
+  // The drawable height is height - 2*pad = 22px across a 3.0-4.0 domain, so
+  // a 0.01 move is ~0.22px; the old min-max scaling drew it as the full 22px.
+  assert.ok(swing < 0.5, `swing was ${swing}px`)
+  assert.equal(ys[1], ys[2])
+})
+
+test('the sparkline stays inside its box and keeps rising values rising', () => {
+  const line = sparklinePoints([point('a', 2.4, 2.4), point('b', 3.0, 2.7), point('c', 3.9, 3.2)], { width: 96, height: 28, pad: 3 })
+  const ys = line.solid.split(' ').map((pair) => Number(pair.split(',')[1]))
+  assert.ok(ys.every((y) => y >= 3 && y <= 25))
+  assert.ok(ys[0] > ys[1] && ys[1] > ys[2])
+})
+
 test('the sparkline splits off the projected tail', () => {
   const line = sparklinePoints(HISTORY, { width: 96, height: 28 })
   assert.equal(line.solid.split(' ').length, 3)
