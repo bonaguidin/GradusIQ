@@ -205,10 +205,14 @@ export function AuthenticatedDashboard() {
   // for an always-mounted element like this one.
   useFocusTrap(railRef, railOpen);
 
-  // Profile menu on the identity block (initials + name), the place students
-  // expect to find their profile. Closes on Escape or a click outside it.
+  // Profile disclosure on the identity block (initials + name), the place
+  // students expect to find their profile. A plain disclosure, not an ARIA
+  // menu: the trigger reports aria-expanded and the panel is a list of links
+  // and buttons in the normal Tab order. Closes on Escape (focus returns to the
+  // trigger) or a click outside it.
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
+  const profileTriggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!profileMenuOpen) return undefined;
@@ -219,6 +223,7 @@ export function AuthenticatedDashboard() {
       if (event.key === 'Escape') {
         event.stopPropagation();
         setProfileMenuOpen(false);
+        profileTriggerRef.current?.focus();
       }
     }
     document.addEventListener('pointerdown', onPointer);
@@ -445,10 +450,10 @@ export function AuthenticatedDashboard() {
         </div>
         <div className="rail-identity" ref={profileMenuRef}>
           <button
+            ref={profileTriggerRef}
             type="button"
             className="rail-identity-button"
             onClick={() => setProfileMenuOpen((open) => !open)}
-            aria-haspopup="menu"
             aria-expanded={profileMenuOpen}
             aria-controls="rail-profile-menu"
           >
@@ -459,12 +464,12 @@ export function AuthenticatedDashboard() {
             </svg>
           </button>
           {profileMenuOpen && (
-            <div id="rail-profile-menu" className="rail-profile-menu" role="menu" aria-label="Profile">
-              <button type="button" role="menuitem" onClick={() => { setProfileMenuOpen(false); navigateToCareerSubTab('profile'); }}>Career Profile</button>
-              <Link role="menuitem" to="/transcript" onClick={() => setProfileMenuOpen(false)}>Update transcript</Link>
-              <Link role="menuitem" to="/resume" onClick={() => setProfileMenuOpen(false)}>Update resume</Link>
-              <button type="button" role="menuitem" onClick={() => { setProfileMenuOpen(false); void handleLogout(); }}>Log out</button>
-            </div>
+            <ul id="rail-profile-menu" className="rail-profile-menu" aria-label="Profile">
+              <li><button type="button" onClick={() => { setProfileMenuOpen(false); navigateToCareerSubTab('profile'); }}>Career Profile</button></li>
+              <li><Link to="/transcript" onClick={() => setProfileMenuOpen(false)}>Update transcript</Link></li>
+              <li><Link to="/resume" onClick={() => setProfileMenuOpen(false)}>Update resume</Link></li>
+              <li><button type="button" onClick={() => { setProfileMenuOpen(false); void handleLogout(); }}>Log out</button></li>
+            </ul>
           )}
           <div className="rail-meta">
             <span>{dashboard.classification ?? 'Student'}</span>
