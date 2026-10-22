@@ -8914,9 +8914,15 @@ label.profile-form-check { display: flex; flex-direction: row; align-items: cent
   stroke-dasharray: 5 4;
 }
 
+/* No outline override: the global :focus-visible ring applies. It is drawn
+   inside the hit area (negative offset) because the SVG clips anything that
+   would fall outside it, e.g. along the top edge. */
 .gpa-trend-point {
   cursor: pointer;
-  outline: none;
+}
+
+.gpa-trend-point:focus-visible {
+  outline-offset: -2px;
 }
 
 .gpa-trend-hit {

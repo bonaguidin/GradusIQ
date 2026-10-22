@@ -102,3 +102,38 @@ test('GPA chart on the GPA Calculator, sparkline on Overview', { timeout: 45_000
   await page.locator('.overview-stat').first().waitFor()
   assert.equal(await page.getByRole('button', { name: 'See GPA by term' }).count(), 0)
 })
+
+test('the chart is a labelled group, so its focusable points are exposed, and a focused point shows the focus ring', { timeout: 45_000 }, async (t) => {
+  const server = await createServer({
+    root: fileURLToPath(new URL('..', import.meta.url)),
+    cacheDir: fileURLToPath(new URL('../node_modules/.vite-gpa-trend', import.meta.url)),
+    logLevel: 'silent',
+    server: { host: '127.0.0.1' },
+  })
+  await server.listen()
+  t.after(async () => server.close())
+  const address = server.httpServer?.address()
+  assert.ok(address && typeof address === 'object')
+  const browser = await chromium.launch()
+  t.after(async () => browser.close())
+  const page = await browser.newPage()
+  await page.goto(`http://127.0.0.1:${String(address.port)}/authenticated-dashboard-preview.html?mode=complete&gpaHistory=1&section=academic&academic=gpa-calculator`)
+
+  const group = page.getByRole('group', { name: 'Term and cumulative GPA for 5 terms' })
+  await group.waitFor()
+  assert.equal(await page.locator('svg.gpa-trend-svg[role="img"]').count(), 0)
+  // role="img" would make these presentational; as a group they stay buttons.
+  assert.equal(await group.getByRole('button').count(), 5)
+
+  // Keyboard focus draws a real outline, not just a thicker dot.
+  await page.keyboard.press('Tab')
+  await group.getByRole('button').first().focus({ timeout: 5000 })
+  await page.keyboard.press('Shift+Tab')
+  await page.keyboard.press('Tab')
+  const outline = await page.evaluate(() => {
+    const style = getComputedStyle(document.activeElement)
+    return { style: style.outlineStyle, width: style.outlineWidth }
+  })
+  assert.notEqual(outline.style, 'none')
+  assert.notEqual(outline.width, '0px')
+})
