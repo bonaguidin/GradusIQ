@@ -350,6 +350,100 @@ def test_malformed_client_ip_header_falls_back_to_the_peer(sent, no_session, mon
     assert client.post(path, data=VALID_FORM, headers=ip_headers("also junk!")).status_code == 429
 
 
+# ── the client IP header is trusted only behind the proxy secret ─────────────
+
+
+def _config(proxy_secret):
+    return api.APIConfig(
+        proxy_secret=proxy_secret,
+        allowed_origins=(),
+        rate_limit_requests=1000,
+        rate_limit_window_seconds=60.0,
+        max_concurrent_ai_requests=2,
+    )
+
+
+def test_spoofed_client_ip_without_the_secret_is_rejected_and_buys_nothing(sent, no_session, monkeypatch):
+    # A caller who reaches the backend directly cannot pick a rate-limit bucket:
+    # the route's authorize_proxy_request dependency refuses it before the
+    # handler ever reads X-GradusIQ-Client-IP.
+    monkeypatch.setattr(api, "FEEDBACK_IP_LIMIT", (1, 3600.0))
+    application = api.create_app(_config(TEST_PROXY_SECRET))
+    direct = TestClient(application)  # no proxy secret header
+    path = "/api/v2/student/me/feedback"
+
+    for index in range(5):
+        response = direct.post(path, data=VALID_FORM, headers=ip_headers(f"203.0.113.{index + 1}"))
+        assert response.status_code == 401
+    assert sent == []
+
+    # And the refused attempts left the real buckets untouched: the proxy's
+    # own request for one of those addresses still gets its single report.
+    proxied = TestClient(application, headers=PROXY_HEADERS)
+    assert proxied.post(path, data=VALID_FORM, headers=ip_headers("203.0.113.1")).status_code == 200
+    assert proxied.post(path, data=VALID_FORM, headers=ip_headers("203.0.113.1")).status_code == 429
+
+
+def test_spoofed_client_ip_with_a_wrong_secret_is_rejected(sent, no_session):
+    client = TestClient(
+        api.create_app(_config(TEST_PROXY_SECRET)),
+        headers={api.PROXY_SECRET_HEADER: "not-the-secret"},
+    )
+    response = client.post("/api/v2/student/me/feedback", data=VALID_FORM, headers=ip_headers("203.0.113.1"))
+    assert response.status_code == 401
+    assert sent == []
+
+
+def test_unset_proxy_secret_refuses_every_request_so_the_header_is_never_read(sent, no_session):
+    # No fallback to the socket address: with GRADUSIQ_PROXY_SECRET unset the
+    # route answers 503 before the handler runs, header or not.
+    client = TestClient(api.create_app(_config("")), headers=PROXY_HEADERS)
+    response = client.post("/api/v2/student/me/feedback", data=VALID_FORM, headers=ip_headers("203.0.113.1"))
+    assert response.status_code == 503
+    assert sent == []
+
+
+def test_valid_proxy_request_is_bucketed_by_the_forwarded_address(sent, no_session, monkeypatch):
+    monkeypatch.setattr(api, "FEEDBACK_IP_LIMIT", (1, 3600.0))
+    client = make_client()
+    path = "/api/v2/student/me/feedback"
+    assert client.post(path, data=VALID_FORM, headers=ip_headers("198.51.100.1")).status_code == 200
+    assert client.post(path, data=VALID_FORM, headers=ip_headers("198.51.100.1")).status_code == 429
+    assert client.post(path, data=VALID_FORM, headers=ip_headers("198.51.100.2")).status_code == 200
+
+
+# ── staggered deploys: the header is optional ───────────────────────────────
+
+
+def test_reports_work_without_the_client_ip_header(sent, no_session):
+    # New backend, old proxy (which never sends the header): reports still go
+    # through, counted against the one socket address the backend sees.
+    client = make_client()
+    path = "/api/v2/student/me/feedback"
+    for _ in range(3):
+        assert client.post(path, data=VALID_FORM).status_code == 200
+    assert len(sent) == 3
+
+
+def test_signed_in_reports_work_without_the_client_ip_header(sent, monkeypatch):
+    fake_session(monkeypatch, user_id="user-1")
+    response = make_client().post(
+        "/api/v2/student/me/feedback", data=VALID_FORM, headers={"Authorization": "Bearer a"}
+    )
+    assert response.status_code == 200
+    assert sent[0]["report"].account_id == "user-1"
+
+
+def test_without_the_header_everyone_shares_the_peer_bucket(sent, no_session, monkeypatch):
+    # The degraded mode of a staggered deploy: still works, but one bucket.
+    monkeypatch.setattr(api, "FEEDBACK_IP_LIMIT", (2, 3600.0))
+    client = make_client()
+    path = "/api/v2/student/me/feedback"
+    assert client.post(path, data=VALID_FORM).status_code == 200
+    assert client.post(path, data=VALID_FORM).status_code == 200
+    assert client.post(path, data=VALID_FORM).status_code == 429
+
+
 def test_keyed_limiter_would_allow_does_not_record():
     now = [0.0]
     limiter = feedback_report.KeyedRateLimiter(1, 10.0, clock=lambda: now[0])
