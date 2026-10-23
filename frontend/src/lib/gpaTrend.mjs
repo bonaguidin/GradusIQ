@@ -76,10 +76,10 @@ export function polylinePoints(placed, key) {
 export function sparklinePoints(points, { width, height, pad = 3 }) {
   const series = points.filter((p) => typeof p.cumulative_gpa === 'number')
   if (series.length < 2) return { solid: '', projected: '', last: null }
-  const vals = series.map((p) => p.cumulative_gpa)
-  const lo = Math.min(...vals)
-  const hi = Math.max(...vals)
-  const span = hi - lo || 1
+  // The same GPA-scale domain as the full chart, not the series' own min and
+  // max: stretching to the data would draw 3.50 -> 3.51 as a full-height swing.
+  const { min: lo, max: hi } = gpaDomain(series.map((p) => p.cumulative_gpa))
+  const span = hi - lo
   const coords = series.map((p, i) => ({
     x: pad + ((width - 2 * pad) * i) / (series.length - 1),
     y: pad + (height - 2 * pad) * (1 - (p.cumulative_gpa - lo) / span),

@@ -61,7 +61,7 @@ export function GpaTrendChart({ points, onSelectTerm }: { points: TermGpaPoint[]
         </ul>
       </div>
       <div className="gpa-trend-plot" ref={plotRef}>
-        <svg viewBox={`0 0 ${width} ${HEIGHT}`} width={width} height={HEIGHT} className="gpa-trend-svg" role="img" aria-label={`Term and cumulative GPA for ${points.length} terms`}>
+        <svg viewBox={`0 0 ${width} ${HEIGHT}`} width={width} height={HEIGHT} className="gpa-trend-svg" role="group" aria-label={`Term and cumulative GPA for ${points.length} terms`}>
           {layout.ticks.map((tick) => (
             <g key={tick.value}>
               <line className="gpa-trend-grid" x1={layout.plotLeft} x2={layout.plotRight} y1={tick.y} y2={tick.y} />
@@ -80,7 +80,7 @@ export function GpaTrendChart({ points, onSelectTerm }: { points: TermGpaPoint[]
             <g
               key={point.term_id}
               className={`gpa-trend-point${point.projected ? ' gpa-trend-point--projected' : ''}${hovered === index ? ' gpa-trend-point--active' : ''}`}
-              role={onSelectTerm ? 'button' : undefined}
+              role={onSelectTerm ? 'button' : 'img'}
               tabIndex={0}
               aria-label={pointDescription(point)}
               onMouseEnter={() => setHovered(index)}

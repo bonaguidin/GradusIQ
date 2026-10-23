@@ -3,7 +3,13 @@ import type { InputHTMLAttributes } from 'react';
 
 type PasswordInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'type'>;
 
-/** A password field with a show/hide toggle. Props pass straight to the <input>. */
+/**
+ * A password field with a show/hide toggle. Props pass straight to the <input>.
+ *
+ * The toggle is a pressed/unpressed button with one constant name, so a screen
+ * reader says "Show password, toggle button, pressed". Swapping the label as
+ * well would announce the state twice ("Hide password, pressed").
+ */
 export function PasswordInput({ className = 'form-input', disabled, ...props }: PasswordInputProps) {
   const [visible, setVisible] = useState(false);
   return (
@@ -18,7 +24,7 @@ export function PasswordInput({ className = 'form-input', disabled, ...props }: 
         type="button"
         className="password-toggle"
         onClick={() => setVisible((v) => !v)}
-        aria-label={visible ? 'Hide password' : 'Show password'}
+        aria-label="Show password"
         aria-pressed={visible}
         aria-controls={props.id}
         disabled={disabled}

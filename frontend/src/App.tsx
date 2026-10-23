@@ -7,6 +7,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { ResumePage } from './pages/ResumePage';
 import { TranscriptPage } from './pages/TranscriptPage';
 import { ProfileCompletionPage } from './pages/ProfileCompletionPage';
+import { NotFoundPage } from './pages/NotFoundPage';
 import { RequireAuth } from './auth/RequireAuth';
 import { RequireStudentAccount } from './auth/RequireStudentAccount';
 
@@ -48,7 +49,10 @@ export default function App() {
         path="/profile/complete"
         element={<RequireStudentAccount><ProfileCompletionPage /></RequireStudentAccount>}
       />
-      <Route path="*" element={<Navigate to="/login" replace />} />
+      {/* The bare domain still lands on sign-in (which forwards a signed-in
+          student to /dashboard); only addresses nothing matches get the 404. */}
+      <Route path="/" element={<Navigate to="/login" replace />} />
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
 }

@@ -244,6 +244,16 @@ in `frontend/tests/confirmButton.test.mjs`. Never copy the
 When the success leads somewhere (navigation, swapping the view), `await
 succeed()` first so the check is seen.
 
+One big moment isn't a button: finishing a degree requirement. There is
+nothing to press, so it doesn't use `ConfirmButton` and isn't in
+`BIG_MOMENTS`. Instead the Overview's degree ring reuses the animation's
+slam (`confirm-anim-slam`) and throws a gold ring and sparks, with a gold
+line under the stat tiles ("Core Math done. 3 of 8 requirements
+complete."). It plays once per requirement, ever, and a browser that has
+never seen the student's requirements records them silently instead of
+celebrating years of old work (`lib/requirementCelebration.mjs`,
+`components/RequirementCelebration.tsx`).
+
 Routine saves use a plain `.btn-primary .btn-sm` whose label changes to
 "Saving…" with `aria-busy` (see `EditableSection.tsx`).
 
@@ -442,6 +452,7 @@ in the area; don't copy them.
 | 2026-10-13 | Dark mode is out of scope for now. | Noah |
 | 2026-10-14 | The demo dashboard stays a separate page that shares the Overview look. | Noah |
 | 2026-10-15 | GPA history: the full term-by-term chart lives on the GPA Calculator, and Overview only gets a small sparkline. Term GPA is drawn as points, not bars, so the axis can start near the lowest GPA. | Noah |
+| 2026-10-16 | Finishing a degree requirement is a big moment. It gets the confirm animation's slam and ring (plus gold sparks) on the Overview ring, once per requirement, never replayed. | Noah |
 
 Add a row when a design decision is made, so the next person doesn't
 relitigate it.

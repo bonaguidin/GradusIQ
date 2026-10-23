@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 import { analyzeCourseDiscovery, analyzeFit, analyzeGap, analyzeShift } from '../api/analysis';
 import { useAnalysisRun } from '../hooks/useAnalysisRun';
@@ -23,6 +23,7 @@ import { DashboardSuccessNotice } from '../components/DashboardSuccessNotice';
 import { CourseDiscoveryPanel } from '../components/CourseDiscoveryPanel';
 import { RequirementSatisfactionPanel } from '../components/RequirementSatisfactionPanel';
 import { DegreeProgressRing } from '../components/DegreeProgressRing';
+import { RequirementCelebration, useRequirementCelebration } from '../components/RequirementCelebration';
 import { EmptyState } from '../components/EmptyState';
 import { StatusStat } from '../components/StatusStat';
 import { fetchRequirementSatisfaction, isSkippedRequirementSatisfaction } from '../api/requirementSatisfaction.mjs';
@@ -154,6 +155,14 @@ export function AuthenticatedDashboard() {
   // useUrlParams' doc comment for why that sharing matters whenever a
   // handler below changes more than one of these at once.
   const { getParam, setParams } = useUrlParams();
+  // The 404 page's "Ask GradusIQ" lands here with { ask: true } in router
+  // state: focus the chat once, then let go so coming back to Overview later
+  // doesn't grab focus again.
+  const location = useLocation();
+  const [askOnArrival, setAskOnArrival] = useState(() => (location.state as { ask?: unknown } | null)?.ask === true);
+  useEffect(() => {
+    if (askOnArrival) setAskOnArrival(false);
+  }, [askOnArrival]);
   const activeSection = getParam('section', 'overview', SECTION_VALUES);
   const careerSubTab = getParam('career', 'overview', CAREER_SUB_TAB_VALUES);
   const academicSubTab = getParam('academic', 'overview', ACADEMIC_SUB_TAB_VALUES);
@@ -196,10 +205,14 @@ export function AuthenticatedDashboard() {
   // for an always-mounted element like this one.
   useFocusTrap(railRef, railOpen);
 
-  // Profile menu on the identity block (initials + name), the place students
-  // expect to find their profile. Closes on Escape or a click outside it.
+  // Profile disclosure on the identity block (initials + name), the place
+  // students expect to find their profile. A plain disclosure, not an ARIA
+  // menu: the trigger reports aria-expanded and the panel is a list of links
+  // and buttons in the normal Tab order. Closes on Escape (focus returns to the
+  // trigger) or a click outside it.
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
+  const profileTriggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!profileMenuOpen) return undefined;
@@ -210,6 +223,7 @@ export function AuthenticatedDashboard() {
       if (event.key === 'Escape') {
         event.stopPropagation();
         setProfileMenuOpen(false);
+        profileTriggerRef.current?.focus();
       }
     }
     document.addEventListener('pointerdown', onPointer);
@@ -339,12 +353,6 @@ export function AuthenticatedDashboard() {
     setIntelligenceTarget(null);
   }, [intelligenceTarget, activeSection, careerSubTab]);
 
-  if (!dashboard) return null;
-
-  const displayName = dashboard.name ?? 'Student';
-  const major = dashboard.majorCurrent ?? dashboard.majorIntended;
-  const readiness = dashboard.completeness.overall;
-
   // 'skipped' (no program to evaluate against yet) collapses to the same
   // { satisfied: 0, total: 0 } as 'loading'/'transport-error' -- the ring
   // renders its dash for all three, since none of them is a real 0-of-0.
@@ -353,6 +361,20 @@ export function AuthenticatedDashboard() {
       ? requirementRun.state.result.groups
       : [];
   const degreeProgress = countSatisfiedLeafGroups(requirementGroups);
+  const celebration = useRequirementCelebration({
+    studentId: studentAccount.profile?.student.id ?? null,
+    groups: requirementGroups,
+    ready: requirementRun.state.phase === 'done' && !isSkippedRequirementSatisfaction(requirementRun.state.result),
+    active: activeSection === 'overview',
+    progress: degreeProgress,
+  });
+
+  if (!dashboard) return null;
+
+  const displayName = dashboard.name ?? 'Student';
+  const major = dashboard.majorCurrent ?? dashboard.majorIntended;
+  const readiness = dashboard.completeness.overall;
+
 
   const fitData =
     fitRun.state.phase === 'done' && fitRun.state.result.status === 'success' ? fitRun.state.result.data : null;
@@ -428,10 +450,10 @@ export function AuthenticatedDashboard() {
         </div>
         <div className="rail-identity" ref={profileMenuRef}>
           <button
+            ref={profileTriggerRef}
             type="button"
             className="rail-identity-button"
             onClick={() => setProfileMenuOpen((open) => !open)}
-            aria-haspopup="menu"
             aria-expanded={profileMenuOpen}
             aria-controls="rail-profile-menu"
           >
@@ -442,12 +464,12 @@ export function AuthenticatedDashboard() {
             </svg>
           </button>
           {profileMenuOpen && (
-            <div id="rail-profile-menu" className="rail-profile-menu" role="menu" aria-label="Profile">
-              <button type="button" role="menuitem" onClick={() => { setProfileMenuOpen(false); navigateToCareerSubTab('profile'); }}>Career Profile</button>
-              <Link role="menuitem" to="/transcript" onClick={() => setProfileMenuOpen(false)}>Update transcript</Link>
-              <Link role="menuitem" to="/resume" onClick={() => setProfileMenuOpen(false)}>Update resume</Link>
-              <button type="button" role="menuitem" onClick={() => { setProfileMenuOpen(false); void handleLogout(); }}>Log out</button>
-            </div>
+            <ul id="rail-profile-menu" className="rail-profile-menu" aria-label="Profile">
+              <li><button type="button" onClick={() => { setProfileMenuOpen(false); navigateToCareerSubTab('profile'); }}>Career Profile</button></li>
+              <li><Link to="/transcript" onClick={() => setProfileMenuOpen(false)}>Update transcript</Link></li>
+              <li><Link to="/resume" onClick={() => setProfileMenuOpen(false)}>Update resume</Link></li>
+              <li><button type="button" onClick={() => { setProfileMenuOpen(false); void handleLogout(); }}>Log out</button></li>
+            </ul>
           )}
           <div className="rail-meta">
             <span>{dashboard.classification ?? 'Student'}</span>
@@ -563,13 +585,17 @@ export function AuthenticatedDashboard() {
                     <span>{dashboard.institutionName ?? 'Institution not provided'}</span>
                   </div>
                 </div>
-                <ChatPanel />
+                <ChatPanel autoFocus={askOnArrival} />
                 <div className="overview-stats">
                   <div className="overview-stat"><span className="overview-stat-value"><AnimatedNumber value={dashboard.officialGpa} decimals={2} countIn /></span><span className="overview-stat-label">Official GPA</span><GpaSparkline points={dashboard.gpaByTerm} onOpen={() => navigateToAcademicSubTab('gpa-calculator')} /></div>
                   <div className="overview-stat"><span className="overview-stat-value"><AnimatedNumber value={dashboard.courses.length} decimals={0} countIn /></span><span className="overview-stat-label">Confirmed Courses</span></div>
                   <StatusStat label="Profile Status" tone={readiness}>{readiness}</StatusStat>
-                  <DegreeProgressRing satisfied={degreeProgress.satisfied} total={degreeProgress.total} />
+                  <DegreeProgressRing satisfied={degreeProgress.satisfied} total={degreeProgress.total} celebrate={celebration.message !== null} />
                 </div>
+                {/* Under the tiles, not above them: the requirements arrive after the
+                    page has drawn, and a line appearing here pushes down the
+                    readiness cards instead of the stat row whose ring is bursting. */}
+                <RequirementCelebration message={celebration.message} onDismiss={celebration.dismiss} />
                 <div className="overview-grid">
                   <section className="overview-block">
                     <div className="overview-block-title">Academic readiness</div>

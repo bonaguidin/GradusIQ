@@ -10,18 +10,26 @@ const SUGGESTIONS = [
   'How ready am I for an internship right now?',
 ];
 
-export function ChatPanel() {
+export function ChatPanel({ autoFocus = false }: { autoFocus?: boolean } = {}) {
   const { slug, profile, session, studentAccount } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Shown when Enter is pressed with text while a reply is still pending.
+  const [pendingNotice, setPendingNotice] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const realName = studentAccount.profile?.intelligence_profile.identity.name;
   const firstName = (profile?.student?.name ?? realName)?.split(' ')[0] ?? 'there';
   const canSend = Boolean(slug || session?.access_token);
+
+  useEffect(() => {
+    if (!autoFocus) return;
+    inputRef.current?.focus({ preventScroll: true });
+    inputRef.current?.scrollIntoView({ block: 'center' });
+  }, [autoFocus]);
 
   useEffect(() => {
     const el = listRef.current;
@@ -32,6 +40,7 @@ export function ChatPanel() {
     const trimmed = text.trim();
     if (!trimmed || sending || !canSend) return;
     setError(null);
+    setPendingNotice(false);
     const priorHistory = messages;
     setMessages((m) => [...m, { role: 'user', content: trimmed }]);
     setInput('');
@@ -123,6 +132,11 @@ export function ChatPanel() {
           {error}
         </div>
       )}
+      {pendingNotice && sending && (
+        <div className="chat-notice" role="status">
+          Still answering your last message. Press Enter again once the reply arrives.
+        </div>
+      )}
 
       <form className="chat-input-row chat-composer" onSubmit={onSubmit}>
         {/* Stays enabled while a reply is pending so focus never drops after Enter;
@@ -133,7 +147,18 @@ export function ChatPanel() {
           type="text"
           name="chat-message"
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(e) => {
+            setInput(e.target.value);
+            setPendingNotice(false);
+          }}
+          // The send button is disabled while a reply is pending, which also
+          // stops Enter from submitting the form, so say why nothing happened.
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && sending && input.trim()) {
+              e.preventDefault();
+              setPendingNotice(true);
+            }
+          }}
           placeholder="Ask about your grades, gaps, roles…"
           disabled={!canSend}
           aria-label="Message GradusIQ"

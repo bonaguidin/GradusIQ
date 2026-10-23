@@ -430,15 +430,21 @@ a {
   z-index: 20;
   display: flex;
   flex-direction: column;
+  margin: 0;
   padding: var(--sp-1);
+  list-style: none;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+  box-shadow: var(--shadow-card);
 }
 
-.rail-profile-menu > a,
-.rail-profile-menu > button {
+.rail-profile-menu li {
+  display: block;
+}
+
+.rail-profile-menu a,
+.rail-profile-menu button {
   display: block;
   width: 100%;
   padding: var(--sp-2) var(--sp-3);
@@ -453,8 +459,8 @@ a {
   cursor: pointer;
 }
 
-.rail-profile-menu > a:hover,
-.rail-profile-menu > button:hover {
+.rail-profile-menu a:hover,
+.rail-profile-menu button:hover {
   background: var(--accent-tint);
 }
 
@@ -8908,9 +8914,15 @@ label.profile-form-check { display: flex; flex-direction: row; align-items: cent
   stroke-dasharray: 5 4;
 }
 
+/* No outline override: the global :focus-visible ring applies. It is drawn
+   inside the hit area (negative offset) because the SVG clips anything that
+   would fall outside it, e.g. along the top edge. */
 .gpa-trend-point {
   cursor: pointer;
-  outline: none;
+}
+
+.gpa-trend-point:focus-visible {
+  outline-offset: -2px;
 }
 
 .gpa-trend-hit {
@@ -9026,4 +9038,289 @@ label.profile-form-check { display: flex; flex-direction: row; align-items: cent
 .gpa-sparkline:hover .gpa-sparkline-link,
 .gpa-sparkline:focus-visible .gpa-sparkline-link {
   text-decoration: underline;
+}
+
+/* ─── NOT FOUND (404) ────────────────────────────────────────────────────
+   pages/NotFoundPage.tsx. One white card on paper, the joke told as a line
+   on a transcript: a mono course row, then a serif headline and the two ways
+   back. The ruled header and the double rule under the column heads borrow
+   the review screens' document look without copying their classes. */
+.not-found {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-6);
+  padding: var(--sp-8) var(--sp-4);
+  background: var(--paper);
+}
+
+.not-found-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  color: var(--ink);
+}
+
+.not-found-mark {
+  width: 22px;
+  height: 24px;
+  background-color: var(--ink);
+  -webkit-mask: url("/brand/gradusiq-mark.png") center / contain no-repeat;
+  mask: url("/brand/gradusiq-mark.png") center / contain no-repeat;
+}
+
+.not-found-card {
+  width: 100%;
+  max-width: 560px;
+  padding: var(--sp-6) var(--sp-8) var(--sp-8);
+}
+
+.not-found-sheet-head {
+  display: flex;
+  justify-content: space-between;
+  padding-bottom: var(--sp-2);
+  border-bottom: 1px solid var(--line);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.not-found-line {
+  width: 100%;
+  margin-top: var(--sp-4);
+  border-collapse: collapse;
+  font-size: var(--text-base);
+}
+
+.not-found-line th {
+  padding: 0 0 var(--sp-2);
+  border-bottom: 3px double var(--line);
+  text-align: left;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.not-found-line td {
+  padding: var(--sp-3) 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+}
+
+.not-found-line th + th,
+.not-found-line td + td {
+  padding-left: var(--sp-4);
+}
+
+.not-found-code,
+.not-found-num {
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.not-found-code {
+  font-weight: 600;
+}
+
+.not-found-num {
+  text-align: right;
+}
+
+.not-found-line th.not-found-num {
+  text-align: right;
+}
+
+/* Gold is the label color: the prerequisite reads like the small print a
+   catalogue puts under a course, not like an error. */
+.not-found-prereq {
+  margin: var(--sp-2) 0 0;
+  font-size: var(--text-sm);
+  color: var(--gold-text);
+}
+
+.not-found-title {
+  margin: var(--sp-8) 0 var(--sp-2);
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  font-weight: 400;
+  line-height: 1.15;
+  color: var(--ink);
+}
+
+.not-found-body {
+  margin: 0 0 var(--sp-6);
+  color: var(--muted);
+}
+
+.not-found-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+}
+
+@media (max-width: 640px) {
+  .not-found-card {
+    padding: var(--sp-4) var(--sp-5) var(--sp-6);
+  }
+  .not-found-title {
+    margin-top: var(--sp-6);
+    font-size: var(--text-xl);
+  }
+  .not-found-line th + th,
+  .not-found-line td + td {
+    padding-left: var(--sp-3);
+  }
+  .not-found-actions .btn {
+    flex: 1 1 auto;
+  }
+}
+
+/* ─── REQUIREMENT CELEBRATION ────────────────────────────────────────────
+   components/RequirementCelebration.tsx and DegreeProgressRing's
+   `celebrate`. A big moment (DESIGN.md decision log, 2026-10-16), so it
+   speaks the confirm animation's language: the tile takes the same slam
+   (confirm-anim-slam) and a ring flies off it like .confirm-anim-ring, plus
+   gold sparks. Everything waits --celebrate-delay, until the tile has
+   risen in and its ring has finished drawing. Gold here is decoration
+   around a figure, not an action. */
+.overview-page {
+  --celebrate-delay: calc(var(--t-data) + var(--t-settle));
+}
+
+.req-celebrate {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-3);
+  margin: calc(var(--sp-6) * -1 + var(--sp-4)) 0 var(--sp-6);
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--gold-line);
+  border-left: 3px solid var(--gold);
+  border-radius: var(--radius);
+  background: var(--gold-tint);
+  animation: req-celebrate-in var(--t-move) var(--ease-out) var(--celebrate-delay) backwards;
+}
+
+@keyframes req-celebrate-in {
+  from { opacity: 0; transform: translateY(-4px); }
+}
+
+.req-celebrate-mark {
+  display: flex;
+  color: var(--gold);
+}
+
+.req-celebrate-mark svg {
+  fill: currentColor;
+}
+
+.req-celebrate-text {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--ink);
+}
+
+/* Keeps the tile's entrance (the overview-rise rule above) and adds the slam
+   after it. No fill mode on the slam: a backwards fill would hold scale(1)
+   over the rise's own transform while the tile is still coming in. */
+.overview-page .overview-stat--ring.is-celebrating {
+  animation:
+    overview-rise calc(var(--t-move) * 2) var(--ease-out) 270ms backwards,
+    confirm-anim-slam var(--t-fill) var(--ease-out) var(--celebrate-delay);
+}
+
+/* The ring itself flashes gold as the burst leaves it, then settles back to
+   the accent. Listed after ring-draw so the draw-in still runs first. */
+.overview-stat--ring.is-celebrating .degree-progress-ring-fill {
+  animation:
+    ring-draw var(--t-data) var(--ease-out) backwards,
+    req-ring-gold calc(var(--t-data) * 2) var(--ease-out) var(--celebrate-delay);
+}
+
+@keyframes req-ring-gold {
+  0%, 100% { stroke: var(--accent); }
+  20%, 60% { stroke: var(--gold); }
+}
+
+/* Sits exactly over the ring (same corner offsets as .degree-progress-ring)
+   so the burst comes out of it. */
+.req-burst {
+  position: absolute;
+  top: var(--sp-4);
+  right: var(--sp-5);
+  width: 44px;
+  height: 44px;
+  pointer-events: none;
+}
+
+.req-burst-ring {
+  position: absolute;
+  inset: 0;
+  border: 3px solid var(--gold);
+  border-radius: 50%;
+  opacity: 0;
+  animation: req-burst-ring var(--t-data) var(--ease-out) var(--celebrate-delay) forwards;
+}
+
+@keyframes req-burst-ring {
+  0% { opacity: 0.9; transform: scale(1); }
+  100% { opacity: 0; transform: scale(2.4); }
+}
+
+.req-burst-spark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  border-radius: 50%;
+  background: var(--gold);
+  opacity: 0;
+  animation: req-burst-spark var(--t-data) var(--ease-out) var(--celebrate-delay) forwards;
+}
+
+/* Every other spark is smaller and travels less, so the burst reads as a
+   scatter rather than a perfect ring of dots. */
+.req-burst-spark:nth-child(odd) {
+  width: 5px;
+  height: 5px;
+  margin: -2.5px 0 0 -2.5px;
+  --spark-reach: -46px;
+}
+
+@keyframes req-burst-spark {
+  0% { opacity: 1; transform: rotate(var(--spark-angle)) translateY(-20px) scale(1); }
+  100% { opacity: 0; transform: rotate(var(--spark-angle)) translateY(var(--spark-reach, -62px)) scale(0.5); }
+}
+
+@media (max-width: 640px) {
+  .req-burst {
+    top: var(--sp-3);
+    right: var(--sp-4);
+    width: 36px;
+    height: 36px;
+  }
+}
+
+/* The message is the news; the burst is decoration, so it simply isn't
+   there with motion turned off. */
+@media (prefers-reduced-motion: reduce) {
+  .req-burst {
+    display: none;
+  }
+  .req-celebrate,
+  .overview-page .overview-stat--ring.is-celebrating {
+    animation: none !important;
+  }
 }

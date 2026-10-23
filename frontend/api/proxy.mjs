@@ -41,6 +41,16 @@ const GET_FEATURES = new Set([
 ])
 const STUDENT_SLUG_PATTERN = /^[A-Za-z0-9]{1,64}$/
 const PROXY_SECRET_HEADER = 'X-GradusIQ-Proxy-Secret'
+const CLIENT_IP_HEADER = 'X-GradusIQ-Client-IP'
+const IP_PATTERN = /^[0-9a-fA-F:.]{3,45}$/
+
+// First address in x-forwarded-for (the client; later entries are proxies),
+// else x-real-ip. Empty when neither looks like an address.
+function clientAddress(request) {
+  const forwarded = (request.headers.get('x-forwarded-for') ?? '').split(',')[0].trim()
+  const candidate = forwarded || (request.headers.get('x-real-ip') ?? '').trim()
+  return IP_PATTERN.test(candidate) ? candidate : ''
+}
 
 // Session-scoped targets. `feature` is required only by me-analyze, and is
 // validated against the same analysis vocabulary the slug routes accept.
@@ -494,6 +504,16 @@ export function createProxyHandler({ env = process.env, fetchImpl = globalThis.f
       if (isMeTarget) {
         const authorization = request.headers.get('authorization')
         if (authorization) headers.Authorization = authorization
+      }
+
+      // The report route is open to anonymous callers and rate-limits per
+      // client address, which the backend cannot see from here (it only sees
+      // this proxy). Vercel sets x-real-ip / x-forwarded-for itself, replacing
+      // anything the browser sent; the backend trusts the header only because
+      // the request also carries the proxy secret.
+      if (target === 'me-feedback') {
+        const clientIp = clientAddress(request)
+        if (clientIp) headers[CLIENT_IP_HEADER] = clientIp
       }
 
       try {
