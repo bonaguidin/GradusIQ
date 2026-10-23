@@ -68,7 +68,16 @@ class ReportValidationError(ValueError):
 
 
 class ReportDeliveryError(RuntimeError):
-    """The email provider refused or could not be reached."""
+    """The email provider refused or could not be reached.
+
+    `status_code` is the provider's HTTP status when it answered, else None.
+    That is the only provider detail carried: the response body can echo the
+    reporter's address or the request, so it is never kept or logged.
+    """
+
+    def __init__(self, message: str, status_code: int | None = None) -> None:
+        super().__init__(message)
+        self.status_code = status_code
 
 
 class ReportNotConfiguredError(RuntimeError):
@@ -260,10 +269,11 @@ def send_report(
     except httpx.HTTPError as exc:
         raise ReportDeliveryError("Could not reach the email service.") from exc
     if response.status_code >= 400:
-        # Resend's error body names the problem (unverified domain, bad key)
-        # without echoing the key; keep it for the server log only.
+        # The status code is enough to tell a bad key (401) from an unverified
+        # domain (403) or a rate limit (429). The body is deliberately dropped.
         raise ReportDeliveryError(
-            f"Email service returned {response.status_code}: {response.text[:300]}"
+            f"Email service returned {response.status_code}.",
+            status_code=response.status_code,
         )
     try:
         return response.json().get("id")
@@ -281,6 +291,16 @@ class KeyedRateLimiter:
     clock: Callable[[], float] = time.monotonic
     _hits: dict[str, deque] = field(default_factory=dict)
     _lock: threading.Lock = field(default_factory=threading.Lock)
+
+    def would_allow(self, key: str) -> bool:
+        """Whether `allow(key)` would succeed right now, without recording a hit."""
+        cutoff = self.clock() - self.window_seconds
+        with self._lock:
+            hits = self._hits.get(key)
+            if not hits:
+                return True
+            recent = sum(1 for hit in hits if hit > cutoff)
+            return recent < self.limit
 
     def allow(self, key: str) -> bool:
         now = self.clock()

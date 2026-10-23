@@ -1133,6 +1133,33 @@ def _write_analysis_cache(
         pass
 
 
+# The career-profile fields GAP and FIT read as the student's skills
+# (profile_builder maps them to career.skills_self_reported). The cache key
+# holds only the target-role set, so an edit to these has to drop the stored
+# results explicitly or GET .../analysis-cache keeps serving the old ones.
+_SKILL_FIELDS = {"skills_technical", "skills_soft"}
+_SKILL_DEPENDENT_FEATURES = ["gap", "fit"]
+
+
+def _invalidate_analysis_cache(client, student_id: str, features: list[str]) -> None:
+    """Drop this student's cached results for `features`.
+
+    Best effort, like the write: the profile edit has already succeeded. A
+    failure is logged rather than raised, and costs only a stale cached card
+    until the student re-runs the analysis.
+    """
+    try:
+        (
+            client.table("student_analysis_cache")
+            .delete()
+            .eq("student_id", student_id)
+            .in_("feature", features)
+            .execute()
+        )
+    except Exception:  # noqa: BLE001 -- must not fail an edit that already saved
+        logger.warning("Could not invalidate cached analyses after a profile edit.")
+
+
 def _read_analysis_cache(
     client, student_id: str, feature: str, target_role: str | None
 ) -> dict | None:
@@ -1793,6 +1820,9 @@ def update_me_profile(request: Request, body: ProfileUpdateRequest) -> dict:
         raise
     except Exception as exc:  # noqa: BLE001 -- RLS, constraint, or transport
         raise HTTPException(status_code=502, detail="Could not update your profile.") from exc
+
+    if supplied & _SKILL_FIELDS:
+        _invalidate_analysis_cache(client, student_id, _SKILL_DEPENDENT_FEATURES)
 
     canonical = build_student_intelligence_profile(client, student_id)
     legacy = canonical_to_legacy_profile(canonical)
@@ -4590,7 +4620,98 @@ def post_me_schedule_career_optimize(
 
 FEEDBACK_ACCOUNT_LIMIT = (5, 3600.0)
 FEEDBACK_ANONYMOUS_LIMIT = (10, 3600.0)
+# Per client address, whether or not a session is sent. Checked first and
+# without recording a hit, so a flood is refused before any Supabase call.
+FEEDBACK_IP_LIMIT = (10, 3600.0)
 _FEEDBACK_ANONYMOUS_KEY = "anonymous"
+# Set by the Vercel proxy from the platform-supplied client address. Only
+# trusted because authorize_proxy_request has already verified the shared
+# secret by the time a route reads it.
+CLIENT_IP_HEADER = "X-GradusIQ-Client-IP"
+_IP_PATTERN = re.compile(r"^[0-9a-fA-F:.]{3,45}$")
+
+FEEDBACK_ROUTE_PATH = "/api/v2/student/me/feedback"
+# Three screenshots at their total cap plus generous room for the text fields
+# and multipart framing. The route is open to anonymous callers, so the body is
+# bounded before the multipart parser buffers any of it.
+MAX_FEEDBACK_BODY_BYTES = feedback_report.MAX_TOTAL_SCREENSHOT_BYTES + 256 * 1024
+
+
+class _BodySizeLimitMiddleware:
+    """Answers 413 for a POST to `path` whose body exceeds `max_bytes`.
+
+    Checks Content-Length up front, and counts bytes as they stream in for
+    clients that send none (chunked), so neither form can slip past.
+    """
+
+    def __init__(self, app, *, path: str, max_bytes: int) -> None:
+        self.app = app
+        self.path = path
+        self.max_bytes = max_bytes
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http" or scope["path"] != self.path or scope["method"] != "POST":
+            await self.app(scope, receive, send)
+            return
+
+        declared = dict(scope["headers"]).get(b"content-length")
+        if declared is not None:
+            try:
+                too_big = int(declared) > self.max_bytes
+            except ValueError:
+                too_big = True
+            if too_big:
+                await self._reject(send)
+                return
+
+        received = 0
+        exceeded = False
+
+        async def counting_receive():
+            nonlocal received, exceeded
+            if exceeded:
+                return {"type": "http.disconnect"}
+            message = await receive()
+            if message["type"] == "http.request":
+                received += len(message.get("body", b""))
+                if received > self.max_bytes:
+                    # FastAPI turns an exception raised while parsing the body
+                    # into its own 400, so signal a disconnect instead and
+                    # replace whatever the app answers with the 413 below.
+                    exceeded = True
+                    return {"type": "http.disconnect"}
+            return message
+
+        async def guarded_send(message):
+            if not exceeded:
+                await send(message)
+
+        await self.app(scope, counting_receive, guarded_send)
+        if exceeded:
+            await self._reject(send)
+
+    @staticmethod
+    async def _reject(send) -> None:
+        body = b'{"detail":"Request body is too large."}'
+        await send({
+            "type": "http.response.start",
+            "status": 413,
+            "headers": [
+                (b"content-type", b"application/json"),
+                (b"content-length", str(len(body)).encode()),
+            ],
+        })
+        await send({"type": "http.response.body", "body": body})
+
+
+def _feedback_client_key(request: Request) -> str:
+    """The address the per-IP limit counts. Falls back to the socket peer,
+    which behind the proxy is the proxy itself, so a missing header degrades
+    to one shared bucket rather than to no limit."""
+    forwarded = request.headers.get(CLIENT_IP_HEADER, "").strip()
+    if _IP_PATTERN.match(forwarded):
+        return forwarded
+    return request.client.host if request.client else "unknown"
 
 
 def _verified_feedback_account(request: Request) -> tuple[str, str] | None:
@@ -4612,8 +4733,15 @@ def _verified_feedback_account(request: Request) -> tuple[str, str] | None:
     return str(user.id), str(getattr(user, "email", "") or "")
 
 
+def _feedback_rate_limited() -> HTTPException:
+    return HTTPException(
+        status_code=429,
+        detail="You've sent several reports recently. Please try again in a little while.",
+    )
+
+
 @router.post(
-    "/api/v2/student/me/feedback",
+    FEEDBACK_ROUTE_PATH,
     dependencies=[Depends(authorize_proxy_request)],
 )
 def post_me_feedback(
@@ -4632,17 +4760,22 @@ def post_me_feedback(
     if website and website.strip():
         return {"status": "sent"}
 
-    account = _verified_feedback_account(request)
-    if account is not None:
-        limiter = request.app.state.feedback_account_limiter
-        limiter_key = account[0]
-    else:
-        limiter = request.app.state.feedback_anonymous_limiter
-        limiter_key = _FEEDBACK_ANONYMOUS_KEY
-    if not limiter.allow(limiter_key):
+    # The per-IP limit goes first and records nothing yet: a flooding client
+    # is refused before the Supabase lookup below, and a report that fails
+    # validation never costs its sender quota.
+    ip_key = _feedback_client_key(request)
+    ip_limiter = request.app.state.feedback_ip_limiter
+    if not ip_limiter.would_allow(ip_key):
+        raise _feedback_rate_limited()
+
+    # Count before reading: a caller can attach far more files than the form
+    # allows, and each read below buffers up to a full screenshot.
+    if len(screenshots) > feedback_report.MAX_SCREENSHOTS:
+        for upload in screenshots:
+            upload.file.close()
         raise HTTPException(
-            status_code=429,
-            detail="You've sent several reports recently. Please try again in a little while.",
+            status_code=422,
+            detail=f"Attach at most {feedback_report.MAX_SCREENSHOTS} screenshots.",
         )
 
     files: list[tuple[str | None, bytes]] = []
@@ -4657,7 +4790,7 @@ def post_me_feedback(
             upload.file.close()
 
     try:
-        report = feedback_report.Report(
+        fields = dict(
             kind=feedback_report.validate_kind(kind),
             description=feedback_report.validate_description(description),
             name=feedback_report.validate_name(name),
@@ -4665,11 +4798,27 @@ def post_me_feedback(
             page=feedback_report.validate_context(page),
             user_agent=feedback_report.validate_context(user_agent),
             screenshots=feedback_report.validate_screenshots(files),
-            account_id=account[0] if account else None,
-            account_email=(account[1] or None) if account else None,
         )
     except feedback_report.ReportValidationError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    account = _verified_feedback_account(request)
+    if account is not None:
+        backstop = request.app.state.feedback_account_limiter
+        backstop_key = account[0]
+    else:
+        backstop = request.app.state.feedback_anonymous_limiter
+        backstop_key = _FEEDBACK_ANONYMOUS_KEY
+    # Quota is spent only now that the report is valid. The shared limiter is
+    # the backstop behind the per-IP one.
+    if not (ip_limiter.allow(ip_key) and backstop.allow(backstop_key)):
+        raise _feedback_rate_limited()
+
+    report = feedback_report.Report(
+        **fields,
+        account_id=account[0] if account else None,
+        account_email=(account[1] or None) if account else None,
+    )
 
     try:
         feedback_report.send_report(
@@ -4685,7 +4834,12 @@ def post_me_feedback(
             detail="Reports aren't set up yet. Please email gradus@gradusiq.com instead.",
         ) from exc
     except feedback_report.ReportDeliveryError as exc:
-        logger.error("Report not sent: %s", exc)
+        # Status code only: the exception text and the provider's body are
+        # not logged (see ReportDeliveryError).
+        logger.error(
+            "Report not sent: email service status %s",
+            exc.status_code if exc.status_code is not None else "unreachable",
+        )
         raise HTTPException(
             status_code=502,
             detail="We couldn't send your report just now. Please try again in a minute.",
@@ -4721,6 +4875,14 @@ def create_app(config: APIConfig | None = None) -> FastAPI:
     )
     application.state.feedback_anonymous_limiter = feedback_report.KeyedRateLimiter(
         *FEEDBACK_ANONYMOUS_LIMIT
+    )
+    application.state.feedback_ip_limiter = feedback_report.KeyedRateLimiter(
+        *FEEDBACK_IP_LIMIT
+    )
+    application.add_middleware(
+        _BodySizeLimitMiddleware,
+        path=FEEDBACK_ROUTE_PATH,
+        max_bytes=MAX_FEEDBACK_BODY_BYTES,
     )
     application.add_middleware(
         CORSMiddleware,
