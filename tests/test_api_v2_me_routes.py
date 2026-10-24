@@ -678,6 +678,23 @@ def test_me_chat_returns_a_reply(client, monkeypatch):
     assert "Real Student" in fake.calls[0]["messages"][0]["content"]
 
 
+def test_me_chat_sends_gathered_context_to_the_model(client, monkeypatch):
+    _patch_session(monkeypatch, profile=_full_profile())
+    monkeypatch.setattr(
+        api,
+        "_gather_chat_context",
+        lambda client, sid, canonical: {"today": "2026-10-24", "saved_analysis": {"GAP": {"summary": "CTX-GAP"}}},
+    )
+    fake = FakeAI("ok")
+    monkeypatch.setattr(api, "build_client", lambda: fake)
+
+    response = _call(client, "post", "/api/v2/student/me/chat", {"message": "gaps?", "history": []})
+
+    assert response.status_code == 200
+    system = fake.calls[0]["messages"][0]["content"]
+    assert "<STUDENT_CONTEXT_DATA>" in system and "CTX-GAP" in system
+
+
 def test_me_chat_requires_a_message(client, monkeypatch):
     _patch_session(monkeypatch, profile=_full_profile())
     monkeypatch.setattr(api, "build_client", lambda: pytest.fail("must not reach the AI client"))

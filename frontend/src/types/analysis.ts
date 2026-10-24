@@ -28,6 +28,13 @@ export interface FeatureResult<T> {
   data: T;
   errors: string[];
   missing_fields?: MissingField[];
+  /**
+   * Only on a saved result served from the analysis cache: true when the
+   * inputs this analysis read (courses, skills, experience, roles...) have
+   * changed since it ran. Absent on live runs and on results saved before
+   * the backend began fingerprinting them.
+   */
+  profile_changed?: boolean;
 }
 
 // ── GAP (readiness check) — gap.py output_contract ──────────────────────────

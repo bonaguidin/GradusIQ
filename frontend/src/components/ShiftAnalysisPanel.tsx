@@ -67,6 +67,7 @@ export function ShiftAnalysisPanel({ run: externalRun }: ShiftAnalysisPanelProps
       refreshing={refreshing}
       refreshError={refreshError}
       blockedReason={blockedReason}
+      profileChanged={state.phase === 'done' && state.result.profile_changed === true}
     >
       {state.phase === 'done' && state.result.status === 'success' && (
         <ShiftResult data={state.result.data} summary={state.result.summary} />

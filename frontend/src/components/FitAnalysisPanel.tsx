@@ -61,6 +61,7 @@ export function FitAnalysisPanel({ run: externalRun }: FitAnalysisPanelProps = {
       refreshing={refreshing}
       refreshError={refreshError}
       blockedReason={blockedReason}
+      profileChanged={state.phase === 'done' && state.result.profile_changed === true}
     >
       {state.phase === 'done' && state.result.status === 'success' && (
         <FitResult data={state.result.data} summary={state.result.summary} />
