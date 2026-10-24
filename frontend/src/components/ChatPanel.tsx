@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
+import { saveMemory } from '../api/memory';
 import { useAuth } from '../auth/useAuth';
 import { useChat, useChatPage } from '../chat/ChatContext';
 import { useChatAction } from '../chat/useChatAction';
@@ -20,9 +21,11 @@ interface ChatPanelProps {
 }
 
 export function ChatPanel({ autoFocus = false, variant = 'inline', onClose }: ChatPanelProps = {}) {
-  const { profile, slug, studentAccount } = useAuth();
+  const { profile, slug, session, studentAccount } = useAuth();
+  // Memory notes belong to a real account; demo personas have nowhere to keep them.
+  const memoryToken = slug ? null : session?.access_token ?? null;
   const runAction = useChatAction();
-  const { messages, sending, error, canSend, send, reset } = useChat();
+  const { messages, sending, error, canSend, send, reset, setRememberState } = useChat();
   const page = useChatPage();
   const suggestions = chatSuggestions(page);
   const [input, setInput] = useState('');
@@ -130,6 +133,19 @@ export function ChatPanel({ autoFocus = false, variant = 'inline', onClose }: Ch
             <div className="chat-msg-body">
               {m.role === 'assistant' ? <ChatMarkdown text={m.content} /> : m.content}
             </div>
+            {m.role === 'assistant' && m.remember && memoryToken && m.rememberState !== 'dismissed' && (
+              <RememberOffer
+                note={m.remember}
+                saved={m.rememberState === 'saved'}
+                onSave={async () => {
+                  await saveMemory(memoryToken, m.remember ?? '');
+                  setRememberState(i, 'saved');
+                }}
+                onDismiss={() => setRememberState(i, 'dismissed')}
+                // The side panel would cover the list's Forget buttons.
+                onManage={() => runAction('career-profile', { closeChat: true, scrollTo: '.memory-notes' })}
+              />
+            )}
             {m.role === 'assistant' && (
               <ChatActions ids={usableActions(m.actions, { demo: Boolean(slug) })} onRun={runAction} />
             )}
@@ -213,6 +229,70 @@ function ChatActions({ ids, onRun }: { ids: string[]; onRun(id: string): void })
           </svg>
         </button>
       ))}
+    </div>
+  );
+}
+
+/**
+ * The assistant offering to remember something the student said. Nothing is
+ * saved until they press Remember (see ai/chat_memory.py).
+ */
+function RememberOffer({
+  note,
+  saved,
+  onSave,
+  onDismiss,
+  onManage,
+}: {
+  note: string;
+  saved: boolean;
+  onSave(): Promise<void>;
+  onDismiss(): void;
+  onManage(): void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
+
+  if (saved) {
+    return (
+      <div className="chat-remember chat-remember--saved" role="status">
+        <span>Saved to memory: <q>{note}</q></span>
+        <button type="button" className="btn btn-ghost btn-sm" onClick={onManage}>
+          Manage
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="chat-remember">
+      <p className="chat-remember-ask">
+        Remember this for future chats? <q>{note}</q>
+      </p>
+      <div className="chat-remember-buttons">
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          disabled={saving}
+          onClick={async () => {
+            setSaving(true);
+            setFailure(null);
+            try {
+              await onSave();
+            } catch (e) {
+              setFailure(e instanceof Error ? e.message : 'Could not save that note.');
+            } finally {
+              setSaving(false);
+            }
+          }}
+        >
+          {saving ? 'Saving…' : 'Remember'}
+        </button>
+        <button type="button" className="btn btn-ghost btn-sm" onClick={onDismiss} disabled={saving}>
+          No thanks
+        </button>
+      </div>
+      {failure && <p className="chat-remember-error" role="alert">{failure}</p>}
     </div>
   );
 }

@@ -150,6 +150,10 @@ const ME_TARGETS = Object.assign(Object.create(null), {
   // disconnect, and a forced re-sync on its own fixed path.
   'me-canvas-calendar': { methods: ['GET', 'PUT', 'DELETE'], needsFeature: false },
   'me-canvas-calendar-refresh': { method: 'POST', needsFeature: false },
+  // Assistant memory notes: list and save on the bare path, delete one by
+  // UUID on its own path.
+  'me-memory': { methods: ['GET', 'POST'], needsFeature: false },
+  'me-memory-note': { method: 'DELETE', needsFeature: false, needsMemoryRecord: true },
   // Combined Job Search feed -- reads only, never a live vendor call. Every
   // param is optional: `role` (a cached old bundle's one-family shape),
   // `families` (comma list), `days`, `employer`, `cursor`. Each is
@@ -265,6 +269,8 @@ function meBackendPath(target, feature, reviewTable, recordId, searchQuery, term
   if (target === 'me-career-role-options') return '/api/v2/student/me/career-role-options'
   if (target === 'me-canvas-calendar') return '/api/v2/student/me/canvas-calendar'
   if (target === 'me-canvas-calendar-refresh') return '/api/v2/student/me/canvas-calendar/refresh'
+  if (target === 'me-memory') return '/api/v2/student/me/memory'
+  if (target === 'me-memory-note') return `/api/v2/student/me/memory/${encodeURIComponent(recordId)}`
   if (target === 'me-job-search') {
     // Every param optional -- only append what the caller actually sent, so
     // a bare request (no params) forwards to a bare backend URL rather than
@@ -395,6 +401,9 @@ export function createProxyHandler({ env = process.env, fetchImpl = globalThis.f
           return jsonError(400, 'Invalid analysis route.')
         }
         if (spec.needsCourseRecord && !RECORD_ID_PATTERN.test(recordId)) {
+          return jsonError(400, 'Invalid analysis route.')
+        }
+        if (spec.needsMemoryRecord && !RECORD_ID_PATTERN.test(recordId)) {
           return jsonError(400, 'Invalid analysis route.')
         }
         if (spec.needsCacheFeature && !ME_CACHE_FEATURES.has(feature)) {

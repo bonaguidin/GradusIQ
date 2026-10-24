@@ -1657,3 +1657,52 @@ test('other targets never get a client address header', async () => {
   }))
   assert.equal(calls[0]['X-GradusIQ-Client-IP'], undefined)
 })
+
+// ── me-memory: assistant memory notes ────────────────────────────────────────
+
+test('me-memory lists and saves; me-memory-note deletes one note by UUID', async () => {
+  for (const method of ['GET', 'POST']) {
+    const { handler, seen } = planningHandler()
+    const response = await handler.fetch(
+      new Request('https://gradusiq.example/api/proxy?target=me-memory', {
+        method,
+        headers: { Authorization: 'Bearer t', 'Content-Type': 'application/json' },
+        ...(method === 'POST' ? { body: '{"note":"Aiming for remote roles"}' } : {}),
+      }),
+    )
+    assert.equal(response.status, 200)
+    assert.equal(seen[0].url, 'https://backend.example/api/v2/student/me/memory')
+  }
+
+  const uuid = '11111111-2222-3333-4444-555555555555'
+  const { handler, seen } = planningHandler()
+  const deleted = await handler.fetch(
+    new Request(`https://gradusiq.example/api/proxy?target=me-memory-note&id=${uuid}`, {
+      method: 'DELETE',
+      headers: { Authorization: 'Bearer t' },
+    }),
+  )
+  assert.equal(deleted.status, 200)
+  assert.equal(seen[0].url, `https://backend.example/api/v2/student/me/memory/${uuid}`)
+
+  for (const [target, method, id] of [
+    ['me-memory-note', 'DELETE', '../gpa'],
+    ['me-memory', 'DELETE', ''],
+    ['me-memory-note', 'GET', uuid],
+  ]) {
+    const { handler: bad, seen: badSeen } = planningHandler()
+    const rejected = await bad.fetch(
+      new Request(`https://gradusiq.example/api/proxy?target=${target}&id=${encodeURIComponent(id)}`, { method }),
+    )
+    assert.equal(rejected.status, 400, `${target} ${method}`)
+    assert.equal(badSeen.length, 0)
+  }
+
+  const config = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'))
+  const rewrites = config.rewrites.map(({ source, destination }) => [source, destination])
+  const noteIndex = rewrites.findIndex(([s]) => s === '/api/v2/student/me/memory/:id')
+  const baseIndex = rewrites.findIndex(([s]) => s === '/api/v2/student/me/memory')
+  assert.ok(noteIndex >= 0 && baseIndex > noteIndex)
+  assert.equal(rewrites[noteIndex][1], '/api/proxy?target=me-memory-note&id=:id')
+  assert.equal(rewrites[baseIndex][1], '/api/proxy?target=me-memory')
+})

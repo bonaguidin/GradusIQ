@@ -25,14 +25,21 @@ function scrollWhenThere(selector: string, framesLeft = 60): void {
  * Runs an assistant action button: go to its page and keep the chat open
  * beside it (on a phone the chat would cover the page, so it closes there).
  */
-export function useChatAction(): (id: string) => void {
+export interface ChatActionOptions {
+  /** Close the chat instead of keeping it beside the page. */
+  closeChat?: boolean;
+  /** Bring this element into view instead of the action's own target. */
+  scrollTo?: string;
+}
+
+export function useChatAction(): (id: string, options?: ChatActionOptions) => void {
   const navigate = useNavigate();
   const { setPanelOpen } = useChat();
   const page = useChatPage();
   const dashboard = useDashboardLocation();
 
   return useCallback(
-    (id: string) => {
+    (id: string, options: ChatActionOptions = {}) => {
       const action = CHAT_ACTIONS[id];
       if (!action) return;
       const onDashboard = page !== null && !['transcript', 'resume', 'profile-complete'].includes(page);
@@ -55,8 +62,9 @@ export function useChatAction(): (id: string) => void {
         href = `${dashboard.path}?${params.toString()}`;
       }
       navigate(href);
-      setPanelOpen(!isPhone());
-      if (action.scrollTo) scrollWhenThere(action.scrollTo);
+      setPanelOpen(!options.closeChat && !isPhone());
+      const target = options.scrollTo ?? action.scrollTo;
+      if (target) scrollWhenThere(target);
     },
     [navigate, setPanelOpen, page, dashboard],
   );

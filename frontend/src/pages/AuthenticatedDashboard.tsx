@@ -11,6 +11,7 @@ import { useFocusTrap } from '../hooks/useFocusTrap';
 import { useUrlParams } from '../hooks/useUrlParams';
 import { GuidedTour } from '../components/GuidedTour';
 import { ReportIssueButton } from '../components/ReportIssueButton';
+import { MemoryNotesPanel } from '../components/career/MemoryNotesPanel';
 import { supabase } from '../lib/supabase';
 import {
   TOUR_COMPLETED_METADATA_KEY,
@@ -1004,6 +1005,13 @@ export function AuthenticatedDashboard() {
                         />
                       </div>
                       </>
+                )}
+                {/* Notes saved from the assistant chat; shown whether or not
+                    the resume is confirmed, since chat works either way. */}
+                {accessToken && (
+                  <div className="career-profile-block">
+                    <MemoryNotesPanel accessToken={accessToken} />
+                  </div>
                 )}
               </div>
             )}

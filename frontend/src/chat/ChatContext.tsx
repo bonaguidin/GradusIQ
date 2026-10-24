@@ -28,6 +28,8 @@ export interface ChatStore {
   send(text: string, page: string | null): Promise<void>;
   /** Starts a new, empty conversation. */
   reset(): void;
+  /** Records what the student did with a "Remember this?" offer. */
+  setRememberState(index: number, state: 'saved' | 'dismissed'): void;
   /** Whether the side panel is open. Lives here so it survives navigation. */
   panelOpen: boolean;
   setPanelOpen(open: boolean): void;
@@ -56,6 +58,8 @@ function readStored(key: string | null): ChatMessage[] {
         role: m.role,
         content: m.content,
         ...(Array.isArray(m.actions) ? { actions: m.actions.filter((a) => typeof a === 'string') } : {}),
+        ...(typeof m.remember === 'string' ? { remember: m.remember } : {}),
+        ...(m.rememberState === 'saved' || m.rememberState === 'dismissed' ? { rememberState: m.rememberState } : {}),
       }));
   } catch {
     return [];
@@ -138,11 +142,16 @@ function useChatState(persist: boolean): ChatStore {
       setMessages(() => [...history, { role: 'user', content: text }]);
       setSending(true);
       try {
-        const { reply, actions } = await sendChat({ slug, accessToken }, text, history, page);
+        const { reply, actions, remember } = await sendChat({ slug, accessToken }, text, history, page);
         if (generation.current === asked) {
           setMessages((m) => [
             ...m,
-            { role: 'assistant', content: reply, ...(actions.length ? { actions } : {}) },
+            {
+              role: 'assistant',
+              content: reply,
+              ...(actions.length ? { actions } : {}),
+              ...(remember ? { remember } : {}),
+            },
           ]);
         }
       } catch (e) {
@@ -168,9 +177,17 @@ function useChatState(persist: boolean): ChatStore {
     setError(null);
   }, [setMessages]);
 
+  const setRememberState = useCallback(
+    (index: number, state: 'saved' | 'dismissed') =>
+      setMessages((current) =>
+        current.map((m, i) => (i === index ? { ...m, rememberState: state } : m)),
+      ),
+    [setMessages],
+  );
+
   return useMemo(
-    () => ({ messages, sending, error, canSend, send, reset, panelOpen, setPanelOpen }),
-    [messages, sending, error, canSend, send, reset, panelOpen],
+    () => ({ messages, sending, error, canSend, send, reset, setRememberState, panelOpen, setPanelOpen }),
+    [messages, sending, error, canSend, send, reset, setRememberState, panelOpen],
   );
 }
 
