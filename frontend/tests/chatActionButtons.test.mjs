@@ -21,7 +21,7 @@ test('assistant action buttons open the page and keep the chat beside it', { tim
   await page.route('**/api/v2/student/me/chat', async (route) => {
     bodies.push(route.request().postDataJSON())
     const reply = bodies.length === 1
-      ? { reply: 'Your GPA is 3.42.', actions: ['gpa-calculator', 'made-up', 'report-issue'] }
+      ? { reply: 'Your GPA is 3.42.', actions: ['gpa-calculator', 'made-up', 'report-issue'], lookups: ['your course grades'] }
       : { reply: 'Sure.', actions: [] }
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(reply) })
   })
@@ -39,6 +39,8 @@ test('assistant action buttons open the page and keep the chat beside it', { tim
   // Unknown ids never become buttons.
   const buttons = inline.locator('.chat-action')
   assert.deepEqual(await buttons.allTextContents(), ['Open GPA Calculator', 'Report a bug'])
+  // What the assistant looked up is named under the reply.
+  assert.equal(await inline.locator('.chat-lookups').textContent(), 'Checked your course grades')
 
   // The button goes to the page, keeps the preview fixture, and the same
   // conversation is open in the side panel.
@@ -54,6 +56,7 @@ test('assistant action buttons open the page and keep the chat beside it', { tim
   await page.reload()
   await page.locator('.assistant-launcher').click()
   await dock.getByRole('button', { name: 'Report a bug' }).waitFor()
+  assert.equal(await dock.locator('.chat-lookups').count(), 1)
   await dock.getByLabel('Message GradusIQ').fill('Thanks')
   await dock.getByLabel('Message GradusIQ').press('Enter')
   await dock.getByText('Sure.').waitFor()

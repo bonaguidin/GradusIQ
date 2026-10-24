@@ -11,6 +11,7 @@ Student identity here is the dashboard "slug" (e.g. "jordanReyes"), matching the
 """
 
 import hmac
+import inspect
 import json
 import logging
 import os
@@ -37,7 +38,7 @@ from GradusIQ_career.ai.errors import AIConfigError, AIRequestError, AIResponseP
 from GradusIQ_career.ai.context import AgentContext, GroundingMetadata
 from GradusIQ_career import analysis_freshness
 from GradusIQ_career.ai import chat_context
-from GradusIQ_career.ai import chat_actions, chat_memory
+from GradusIQ_career.ai import chat_actions, chat_memory, chat_tools
 from GradusIQ_career.ai.contracts import ChatOutput, feature_output_is_valid
 from GradusIQ_career.ai.runtime import AIRuntime
 from GradusIQ_career.ai.model_config import (
@@ -875,7 +876,12 @@ def canonical_chat_projection(profile) -> dict:
 
 
 def build_canonical_chat_messages(
-    profile, body: ChatRequest, context: dict | None = None, *, memory_enabled: bool = False
+    profile,
+    body: ChatRequest,
+    context: dict | None = None,
+    *,
+    memory_enabled: bool = False,
+    lookups_enabled: bool = False,
 ) -> list[dict]:
     """System prompt + bounded history for the authenticated chat.
 
@@ -904,6 +910,8 @@ def build_canonical_chat_messages(
         # Only once the notes table exists: a "Remember this?" card the
         # student could not save would be worse than none.
         system += f"{chat_memory.memory_instructions()}\n\n"
+    if lookups_enabled:
+        system += f"{chat_tools.tool_instructions()}\n\n"
     if context:
         system += (
             f"<STUDENT_CONTEXT_DATA>\n{json.dumps(context, sort_keys=True)}\n"
@@ -1008,8 +1016,148 @@ def _load_memory_notes(client, student_id: str) -> list[str] | None:
         return None
 
 
+class _ChatLookups:
+    """The chat's lookup tools (ai/chat_tools.py), bound to one request.
+
+    Each tool reuses the code behind the matching page and runs on the
+    student's own session client, so it sees exactly what their pages see.
+    A failure comes back to the model as an error result instead of failing
+    the reply.
+    """
+
+    def __init__(self, request: Request, client, student_id: str, canonical) -> None:
+        self.request = request
+        self.client = client
+        self.student_id = student_id
+        self.canonical = canonical
+        self._grade_cards: list[dict] | None = None
+        # Tools that returned data (not an error), for "Looked up: ..." in the reply.
+        self.used: list[str] = []
+
+    def run(self, name: str, arguments: dict) -> str:
+        handler = getattr(self, f"_tool_{name}", None) if name in chat_tools.TOOL_NAMES else None
+        if handler is None:
+            return chat_tools.error_result(f"Unknown lookup '{name}'.")
+        try:
+            inspect.signature(handler).bind(**arguments)
+        except TypeError:
+            return chat_tools.error_result("Those arguments do not match this lookup.")
+        if any(value is not None and not isinstance(value, str) for value in arguments.values()):
+            return chat_tools.error_result("Lookup arguments must be text.")
+        try:
+            payload = handler(**arguments)
+        except Exception:  # noqa: BLE001 -- a failed lookup must not cost the reply
+            logger.warning("chat lookup failed: %s", name, exc_info=True)
+            return chat_tools.error_result("This lookup is unavailable right now.")
+        if "error" not in payload:
+            self.used.append(name)
+        return chat_tools.to_result(payload)
+
+    def _tool_get_degree_plan(self) -> dict:
+        state = _reconstruct_academic_schedule(self.request)
+        if isinstance(state, FeatureResult):
+            return {"error": state.summary or "No degree plan is available for this student yet."}
+        schedule = state.academic_schedule
+        if schedule.status == "ERROR":
+            failure = schedule.failure.model_dump(mode="json") if schedule.failure else {}
+            return {"error": "The schedule builder could not fit the remaining requirements.", "detail": failure}
+        names = {str(course.requirement_group_id): course.requirement_group_name for course in state.base_courses}
+        names.update({d.requirement_group_id: d.requirement_name for d in state.academic_selection.decisions})
+        term_keys = _resolve_decision_term_keys(state)
+        choices = [
+            {"requirement": d.requirement_name, "term": term_keys.get(d.requirement_group_id)}
+            for d in state.academic_selection.decisions
+            if d.state == "CHOICE_REQUIRED"
+        ]
+        titles = {code: record.title for code, record in state.catalog_by_code.items()}
+        dumped = schedule.model_dump(mode="json")
+        return chat_tools.compact_degree_plan(dumped["terms"], dumped["unscheduled"], choices, titles, names)
+
+    def _tool_search_courses(self, query: str) -> dict:
+        institution_id = _home_institution_id(self.client, self.student_id)
+        rows = search_catalog(self.client, institution_id, query, chat_tools.MAX_CATALOG_RESULTS)
+        return {"query": query, "results": chat_tools.compact_catalog([row.to_dict() for row in rows])}
+
+    def _tool_get_deadlines(self, start_date: str, end_date: str) -> dict:
+        start, end = chat_tools.parse_date(start_date), chat_tools.parse_date(end_date)
+        if start is None or end is None or end < start:
+            return {"error": "Give start_date and end_date as YYYY-MM-DD, start first."}
+        row = calendar_feed.load_feed_row(self.client, self.student_id)
+        if row is None:
+            return {"error": "Canvas calendar is not connected."}
+        events, truncated = chat_tools.deadlines_in_range(row.get("events") or [], start, end)
+        result: dict[str, Any] = {"events": events}
+        if truncated:
+            result["note"] = "More events in this range; narrow the dates to see them all."
+        return result
+
+    def _tool_search_jobs(
+        self, family: str | None = None, employer: str | None = None, location: str | None = None
+    ) -> dict:
+        target_roles = list(self.canonical.career.target_roles)
+        if not target_roles and not family:
+            return {"error": "No target roles are set, so there are no postings to match."}
+        feed = get_job_search_feed(
+            build_service_client(),
+            target_role_families=target_roles,
+            families=[family] if family else None,
+            page_size=200,
+        )
+        postings = feed.get("postings") or []
+        if employer:
+            wanted = employer.strip().casefold()
+            postings = [p for p in postings if wanted in str(p.get("employer") or "").casefold()]
+        results = chat_tools.compact_jobs(postings, location)
+        payload: dict[str, Any] = {"postings": results, "total_matching_before_filters": feed.get("total", 0)}
+        if not results:
+            payload["families_available"] = [f.get("family") for f in (feed.get("facets") or {}).get("families", [])][:15]
+        return payload
+
+    def _grade_list(self) -> list[dict]:
+        if self._grade_cards is None:
+            self._grade_cards = _syllabus_list_items(self.client, self.student_id)
+        return self._grade_cards
+
+    def _tool_get_course_grades(self) -> dict:
+        cards = self._grade_list()
+        if not cards:
+            return {"courses": [], "note": "No syllabi have been added to the Grade Calculator yet."}
+        return {"courses": [chat_tools.compact_course_grade(card) for card in cards]}
+
+    def _tool_solve_grade_needed(self, course: str, component: str, target_letter: str) -> dict:
+        card = chat_tools.match_course(self._grade_list(), course)
+        if card is None:
+            return {"error": f"No Grade Calculator course matches '{course}'."}
+        if not card.get("calculator_ready"):
+            return {"error": "This course's grading model has not been confirmed yet."}
+        assembled = syllabus_service.get_syllabus_grade_profile(
+            self.client, profile_id=card["id"], student_id=self.student_id
+        )
+        if assembled is None:
+            return {"error": "This course is no longer in the Grade Calculator."}
+        saved = syllabus_store.get_grade_state(self.client, profile_id=card["id"], student_id=self.student_id)
+        grade_state = (
+            syllabus_read.grade_state_from_row(saved)
+            if saved is not None
+            else _syllabus_grade_state_from_body([], [])
+        )
+        reconciliation = syllabus_read.reconciliation_result_from_row(assembled["current_revision"], confirmed=True)
+        try:
+            result = solve_required_score(
+                reconciliation, grade_state, target_component=component, target_letter=target_letter.strip()
+            )
+        except GradeCalculationError as exc:
+            return {"error": str(exc)[:300]}
+        return chat_tools.compact_target(result.model_dump(mode="json"))
+
+
 def _complete_authenticated_chat(
-    canonical, body: ChatRequest, student_context: dict | None = None, *, memory_enabled: bool = False
+    canonical,
+    body: ChatRequest,
+    student_context: dict | None = None,
+    *,
+    memory_enabled: bool = False,
+    lookups: _ChatLookups | None = None,
 ) -> dict:
     sent_history_count = sum(
         bool(turn.content.strip()) for turn in body.history[-MAX_CHAT_HISTORY:]
@@ -1020,7 +1168,7 @@ def _complete_authenticated_chat(
         canonical_profile=canonical,
         model_role="chat",
         prompt_name="chat",
-        prompt_version="1.3",
+        prompt_version="1.4",
         grounding=GroundingMetadata(
             source_types=("canonical_student_profile", "student_context", "browser_history"),
             trust_level="untrusted_external",
@@ -1033,19 +1181,23 @@ def _complete_authenticated_chat(
     result = AIRuntime(build_client()).invoke_text(
         context=context,
         messages=build_canonical_chat_messages(
-            canonical, body, student_context, memory_enabled=memory_enabled
+            canonical, body, student_context, memory_enabled=memory_enabled, lookups_enabled=lookups is not None
         ),
         output_model=ChatOutput,
+        tools=chat_tools.TOOLS if lookups is not None else (),
+        run_tool=lookups.run if lookups is not None else None,
+        max_tool_rounds=chat_tools.MAX_TOOL_ROUNDS,
     )
     # Token counts per turn, so a per-student message cap can be set from
     # measured cost rather than a guess (see the chat overhaul plan).
     usage = result.trace.usage
     logger.info(
-        "chat turn: model=%s input_tokens=%s output_tokens=%s context=%s",
+        "chat turn: model=%s input_tokens=%s output_tokens=%s context=%s lookups=%s",
         result.trace.resolved_model,
         usage.input_tokens,
         usage.output_tokens,
         ",".join(context_sources) or "-",
+        ",".join(result.tool_calls) or "-",
     )
     if result.output is None:
         raise HTTPException(status_code=502, detail="Chat service is unavailable.")
@@ -1058,6 +1210,9 @@ def _complete_authenticated_chat(
     )
     if proposal:
         response["remember"] = proposal
+    looked_up = chat_tools.lookup_labels(lookups.used if lookups is not None else ())
+    if looked_up:
+        response["lookups"] = looked_up
     return response
 
 
@@ -1860,7 +2015,13 @@ def chat_me(request: Request, body: ChatRequest) -> dict:
         context["remembered_notes"] = notes
     try:
         with request.app.state.ai_concurrency.slot():
-            return _complete_authenticated_chat(canonical, body, context, memory_enabled=notes is not None)
+            return _complete_authenticated_chat(
+                canonical,
+                body,
+                context,
+                memory_enabled=notes is not None,
+                lookups=_ChatLookups(request, client, str(student_id), canonical),
+            )
     except HTTPException:
         raise
     except Exception as exc:
@@ -2897,6 +3058,11 @@ def get_me_syllabus_grade_profiles(request: Request) -> dict:
     """
     client = _session_client(request)
     student_id = _resolve_session_student_id(client)
+    return {"syllabus_grade_profiles": _syllabus_list_items(client, student_id)}
+
+
+def _syllabus_list_items(client, student_id) -> list[dict]:
+    """The Grade Calculator list cards, shared with the chat's grade lookup."""
     profiles = syllabus_store.list_profiles(client, student_id=student_id)
 
     items = []
@@ -2937,7 +3103,7 @@ def get_me_syllabus_grade_profiles(request: Request) -> dict:
                     summary["components"] = []
         items.append(summary)
 
-    return {"syllabus_grade_profiles": items}
+    return items
 
 
 @router.get(

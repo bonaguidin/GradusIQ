@@ -60,6 +60,7 @@ function readStored(key: string | null): ChatMessage[] {
         ...(Array.isArray(m.actions) ? { actions: m.actions.filter((a) => typeof a === 'string') } : {}),
         ...(typeof m.remember === 'string' ? { remember: m.remember } : {}),
         ...(m.rememberState === 'saved' || m.rememberState === 'dismissed' ? { rememberState: m.rememberState } : {}),
+        ...(Array.isArray(m.lookups) ? { lookups: m.lookups.filter((l) => typeof l === 'string') } : {}),
       }));
   } catch {
     return [];
@@ -142,7 +143,7 @@ function useChatState(persist: boolean): ChatStore {
       setMessages(() => [...history, { role: 'user', content: text }]);
       setSending(true);
       try {
-        const { reply, actions, remember } = await sendChat({ slug, accessToken }, text, history, page);
+        const { reply, actions, remember, lookups } = await sendChat({ slug, accessToken }, text, history, page);
         if (generation.current === asked) {
           setMessages((m) => [
             ...m,
@@ -151,6 +152,7 @@ function useChatState(persist: boolean): ChatStore {
               content: reply,
               ...(actions.length ? { actions } : {}),
               ...(remember ? { remember } : {}),
+              ...(lookups.length ? { lookups } : {}),
             },
           ]);
         }
