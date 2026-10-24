@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDataChanged } from '../lib/dataChanged';
 import {
   TERM_STATUS_LABELS,
   currentGradeOptions,
@@ -148,6 +149,8 @@ export function TermPlanner({ slug, accessToken, courses, onCourseRecordsChanged
   }, [identity]);
 
   useEffect(() => { void loadPlanned(); }, [loadPlanned]);
+  // A course planned or removed from the assistant chat while this is open.
+  useDataChanged('planned-courses', () => { void loadPlanned(); });
 
   // The student's own institution's grade vocabulary -- see
   // lib/termPlanning.mjs's currentGradeOptions/finalGradeOptions. Fetched

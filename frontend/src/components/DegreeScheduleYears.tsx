@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useDataChanged } from '../lib/dataChanged';
 import {
   addPlannedCourse,
   fetchCrossListings,
@@ -447,6 +448,8 @@ export function DegreeScheduleYears({
 
   useEffect(() => { void loadTerms(); }, [loadTerms]);
   useEffect(() => { void loadPlanned(); }, [loadPlanned]);
+  // A course planned or removed from the assistant chat while this is open.
+  useDataChanged('planned-courses', () => { void loadPlanned(); });
 
   useEffect(() => {
     let cancelled = false;

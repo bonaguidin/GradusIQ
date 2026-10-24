@@ -217,7 +217,7 @@ def execute_live(
             canonical_profile=canonical,
             model_role="chat",
             prompt_name="chat",
-            prompt_version="1.4",
+            prompt_version="1.5",
             grounding=GroundingMetadata(
                 source_types=("synthetic_eval",),
                 attributes={"history_message_count": len(body.history)},

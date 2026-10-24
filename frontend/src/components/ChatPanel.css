@@ -569,3 +569,43 @@ body:has(.rv-commit) .assistant-launcher {
   margin: 0;
   color: var(--error);
 }
+
+/* ---------------------------------------------------------------------------
+   A change the assistant offered (ai/chat_changes.py). A solid card rather
+   than the dashed "Remember this?" one: confirming it changes the student's
+   plan or profile.
+   --------------------------------------------------------------------------- */
+
+.chat-proposal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin-top: var(--sp-1);
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-elevated);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--ink);
+}
+
+.chat-proposal--done {
+  color: var(--muted);
+}
+
+.chat-proposal-ask {
+  margin: 0;
+  font-weight: 600;
+}
+
+.chat-proposal-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.chat-proposal-error {
+  margin: 0;
+  color: var(--error);
+}

@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
+import type { ChatProposal, ProposalState } from '../api/chat';
 import { saveMemory } from '../api/memory';
 import { useAuth } from '../auth/useAuth';
 import { useChat, useChatPage } from '../chat/ChatContext';
+import { runProposal } from '../chat/runProposal';
 import { useChatAction } from '../chat/useChatAction';
 import { CHAT_ACTIONS, usableActions } from '../lib/chatActions.mjs';
 import { chatSuggestions } from '../lib/chatPage.mjs';
@@ -21,11 +23,11 @@ interface ChatPanelProps {
 }
 
 export function ChatPanel({ autoFocus = false, variant = 'inline', onClose }: ChatPanelProps = {}) {
-  const { profile, slug, session, studentAccount } = useAuth();
+  const { profile, slug, session, studentAccount, reloadStudentProfile } = useAuth();
   // Memory notes belong to a real account; demo personas have nowhere to keep them.
   const memoryToken = slug ? null : session?.access_token ?? null;
   const runAction = useChatAction();
-  const { messages, sending, error, canSend, send, reset, setRememberState } = useChat();
+  const { messages, sending, error, canSend, send, reset, setRememberState, setProposalState } = useChat();
   const page = useChatPage();
   const suggestions = chatSuggestions(page);
   const [input, setInput] = useState('');
@@ -134,7 +136,9 @@ export function ChatPanel({ autoFocus = false, variant = 'inline', onClose }: Ch
               {m.role === 'assistant' ? <ChatMarkdown text={m.content} /> : m.content}
             </div>
             {m.role === 'assistant' && m.lookups && m.lookups.length > 0 && (
-              <p className="chat-lookups">Checked {m.lookups.join(', ')}</p>
+              <p className="chat-lookups">Checked {m.lookups.length > 1
+                ? `${m.lookups.slice(0, -1).join(', ')} and ${m.lookups[m.lookups.length - 1]}`
+                : m.lookups[0]}</p>
             )}
             {m.role === 'assistant' && m.remember && memoryToken && m.rememberState !== 'dismissed' && (
               <RememberOffer
@@ -149,6 +153,19 @@ export function ChatPanel({ autoFocus = false, variant = 'inline', onClose }: Ch
                 onManage={() => runAction('career-profile', { closeChat: true, scrollTo: '.memory-notes' })}
               />
             )}
+            {m.role === 'assistant' && memoryToken && m.proposals?.map((proposal) => (
+              <ProposalCard
+                key={proposal.id}
+                proposal={proposal}
+                state={m.proposalStates?.[proposal.id]}
+                onConfirm={async () => {
+                  const outcome = await runProposal(memoryToken, proposal, reloadStudentProfile);
+                  if (outcome.ok) setProposalState(i, proposal.id, { state: 'done', message: outcome.message });
+                  return outcome;
+                }}
+                onDismiss={() => setProposalState(i, proposal.id, { state: 'dismissed' })}
+              />
+            ))}
             {m.role === 'assistant' && (
               <ChatActions ids={usableActions(m.actions, { demo: Boolean(slug) })} onRun={runAction} />
             )}
@@ -296,6 +313,68 @@ function RememberOffer({
         </button>
       </div>
       {failure && <p className="chat-remember-error" role="alert">{failure}</p>}
+    </div>
+  );
+}
+
+/**
+ * A change the assistant offered (ai/chat_changes.py). Nothing happens until
+ * the student presses Confirm, which runs the page's own endpoint with their
+ * login. Routine strength: a plain primary button, not the confirm animation
+ * (docs/DESIGN.md, "big moments").
+ */
+function ProposalCard({
+  proposal,
+  state,
+  onConfirm,
+  onDismiss,
+}: {
+  proposal: ChatProposal;
+  state: ProposalState | undefined;
+  onConfirm(): Promise<{ ok: boolean; message: string }>;
+  onDismiss(): void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
+
+  if (state?.state === 'dismissed') return null;
+  if (state?.state === 'done') {
+    return (
+      <div className="chat-proposal chat-proposal--done" role="status">
+        <span>Done. {state.message ?? proposal.summary}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="chat-proposal">
+      <p className="chat-proposal-ask">{proposal.summary}?</p>
+      <div className="chat-proposal-buttons">
+        <button
+          type="button"
+          className="btn btn-primary btn-sm"
+          disabled={busy}
+          aria-busy={busy}
+          onClick={async () => {
+            setBusy(true);
+            setFailure(null);
+            try {
+              const outcome = await onConfirm();
+              if (!outcome.ok) setFailure(outcome.message);
+            } catch {
+              setFailure('That did not go through. Try again.');
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          {busy ? 'Confirming…' : 'Confirm'}
+        </button>
+        <button type="button" className="btn btn-ghost btn-sm" onClick={onDismiss} disabled={busy}>
+          No thanks
+        </button>
+      </div>
+      {failure && <p className="chat-proposal-error" role="alert">{failure}</p>}
     </div>
   );
 }
