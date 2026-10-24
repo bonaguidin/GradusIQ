@@ -83,7 +83,13 @@ jobs:
         # testpaths = ["tests"] and pythonpath = ["."] come from
         # [tool.pytest.ini_options] in pyproject.toml, so bare pytest is the
         # whole command. A non-zero exit fails the job; nothing wraps this.
-        run: uv run --frozen pytest
+        #
+        # -n auto spreads the suite over the runner's cores (pytest-xdist).
+        # It is CI-only, added with --with rather than to the dev group so
+        # uv.lock is untouched; the version is pinned here instead. Locally,
+        # bare `uv run pytest` still runs everything serially. Every test
+        # still runs -- this only changes how many run at once.
+        run: uv run --frozen --with pytest-xdist==3.8.0 pytest -n auto
 
   frontend:
     name: Frontend (node --test)

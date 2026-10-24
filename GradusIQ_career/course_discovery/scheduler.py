@@ -318,6 +318,129 @@ def schedule_courses(
             ),
         )
 
+    failure, term_codes = _pack_terms(
+        courses, course_by_code, edge_pairs, corequisite_pairs,
+        max_terms=max_terms, credit_hour_cap=credit_hour_cap,
+    )
+    if term_codes:
+        # The term loop used to advance the season after each placed term,
+        # raising on an unsupported starting season before any later failure.
+        _next_long_term(starting_year, starting_season)
+    if failure is not None:
+        return ScheduleResult(
+            student_id=student_id,
+            program_id=program_id,
+            status="ERROR",
+            failure=failure,
+        )
+
+    terms: list[TermPlan] = []
+    year, season = starting_year, starting_season
+    for codes in term_codes:
+        terms.append(
+            TermPlan(
+                term_key=term_key(year, season),
+                courses=[
+                    ScheduledCourse(
+                        course_code=code,
+                        credit_hours=course_by_code[code].credit_hours,
+                        requirement_group_id=course_by_code[code].requirement_group_id,
+                        limitations=limitations_by_code.get(code, []),
+                    )
+                    for code in codes
+                ],
+                total_credit_hours=sum(course_by_code[code].credit_hours for code in codes),
+            )
+        )
+        year, season = _next_long_term(year, season)
+
+    return ScheduleResult(
+        student_id=student_id,
+        program_id=program_id,
+        terms=terms,
+        unscheduled=unscheduled,
+        status="SCHEDULED",
+        failure=None,
+    )
+
+
+def place_courses(
+    courses: list[CourseToSchedule],
+    prerequisites: Mapping[str, StructuredPrerequisite],
+    already_satisfied: Iterable[str],
+    *,
+    starting_season: str,
+    max_terms: int,
+    credit_hour_cap: float = DEFAULT_CREDIT_HOUR_CAP,
+) -> tuple[list[list[str]] | None, dict[str, list[str]]]:
+    """schedule_courses() without building the result models: the course
+    codes placed in each term (None when schedule_courses would return an
+    ERROR result) and the per-course limitations it would attach.
+
+    Same dependency rules and the same _pack_terms() loop, so for any input
+    it agrees with schedule_courses() exactly. Exists for the requirement
+    selector, which simulates thousands of candidate schedules per build and
+    needs only placement and limitations from each.
+    """
+    course_by_code = {course.course_code: course for course in courses}
+    edge_pairs, corequisite_pairs, limitations_by_code = _build_dependencies(
+        courses, prerequisites, already_satisfied
+    )
+    for dependent, prerequisite in edge_pairs:
+        if dependent == prerequisite:
+            # schedule_courses() raises here (PlanEdge rejects self-loops);
+            # raise the identical error rather than diverge.
+            PlanEdge(from_node_id=dependent, to_node_id=prerequisite, relation="requires")
+    if _has_requires_cycle(course_by_code, edge_pairs):
+        return None, limitations_by_code
+    failure, term_codes = _pack_terms(
+        courses, course_by_code, edge_pairs, corequisite_pairs,
+        max_terms=max_terms, credit_hour_cap=credit_hour_cap,
+    )
+    if term_codes:
+        # Same unsupported-starting-season error as schedule_courses().
+        _next_long_term(0, starting_season)
+    if failure is not None:
+        return None, limitations_by_code
+    return term_codes, limitations_by_code
+
+
+def _has_requires_cycle(
+    course_by_code: Mapping[str, CourseToSchedule], edge_pairs: list[tuple[str, str]]
+) -> bool:
+    """True exactly when detect_cycles() would report a cycle among these
+    requires edges: a topological sort that cannot consume every course."""
+    in_degree = {code: 0 for code in course_by_code}
+    successors: dict[str, list[str]] = {code: [] for code in course_by_code}
+    for dependent, prerequisite in edge_pairs:
+        successors[prerequisite].append(dependent)
+        in_degree[dependent] += 1
+    stack = [code for code, degree in in_degree.items() if degree == 0]
+    consumed = 0
+    while stack:
+        code = stack.pop()
+        consumed += 1
+        for successor in successors[code]:
+            in_degree[successor] -= 1
+            if in_degree[successor] == 0:
+                stack.append(successor)
+    return consumed != len(in_degree)
+
+
+def _pack_terms(
+    courses: list[CourseToSchedule],
+    course_by_code: Mapping[str, CourseToSchedule],
+    edge_pairs: list[tuple[str, str]],
+    corequisite_pairs: list[tuple[str, str]],
+    *,
+    max_terms: int,
+    credit_hour_cap: float,
+) -> tuple[PlanFailure | None, list[list[str]]]:
+    """The greedy term loop shared by schedule_courses() and place_courses().
+
+    Returns the sorted course codes placed in each term, plus a PlanFailure
+    when the schedule must fail closed (the terms are then not a plan)."""
+
     successors: dict[str, list[str]] = {code: [] for code in course_by_code}
     in_degree: dict[str, int] = {code: 0 for code in course_by_code}
     for dependent, prerequisite in edge_pairs:
@@ -333,28 +456,25 @@ def schedule_courses(
     # trying to fit it.
     for course in courses:
         if course.credit_hours > credit_hour_cap:
-            return ScheduleResult(
-                student_id=student_id,
-                program_id=program_id,
-                status="ERROR",
-                failure=PlanFailure(
-                    error_class="CreditHourCapTooSmall",
-                    safe_message=(
-                        f"{course.course_code} requires {course.credit_hours} credit hours, "
-                        f"exceeding the {credit_hour_cap}-credit-hour term cap on its own."
-                    ),
+            return PlanFailure(
+                error_class="CreditHourCapTooSmall",
+                safe_message=(
+                    f"{course.course_code} requires {course.credit_hours} credit hours, "
+                    f"exceeding the {credit_hour_cap}-credit-hour term cap on its own."
                 ),
-            )
+            ), []
 
     ready = sorted(code for code, degree in in_degree.items() if degree == 0)
     placed: set[str] = set()
-    terms: list[TermPlan] = []
-    year, season = starting_year, starting_season
+    terms: list[list[str]] = []
 
     for _ in range(max_terms):
         if not ready:
             break
         chosen: set[str] = set()
+        # Running credit total of `chosen`. Catalog credit hours are whole
+        # numbers, so this equals re-summing `chosen` each time, exactly.
+        chosen_credits = 0.0
         ready_set = set(ready)
 
         def corequisite_closure(code: str, visiting: set[str] | None = None) -> set[str] | None:
@@ -391,30 +511,15 @@ def schedule_courses(
                 continue
             additional = closure - chosen
             credits = sum(course_by_code[item].credit_hours for item in additional)
-            current_total = sum(course_by_code[item].credit_hours for item in chosen)
-            if current_total + credits <= credit_hour_cap:
+            if chosen_credits + credits <= credit_hour_cap:
                 chosen.update(additional)
+                chosen_credits += credits
 
         term_courses = sorted(chosen)
-        total = sum(course_by_code[code].credit_hours for code in term_courses)
         if not term_courses:
             break
 
-        terms.append(
-            TermPlan(
-                term_key=term_key(year, season),
-                courses=[
-                    ScheduledCourse(
-                        course_code=code,
-                        credit_hours=course_by_code[code].credit_hours,
-                        requirement_group_id=course_by_code[code].requirement_group_id,
-                        limitations=limitations_by_code.get(code, []),
-                    )
-                    for code in term_courses
-                ],
-                total_credit_hours=total,
-            )
-        )
+        terms.append(term_courses)
 
         newly_ready: list[str] = []
         for code in term_courses:
@@ -424,31 +529,18 @@ def schedule_courses(
                     newly_ready.append(successor)
         placed.update(term_courses)
         ready = sorted((ready_set - chosen) | set(newly_ready))
-        year, season = _next_long_term(year, season)
 
     if ready:
         # Every course that will ever become ready given credit_hour_cap
         # has been tried, and courses remain -- genuinely over-constrained
         # for this term horizon, not a bug in the loop above.
-        return ScheduleResult(
-            student_id=student_id,
-            program_id=program_id,
-            status="ERROR",
-            failure=PlanFailure(
-                error_class="OverConstrained",
-                safe_message=(
-                    f"{len(ready)} required course(s) could not be placed within "
-                    f"{max_terms} term(s) at a {credit_hour_cap}-credit-hour cap: "
-                    f"{', '.join(ready)}."
-                ),
+        return PlanFailure(
+            error_class="OverConstrained",
+            safe_message=(
+                f"{len(ready)} required course(s) could not be placed within "
+                f"{max_terms} term(s) at a {credit_hour_cap}-credit-hour cap: "
+                f"{', '.join(ready)}."
             ),
-        )
+        ), terms
 
-    return ScheduleResult(
-        student_id=student_id,
-        program_id=program_id,
-        terms=terms,
-        unscheduled=unscheduled,
-        status="SCHEDULED",
-        failure=None,
-    )
+    return None, terms
