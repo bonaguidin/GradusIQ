@@ -441,6 +441,9 @@ def test_other_unknown_content_types_are_unsupported(content_type):
         ("magic-then-garbage", b"%PDF-1.7\n" + b"\x00\xff\xde\xad" * 50),
         ("not-a-pdf-at-all", b"this is plain text, definitely not a pdf"),
     ],
+    # Explicit ids: the generated PDFs embed a timestamp, so ids built from
+    # the bytes differ between runs (and between pytest-xdist workers).
+    ids=lambda value: value if isinstance(value, str) else "payload",
 )
 def test_corrupt_pdf_returns_extraction_failed_without_raising(label, payload):
     result = extract_transcript_text(payload, PDF)
@@ -457,6 +460,7 @@ def test_corrupt_pdf_returns_extraction_failed_without_raising(label, payload):
         ("zip-but-not-docx", b"PK\x03\x04" + b"\x00" * 100),
         ("random-bytes", bytes(range(256))),
     ],
+    ids=lambda value: value if isinstance(value, str) else "payload",
 )
 def test_corrupt_docx_returns_extraction_failed_without_raising(label, payload):
     result = extract_transcript_text(payload, DOCX)

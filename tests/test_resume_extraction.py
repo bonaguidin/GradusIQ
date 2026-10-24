@@ -364,6 +364,9 @@ def test_content_type_parameters_and_case_are_tolerated():
         ("not-a-pdf-at-all", b"this is plain text, definitely not a pdf"),
         ("encrypted", _encrypted_pdf()),
     ],
+    # Explicit ids: the generated PDFs embed a timestamp, so ids built from
+    # the bytes differ between runs (and between pytest-xdist workers).
+    ids=lambda value: value if isinstance(value, str) else "payload",
 )
 def test_corrupt_pdf_returns_extraction_failed_without_raising(label, payload):
     result = extract_resume_text(payload, PDF)
@@ -380,6 +383,7 @@ def test_corrupt_pdf_returns_extraction_failed_without_raising(label, payload):
         ("zip-but-not-docx", b"PK\x03\x04" + b"\x00" * 100),
         ("random-bytes", bytes(range(256))),
     ],
+    ids=lambda value: value if isinstance(value, str) else "payload",
 )
 def test_corrupt_docx_returns_extraction_failed_without_raising(label, payload):
     result = extract_resume_text(payload, DOCX)

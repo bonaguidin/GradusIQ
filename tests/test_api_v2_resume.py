@@ -415,6 +415,9 @@ def test_docx_upload_also_writes_rows(client, db, monkeypatch):
         ("unsupported type", b"hello there", "notes.txt", "text/plain", 415),
         ("corrupt pdf", b"%PDF-1.7\n" + b"\xde\xad\xbe\xef" * 20, "broken.pdf", PDF, 422),
     ],
+    # Explicit ids: the generated PDF embeds a timestamp, so ids built from
+    # the bytes differ between runs (and between pytest-xdist workers).
+    ids=lambda value: value if isinstance(value, (str, int)) else "content",
 )
 def test_extraction_failure_never_reaches_the_model(
     label, content, filename, content_type, expected_status, client, db, monkeypatch
