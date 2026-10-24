@@ -15,8 +15,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from GradusIQ_career import api
+from GradusIQ_career.ai import chat_tools
 from GradusIQ_career.ai.errors import AIRequestError
-from GradusIQ_career.ai.types import AIResponse
+from GradusIQ_career.ai.types import AIMessageResponse, AIResponse
 from GradusIQ_career.student_intelligence_profile import StudentIntelligenceProfile
 from GradusIQ_career.supabase_client import SupabaseConfigError
 
@@ -117,7 +118,17 @@ SHIFT_JSON = json.dumps(
 )
 
 
-class FakeAI:
+class ToolLoopCompat:
+    """Authenticated chat offers lookup tools, so the runtime calls
+    complete_message_with_metadata; these fakes answer it with plain text."""
+
+    def complete_message_with_metadata(self, **kwargs):
+        kwargs.pop("extra_body", None)
+        response = self.complete(**kwargs)
+        return AIMessageResponse(message={"role": "assistant", "content": response.text}, model=response.model)
+
+
+class FakeAI(ToolLoopCompat):
     def __init__(self, text=None):
         self.text = text
         self.calls = []
@@ -829,7 +840,7 @@ def test_me_chat_retries_inside_concurrency_slot_and_releases(client, monkeypatc
     client.app.state.ai_concurrency = gate
     attempts = 0
 
-    class RetryingAI:
+    class RetryingAI(ToolLoopCompat):
         def complete(self, **kwargs):
             nonlocal attempts
             attempts += 1
@@ -867,7 +878,7 @@ def test_me_chat_releases_concurrency_slot_after_retry_exhaustion(client, monkey
     gate = TrackingGate()
     client.app.state.ai_concurrency = gate
 
-    class FailingAI:
+    class FailingAI(ToolLoopCompat):
         def complete(self, **kwargs):
             assert gate.active is True
             raise AIRequestError("temporary", transient=True)
@@ -1837,3 +1848,214 @@ def test_me_chat_never_offers_to_remember_without_the_table(client, monkeypatch)
     assert response.json()["reply"] == "Noted."
     assert "remember" not in response.json()
     assert "<MEMORY>" not in fake.calls[0]["messages"][0]["content"]
+
+
+class ToolCallingAI:
+    """Asks for one lookup on the first call, then answers with what it got."""
+
+    def __init__(self, name, arguments, answer="Your exam is on Dec 9."):
+        self.name, self.arguments, self.answer = name, arguments, answer
+        self.calls = []
+
+    def complete_message_with_metadata(self, **kwargs):
+        self.calls.append({**kwargs, "messages": list(kwargs["messages"])})
+        if len(self.calls) == 1:
+            call = {"id": "call-1", "type": "function",
+                    "function": {"name": self.name, "arguments": json.dumps(self.arguments)}}
+            return AIMessageResponse(message={"role": "assistant", "content": "", "tool_calls": [call]}, model="fake-model")
+        return AIMessageResponse(message={"role": "assistant", "content": self.answer}, model="fake-model")
+
+
+def test_me_chat_runs_a_lookup_and_names_it(client, monkeypatch):
+    _patch_session(monkeypatch, profile=_full_profile())
+    events = [
+        {"title": "Final exam", "kind": "event", "starts_at": "2026-12-09T15:00:00Z", "likely_exam": True},
+        {"title": "Quiz 3", "kind": "assignment", "starts_at": "2026-10-30T23:59:00Z"},
+    ]
+    monkeypatch.setattr(api.calendar_feed, "load_feed_row", lambda client, sid: {"events": events})
+    fake = ToolCallingAI("get_deadlines", {"start_date": "2026-12-01", "end_date": "2026-12-20"})
+    monkeypatch.setattr(api, "build_client", lambda: fake)
+
+    response = _call(client, "post", "/api/v2/student/me/chat", {"message": "When is my final?", "history": []})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["reply"] == "Your exam is on Dec 9."
+    assert body["lookups"] == ["your Canvas calendar"]
+    first, second = fake.calls
+    assert {tool["function"]["name"] for tool in first["extra_body"]["tools"]} >= {"get_deadlines", "get_degree_plan"}
+    assert "<LOOKUPS>" in first["messages"][0]["content"]
+    tool_message = second["messages"][-1]
+    assert tool_message["role"] == "tool" and tool_message["tool_call_id"] == "call-1"
+    result = json.loads(tool_message["content"])
+    assert [event["title"] for event in result["events"]] == ["Final exam"]
+
+
+def test_me_chat_lookup_failure_still_answers(client, monkeypatch):
+    _patch_session(monkeypatch, profile=_full_profile())
+
+    def broken(client, sid):
+        raise RuntimeError("supabase down")
+
+    monkeypatch.setattr(api.calendar_feed, "load_feed_row", broken)
+    fake = ToolCallingAI("get_deadlines", {"start_date": "2026-12-01", "end_date": "2026-12-20"}, "I could not check.")
+    monkeypatch.setattr(api, "build_client", lambda: fake)
+
+    response = _call(client, "post", "/api/v2/student/me/chat", {"message": "When is my final?", "history": []})
+
+    assert response.status_code == 200
+    assert response.json()["reply"] == "I could not check."
+    assert json.loads(fake.calls[1]["messages"][-1]["content"]) == {"error": "This lookup is unavailable right now."}
+
+
+def test_me_chat_rejects_unknown_lookups_and_bad_arguments(client, monkeypatch):
+    _patch_session(monkeypatch, profile=_full_profile())
+    for name, arguments, expected in [
+        ("delete_account", {}, "Unknown lookup 'delete_account'."),
+        ("get_deadlines", {"start_date": "2026-12-01"}, "Those arguments do not match this lookup."),
+        ("search_courses", {"query": ["CS"]}, "Lookup arguments must be text."),
+    ]:
+        fake = ToolCallingAI(name, arguments, "ok")
+        monkeypatch.setattr(api, "build_client", lambda: fake)
+        response = _call(client, "post", "/api/v2/student/me/chat", {"message": "hi", "history": []})
+        assert response.status_code == 200
+        assert json.loads(fake.calls[1]["messages"][-1]["content"]) == {"error": expected}
+        assert "lookups" not in response.json()
+
+
+def test_demo_chat_offers_no_lookups(client, monkeypatch):
+    profile = _full_profile()
+    monkeypatch.setattr(api, "load_profile_for_slug", lambda request, slug: profile)
+    fake = FakeAI("demo reply")
+    monkeypatch.setattr(api, "build_client", lambda: fake)
+
+    response = client.post("/api/students/jordanReyes/chat", json={"message": "hi", "history": []})
+
+    assert response.status_code == 200
+    assert all("tools" not in (call.get("extra_body") or {}) for call in fake.calls)
+    assert "<LOOKUPS>" not in fake.calls[0]["messages"][0]["content"]
+
+
+def _lookups(canonical=None):
+    canonical = canonical or SimpleNamespace(career=SimpleNamespace(target_roles=["Data Analyst"]))
+    return api._ChatLookups(request=None, client=object(), student_id=STUDENT_UUID, canonical=canonical)
+
+
+def test_lookup_degree_plan_shapes_the_schedule(monkeypatch):
+    from GradusIQ_career.course_discovery.scheduler import ScheduleResult
+
+    schedule = ScheduleResult(
+        student_id=STUDENT_UUID, program_id="p",
+        terms=[{"term_key": "2027-Spring", "total_credit_hours": 3.0, "courses": [
+            {"course_code": "CS 3353", "credit_hours": 3.0, "requirement_group_id": "g1"}]}],
+        unscheduled=[{"requirement_group_id": "g9", "name": "Free electives", "reason": "FREEFORM_MANUAL_REVIEW"}],
+    )
+    state = SimpleNamespace(
+        academic_schedule=schedule,
+        base_courses=[SimpleNamespace(requirement_group_id="g1", requirement_group_name="Core CS")],
+        academic_selection=SimpleNamespace(decisions=[
+            SimpleNamespace(requirement_group_id="g2", requirement_name="Science elective", state="CHOICE_REQUIRED"),
+            SimpleNamespace(requirement_group_id="g3", requirement_name="Done", state="LOCKED"),
+        ]),
+        catalog_by_code={"CS 3353": SimpleNamespace(title="Data Structures")},
+    )
+    monkeypatch.setattr(api, "_reconstruct_academic_schedule", lambda request: state)
+    monkeypatch.setattr(api, "_resolve_decision_term_keys", lambda s: {"g2": "2027-Fall"})
+    lookups = _lookups()
+
+    result = json.loads(lookups.run("get_degree_plan", {}))
+
+    assert result == {
+        "terms": [{"term": "2027-Spring", "credits": 3.0, "courses": [
+            {"course": "CS 3353", "title": "Data Structures", "credits": 3.0, "requirement": "Core CS"}]}],
+        "choices_to_make": [{"requirement": "Science elective", "term": "2027-Fall"}],
+        "not_placed": [{"requirement": "Free electives", "reason": "FREEFORM_MANUAL_REVIEW"}],
+    }
+    assert lookups.used == ["get_degree_plan"]
+
+
+def test_lookup_degree_plan_without_program_data_is_an_error(monkeypatch):
+    monkeypatch.setattr(api, "_reconstruct_academic_schedule", lambda request: api._no_program_result())
+    lookups = _lookups()
+
+    result = json.loads(lookups.run("get_degree_plan", {}))
+
+    assert "error" in result and lookups.used == []
+
+
+def test_lookup_course_search_uses_the_home_catalog(monkeypatch):
+    from GradusIQ_career.planning.search import CatalogResult
+
+    seen = {}
+    monkeypatch.setattr(api, "_home_institution_id", lambda client, sid: "inst-1")
+
+    def fake_search(client, institution_id, query, limit):
+        seen.update(institution_id=institution_id, query=query, limit=limit)
+        return [CatalogResult(id="1", code="STAT 2331", title="Statistics", department=None,
+                              course_level=2000, credit_min=3, credit_max=3)]
+
+    monkeypatch.setattr(api, "search_catalog", fake_search)
+
+    result = json.loads(_lookups().run("search_courses", {"query": "stat"}))
+
+    assert result == {"query": "stat", "results": [{"course": "STAT 2331", "title": "Statistics", "credits": 3}]}
+    assert seen == {"institution_id": "inst-1", "query": "stat", "limit": chat_tools.MAX_CATALOG_RESULTS}
+
+
+def test_lookup_jobs_filters_employer_and_location(monkeypatch):
+    seen = {}
+
+    def fake_feed(client, **kwargs):
+        seen.update(kwargs)
+        return {"total": 2, "facets": {"families": [{"family": "Data Analyst"}]}, "postings": [
+            {"title": "Data Intern", "employer": "Acme Corp", "locations": ["Dallas, TX"], "url": "https://a.example/1"},
+            {"title": "Data Intern", "employer": "Beta", "locations": ["Dallas, TX"]},
+        ]}
+
+    monkeypatch.setattr(api, "build_service_client", lambda: object())
+    monkeypatch.setattr(api, "get_job_search_feed", fake_feed)
+
+    result = json.loads(_lookups().run("search_jobs", {"employer": "acme", "location": "Dallas"}))
+
+    assert [p["employer"] for p in result["postings"]] == ["Acme Corp"]
+    assert seen["target_role_families"] == ["Data Analyst"] and seen["families"] is None
+
+    empty = json.loads(_lookups().run("search_jobs", {"location": "Tokyo"}))
+    assert empty["postings"] == [] and empty["families_available"] == ["Data Analyst"]
+
+    no_roles = _lookups(SimpleNamespace(career=SimpleNamespace(target_roles=[])))
+    assert "error" in json.loads(no_roles.run("search_jobs", {}))
+
+
+def test_lookup_grade_needed_uses_saved_scores(monkeypatch):
+    cards = [{"id": "p1", "course_code": "CS 3353", "course_title": "Data Structures", "calculator_ready": True,
+              "current_grade": 85.0, "current_letter_grade": "B", "components": []}]
+    monkeypatch.setattr(api, "_syllabus_list_items", lambda client, sid: cards)
+    monkeypatch.setattr(api.syllabus_service, "get_syllabus_grade_profile",
+                        lambda client, profile_id, student_id: {"current_revision": {"id": "r"}})
+    monkeypatch.setattr(api.syllabus_store, "get_grade_state", lambda client, profile_id, student_id: {"saved": True})
+    monkeypatch.setattr(api.syllabus_read, "grade_state_from_row", lambda row: "SAVED-STATE")
+    monkeypatch.setattr(api.syllabus_read, "reconciliation_result_from_row", lambda revision, confirmed: "MODEL")
+    seen = {}
+
+    def fake_solve(reconciliation, grade_state, *, target_component, target_letter):
+        seen.update(reconciliation=reconciliation, grade_state=grade_state,
+                    target_component=target_component, target_letter=target_letter)
+        return SimpleNamespace(model_dump=lambda mode: {
+            "target_component": "Final Exam", "target_label": "A", "required_score": 91.25,
+            "feasible": True, "already_achieved": False, "warnings": []})
+
+    monkeypatch.setattr(api, "solve_required_score", fake_solve)
+    lookups = _lookups()
+
+    grades = json.loads(lookups.run("get_course_grades", {}))
+    needed = json.loads(lookups.run("solve_grade_needed",
+                                    {"course": "data structures", "component": "Final Exam", "target_letter": " A "}))
+
+    assert grades["courses"][0]["course"] == "CS 3353"
+    assert needed == {"component": "Final Exam", "target": "A", "feasible": True, "required_score_percent": 91.2}
+    assert seen == {"reconciliation": "MODEL", "grade_state": "SAVED-STATE",
+                    "target_component": "Final Exam", "target_letter": "A"}
+    assert lookups.used == ["get_course_grades", "solve_grade_needed"]
+    missing = json.loads(lookups.run("solve_grade_needed", {"course": "BIO", "component": "x", "target_letter": "A"}))
+    assert missing == {"error": "No Grade Calculator course matches 'BIO'."}

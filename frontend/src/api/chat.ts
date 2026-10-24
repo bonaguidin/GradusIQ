@@ -12,12 +12,15 @@ export interface ChatMessage {
   remember?: string;
   /** What the student did with that offer. */
   rememberState?: 'saved' | 'dismissed';
+  /** What the assistant looked up for this reply, e.g. "your degree plan". */
+  lookups?: string[];
 }
 
 export interface ChatReply {
   reply: string;
   actions: string[];
   remember: string | null;
+  lookups: string[];
 }
 
 export async function sendChat(
@@ -57,10 +60,14 @@ export async function sendChat(
     throw new Error(detail);
   }
 
-  const data = (await response.json()) as { reply?: string; actions?: unknown; remember?: unknown };
-  const actions = Array.isArray(data.actions)
-    ? data.actions.filter((a): a is string => typeof a === 'string')
-    : [];
+  const data = (await response.json()) as {
+    reply?: string;
+    actions?: unknown;
+    remember?: unknown;
+    lookups?: unknown;
+  };
+  const strings = (value: unknown) =>
+    Array.isArray(value) ? value.filter((a): a is string => typeof a === 'string') : [];
   const remember = typeof data.remember === 'string' && data.remember.trim() ? data.remember.trim() : null;
-  return { reply: data.reply ?? '', actions, remember };
+  return { reply: data.reply ?? '', actions: strings(data.actions), remember, lookups: strings(data.lookups) };
 }

@@ -133,6 +133,9 @@ export function ChatPanel({ autoFocus = false, variant = 'inline', onClose }: Ch
             <div className="chat-msg-body">
               {m.role === 'assistant' ? <ChatMarkdown text={m.content} /> : m.content}
             </div>
+            {m.role === 'assistant' && m.lookups && m.lookups.length > 0 && (
+              <p className="chat-lookups">Checked {m.lookups.join(', ')}</p>
+            )}
             {m.role === 'assistant' && m.remember && memoryToken && m.rememberState !== 'dismissed' && (
               <RememberOffer
                 note={m.remember}

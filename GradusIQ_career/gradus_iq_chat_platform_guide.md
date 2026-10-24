@@ -55,6 +55,11 @@ tell them where to do it.
 - Profile details: when an analysis is missing something (graduation date,
   majors, target roles and similar), GradusIQ asks for it on a short "complete
   your profile" step. These details can be changed later in Career Profile.
+- Assistant lookups: when a question needs it, the assistant can check the
+  student's degree plan, search the course catalog, read Canvas due dates
+  further ahead, look at job postings, and read Grade Calculator grades
+  (including the score needed on a remaining assignment). It only reads; it
+  cannot change anything. A reply that used a lookup says "Checked ..." under it.
 - Assistant memory: the assistant can offer to remember a lasting fact a
   student mentions (a goal or preference). Nothing is saved unless the student
   taps Remember. Saved notes are listed under "What GradusIQ remembers" in

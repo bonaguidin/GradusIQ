@@ -515,6 +515,15 @@ body:has(.rv-commit) .assistant-launcher {
   }
 }
 
+/* What the assistant looked up for a reply (ai/chat_tools.py), so the
+   student can tell an answer from their live data apart from one from memory. */
+.chat-lookups {
+  margin: 4px 0 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
 /* ---------------------------------------------------------------------------
    "Remember this?" under a reply (ai/chat_memory.py). Quiet and inline: the
    student decides, and nothing is saved until they press Remember.
