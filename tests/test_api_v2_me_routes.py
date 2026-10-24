@@ -710,6 +710,18 @@ def test_me_chat_passes_the_open_page_to_the_model(client, monkeypatch):
     assert "Career Intelligence (FIT/GAP/SHIFT) page open" in fake.calls[0]["messages"][0]["content"]
 
 
+def test_me_chat_returns_action_buttons_separately(client, monkeypatch):
+    _patch_session(monkeypatch, profile=_full_profile())
+    monkeypatch.setattr(api, "_gather_chat_context", lambda client, sid, canonical: {})
+    monkeypatch.setattr(api, "build_client", lambda: FakeAI("Your GPA is 3.4.\nACTIONS: gpa-calculator, made-up"))
+
+    response = _call(client, "post", "/api/v2/student/me/chat", {"message": "gpa?", "history": []})
+
+    assert response.status_code == 200
+    assert response.json()["reply"] == "Your GPA is 3.4."
+    assert response.json()["actions"] == ["gpa-calculator"]
+
+
 def test_me_chat_requires_a_message(client, monkeypatch):
     _patch_session(monkeypatch, profile=_full_profile())
     monkeypatch.setattr(api, "build_client", lambda: pytest.fail("must not reach the AI client"))

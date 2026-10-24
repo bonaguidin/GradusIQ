@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useAuth } from '../auth/useAuth';
 import { useChat, useChatPage } from '../chat/ChatContext';
+import { useChatAction } from '../chat/useChatAction';
+import { CHAT_ACTIONS, usableActions } from '../lib/chatActions.mjs';
 import { chatSuggestions } from '../lib/chatPage.mjs';
 import { ChatMarkdown } from './ChatMarkdown';
 import './ChatPanel.css';
@@ -18,7 +20,8 @@ interface ChatPanelProps {
 }
 
 export function ChatPanel({ autoFocus = false, variant = 'inline', onClose }: ChatPanelProps = {}) {
-  const { profile, studentAccount } = useAuth();
+  const { profile, slug, studentAccount } = useAuth();
+  const runAction = useChatAction();
   const { messages, sending, error, canSend, send, reset } = useChat();
   const page = useChatPage();
   const suggestions = chatSuggestions(page);
@@ -127,6 +130,9 @@ export function ChatPanel({ autoFocus = false, variant = 'inline', onClose }: Ch
             <div className="chat-msg-body">
               {m.role === 'assistant' ? <ChatMarkdown text={m.content} /> : m.content}
             </div>
+            {m.role === 'assistant' && (
+              <ChatActions ids={usableActions(m.actions, { demo: Boolean(slug) })} onRun={runAction} />
+            )}
           </div>
         ))}
 
@@ -191,5 +197,22 @@ export function ChatPanel({ autoFocus = false, variant = 'inline', onClose }: Ch
         </button>
       </form>
     </section>
+  );
+}
+
+/** The buttons under one assistant reply (lib/chatActions.mjs). */
+function ChatActions({ ids, onRun }: { ids: string[]; onRun(id: string): void }) {
+  if (ids.length === 0) return null;
+  return (
+    <div className="chat-actions">
+      {ids.map((id) => (
+        <button key={id} type="button" className="btn btn-secondary btn-sm chat-action" onClick={() => onRun(id)}>
+          <span>{CHAT_ACTIONS[id].label}</span>
+          <svg className="chat-action-arrow" aria-hidden="true" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 8h10M9 4l4 4-4 4" />
+          </svg>
+        </button>
+      ))}
+    </div>
   );
 }

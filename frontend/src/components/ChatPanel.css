@@ -477,3 +477,40 @@ body:has(.rv-commit) .assistant-launcher {
     transform: none;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Action buttons under an assistant reply (lib/chatActions.mjs): each opens
+   the page the answer points to, and the chat stays open beside it.
+   --------------------------------------------------------------------------- */
+
+.chat-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin-top: var(--sp-1);
+  /* Room for the buttons' border at the bottom of the scrolling list. */
+  padding-bottom: 2px;
+}
+
+.chat-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chat-action-arrow {
+  flex-shrink: 0;
+  transition: transform var(--t-quick) var(--ease-out);
+}
+
+.chat-action:hover .chat-action-arrow {
+  transform: translateX(2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-action-arrow,
+  .chat-action:hover .chat-action-arrow {
+    transition: none;
+    transform: none;
+  }
+}
