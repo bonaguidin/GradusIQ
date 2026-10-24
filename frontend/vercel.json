@@ -149,6 +149,14 @@
       "destination": "/api/proxy?target=me-planned-courses"
     },
     {
+      "source": "/api/v2/student/me/memory/:id",
+      "destination": "/api/proxy?target=me-memory-note&id=:id"
+    },
+    {
+      "source": "/api/v2/student/me/memory",
+      "destination": "/api/proxy?target=me-memory"
+    },
+    {
       "source": "/api/v2/student/me/canvas-calendar/refresh",
       "destination": "/api/proxy?target=me-canvas-calendar-refresh"
     },

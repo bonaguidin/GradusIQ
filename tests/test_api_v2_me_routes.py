@@ -1750,3 +1750,90 @@ def test_job_search_dedupes_by_posting_identity(client, monkeypatch):
     body = response.json()
     assert body["total"] == 1
     assert sorted(body["postings"][0]["locations"]) == ["Dallas, TX", "Plano, TX"]
+
+
+# ── assistant memory notes ───────────────────────────────────────────────────
+
+
+def test_me_memory_reports_unavailable_before_the_migration(client, monkeypatch):
+    _patch_session(monkeypatch)
+
+    def missing(*a, **k):
+        raise api.chat_memory.MemoryUnavailable
+
+    monkeypatch.setattr(api.chat_memory, "list_notes", missing)
+    response = _call(client, "get", "/api/v2/student/me/memory", None)
+    assert response.status_code == 200
+    assert response.json() == {"available": False, "notes": [], "max_notes": 20}
+
+    saved = _call(client, "post", "/api/v2/student/me/memory", {"note": "Wants remote roles"})
+    assert saved.status_code == 503
+
+
+def test_me_memory_saves_cleans_dedupes_and_caps(client, monkeypatch):
+    _patch_session(monkeypatch)
+    store = []
+    monkeypatch.setattr(api.chat_memory, "list_notes", lambda client, sid: list(store))
+
+    def add(client, sid, note):
+        row = {"id": f"id-{len(store)}", "note": note}
+        store.append(row)
+        return row
+
+    monkeypatch.setattr(api.chat_memory, "add_note", add)
+
+    first = _call(client, "post", "/api/v2/student/me/memory", {"note": '  "Wants\n remote roles" '})
+    assert first.status_code == 200 and first.json()["note"]["note"] == "Wants remote roles"
+    again = _call(client, "post", "/api/v2/student/me/memory", {"note": "wants remote ROLES"})
+    assert again.status_code == 200 and len(store) == 1
+
+    assert _call(client, "post", "/api/v2/student/me/memory", {"note": "   "}).status_code == 422
+    assert _call(client, "post", "/api/v2/student/me/memory", {"note": "x" * 201}).status_code == 422
+
+    store.extend({"id": f"f{i}", "note": f"n{i}"} for i in range(19))
+    full = _call(client, "post", "/api/v2/student/me/memory", {"note": "One more"})
+    assert full.status_code == 409
+
+
+def test_me_memory_delete_needs_a_uuid(client, monkeypatch):
+    _patch_session(monkeypatch)
+    deleted = []
+    monkeypatch.setattr(api.chat_memory, "delete_note", lambda client, sid, nid: deleted.append((sid, nid)))
+    note_id = "11111111-2222-3333-4444-555555555555"
+    assert _call(client, "delete", f"/api/v2/student/me/memory/{note_id}", None).status_code == 200
+    assert deleted == [(str(STUDENT_UUID), note_id)]
+    assert _call(client, "delete", "/api/v2/student/me/memory/not-a-uuid", None).status_code == 422
+
+
+def test_me_chat_sends_notes_and_offers_to_remember(client, monkeypatch):
+    _patch_session(monkeypatch, profile=_full_profile())
+    monkeypatch.setattr(api, "_gather_chat_context", lambda client, sid, canonical: {})
+    monkeypatch.setattr(api.chat_memory, "list_notes", lambda client, sid: [{"note": "Prefers mornings"}])
+    fake = FakeAI("Remote roles are common in your field.\nREMEMBER: Aiming for remote roles")
+    monkeypatch.setattr(api, "build_client", lambda: fake)
+
+    response = _call(client, "post", "/api/v2/student/me/chat", {"message": "I want remote work", "history": []})
+
+    assert response.status_code == 200
+    assert response.json()["reply"] == "Remote roles are common in your field."
+    assert response.json()["remember"] == "Aiming for remote roles"
+    system = fake.calls[0]["messages"][0]["content"]
+    assert "Prefers mornings" in system and "<MEMORY>" in system
+
+
+def test_me_chat_never_offers_to_remember_without_the_table(client, monkeypatch):
+    _patch_session(monkeypatch, profile=_full_profile())
+    monkeypatch.setattr(api, "_gather_chat_context", lambda client, sid, canonical: {})
+
+    def missing(*a, **k):
+        raise api.chat_memory.MemoryUnavailable
+
+    monkeypatch.setattr(api.chat_memory, "list_notes", missing)
+    fake = FakeAI("Noted.\nREMEMBER: Aiming for remote roles")
+    monkeypatch.setattr(api, "build_client", lambda: fake)
+
+    response = _call(client, "post", "/api/v2/student/me/chat", {"message": "I want remote work", "history": []})
+
+    assert response.json()["reply"] == "Noted."
+    assert "remember" not in response.json()
+    assert "<MEMORY>" not in fake.calls[0]["messages"][0]["content"]

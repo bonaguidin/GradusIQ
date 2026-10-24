@@ -60,17 +60,32 @@ def action_instructions(allowed: tuple[str, ...]) -> str:
     )
 
 
-def split_actions(text: str, allowed: tuple[str, ...]) -> tuple[str, list[str]]:
-    """Strip trailing ACTIONS lines from a reply; return (reply, known ids)."""
+# A trailing "REMEMBER: <fact>" line: the assistant proposing a memory note
+# (ai/chat_memory.py). Same wrapper tolerance as the ACTIONS line.
+_REMEMBER_LINE = re.compile(r"^[\s*_`\[(]*remember\s*[:\-][\s*_`]*(.*?)[\s*_`\])]*$", re.IGNORECASE)
+
+
+def split_reply(text: str, allowed: tuple[str, ...]) -> tuple[str, list[str], str | None]:
+    """Strip the trailing ACTIONS and REMEMBER lines from a reply.
+
+    Returns (reply, known action ids, proposed memory note or None). The
+    lines may come in either order; anything above them is the reply.
+    """
     lines = text.rstrip().split("\n")
     found: list[str] = []
+    remember: str | None = None
     while lines:
-        match = _ACTIONS_LINE.match(lines[-1].strip())
-        if not match:
+        last = lines[-1].strip()
+        actions_match = _ACTIONS_LINE.match(last)
+        remember_match = None if actions_match else _REMEMBER_LINE.match(last)
+        if not (actions_match or remember_match):
             break
         lines.pop()
-        # Earlier lines come first in the reply, so prepend.
-        found = _ID.findall(match.group(1).lower()) + found
+        if actions_match:
+            # Earlier lines come first in the reply, so prepend.
+            found = _ID.findall(actions_match.group(1).lower()) + found
+        elif remember is None:
+            remember = remember_match.group(1).strip() or None
         while lines and not lines[-1].strip():
             lines.pop()
     reply = "\n".join(lines).strip()
@@ -79,7 +94,13 @@ def split_actions(text: str, allowed: tuple[str, ...]) -> tuple[str, list[str]]:
     for key in found:
         if key in allowed_set and key not in actions:
             actions.append(key)
+    actions = actions[:MAX_ACTIONS]
     if not reply:
-        # The model wrote only the ACTIONS line.
-        return ("This page can help." if actions else text.strip()), actions[:MAX_ACTIONS]
-    return reply, actions[:MAX_ACTIONS]
+        # The model wrote only the trailing lines.
+        if actions:
+            reply = "This page can help."
+        elif remember:
+            reply = "Got it."
+        else:
+            reply = text.strip()
+    return reply, actions, remember

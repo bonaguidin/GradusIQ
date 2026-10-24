@@ -37,7 +37,7 @@ from GradusIQ_career.ai.errors import AIConfigError, AIRequestError, AIResponseP
 from GradusIQ_career.ai.context import AgentContext, GroundingMetadata
 from GradusIQ_career import analysis_freshness
 from GradusIQ_career.ai import chat_context
-from GradusIQ_career.ai import chat_actions
+from GradusIQ_career.ai import chat_actions, chat_memory
 from GradusIQ_career.ai.contracts import ChatOutput, feature_output_is_valid
 from GradusIQ_career.ai.runtime import AIRuntime
 from GradusIQ_career.ai.model_config import (
@@ -875,7 +875,7 @@ def canonical_chat_projection(profile) -> dict:
 
 
 def build_canonical_chat_messages(
-    profile, body: ChatRequest, context: dict | None = None
+    profile, body: ChatRequest, context: dict | None = None, *, memory_enabled: bool = False
 ) -> list[dict]:
     """System prompt + bounded history for the authenticated chat.
 
@@ -900,6 +900,10 @@ def build_canonical_chat_messages(
         f"<GRADUSIQ_APP_GUIDE>\n{chat_context.platform_guide()}\n</GRADUSIQ_APP_GUIDE>\n\n"
         f"{chat_actions.action_instructions(chat_actions.ACCOUNT_ACTIONS)}\n\n"
     )
+    if memory_enabled:
+        # Only once the notes table exists: a "Remember this?" card the
+        # student could not save would be worse than none.
+        system += f"{chat_memory.memory_instructions()}\n\n"
     if context:
         system += (
             f"<STUDENT_CONTEXT_DATA>\n{json.dumps(context, sort_keys=True)}\n"
@@ -992,8 +996,20 @@ def _gather_chat_context(client, student_id: str, canonical, now: datetime | Non
     return context
 
 
+def _load_memory_notes(client, student_id: str) -> list[str] | None:
+    """Saved memory notes for the chat prompt; None when memory is off
+    (table not created yet, or it could not be read this turn)."""
+    try:
+        return [row["note"] for row in chat_memory.list_notes(client, student_id) if row.get("note")]
+    except chat_memory.MemoryUnavailable:
+        return None
+    except Exception:  # noqa: BLE001 -- optional grounding
+        logger.warning("chat context: could not load memory notes", exc_info=True)
+        return None
+
+
 def _complete_authenticated_chat(
-    canonical, body: ChatRequest, student_context: dict | None = None
+    canonical, body: ChatRequest, student_context: dict | None = None, *, memory_enabled: bool = False
 ) -> dict:
     sent_history_count = sum(
         bool(turn.content.strip()) for turn in body.history[-MAX_CHAT_HISTORY:]
@@ -1004,7 +1020,7 @@ def _complete_authenticated_chat(
         canonical_profile=canonical,
         model_role="chat",
         prompt_name="chat",
-        prompt_version="1.2",
+        prompt_version="1.3",
         grounding=GroundingMetadata(
             source_types=("canonical_student_profile", "student_context", "browser_history"),
             trust_level="untrusted_external",
@@ -1016,7 +1032,9 @@ def _complete_authenticated_chat(
     )
     result = AIRuntime(build_client()).invoke_text(
         context=context,
-        messages=build_canonical_chat_messages(canonical, body, student_context),
+        messages=build_canonical_chat_messages(
+            canonical, body, student_context, memory_enabled=memory_enabled
+        ),
         output_model=ChatOutput,
     )
     # Token counts per turn, so a per-student message cap can be set from
@@ -1031,8 +1049,16 @@ def _complete_authenticated_chat(
     )
     if result.output is None:
         raise HTTPException(status_code=502, detail="Chat service is unavailable.")
-    reply, actions = chat_actions.split_actions(result.output.content, chat_actions.ACCOUNT_ACTIONS)
-    return {"reply": reply, "actions": actions, "model": result.trace.resolved_model}
+    reply, actions, remember = chat_actions.split_reply(result.output.content, chat_actions.ACCOUNT_ACTIONS)
+    response = {"reply": reply, "actions": actions, "model": result.trace.resolved_model}
+    proposal = (
+        chat_memory.clean_proposal(remember, (student_context or {}).get("remembered_notes", ()))
+        if memory_enabled
+        else None
+    )
+    if proposal:
+        response["remember"] = proposal
+    return response
 
 
 def _complete_chat(messages: list[dict]) -> dict:
@@ -1058,7 +1084,9 @@ def _complete_chat(messages: list[dict]) -> dict:
         raise
     except Exception as exc:  # noqa: BLE001 — surface any live failure uniformly
         raise HTTPException(status_code=502, detail="Chat service is unavailable.") from exc
-    reply, actions = chat_actions.split_actions(response.text or "", chat_actions.DEMO_ACTIONS)
+    # Demo personas have nowhere to save a memory note, so a REMEMBER line
+    # the model writes anyway is stripped and dropped.
+    reply, actions, _ = chat_actions.split_reply(response.text or "", chat_actions.DEMO_ACTIONS)
     return {"reply": reply, "actions": actions, "model": response.model}
 
 
@@ -1825,9 +1853,14 @@ def chat_me(request: Request, body: ChatRequest) -> dict:
     # server-side memory: the browser-provided bounded history is the only
     # conversation state.
     context = _gather_chat_context(client, str(student_id), canonical)
+    # Notes the student chose to have remembered (ai/chat_memory.py); None
+    # until the notes table exists, which also turns off "Remember this?".
+    notes = _load_memory_notes(client, str(student_id))
+    if notes:
+        context["remembered_notes"] = notes
     try:
         with request.app.state.ai_concurrency.slot():
-            return _complete_authenticated_chat(canonical, body, context)
+            return _complete_authenticated_chat(canonical, body, context, memory_enabled=notes is not None)
     except HTTPException:
         raise
     except Exception as exc:
@@ -4431,6 +4464,86 @@ def get_me_technical_elective_candidates(request: Request) -> dict:
 # The one Canvas source that needs no school approval: the student's own iCal
 # feed URL. See GradusIQ_career/canvas/calendar_feed.py. The feed URL is a
 # secret and is never echoed back -- responses carry only the host.
+
+
+# ── Assistant memory notes (ai/chat_memory.py) ──────────────────────────────
+
+
+class MemoryNoteRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    note: str
+
+
+MEMORY_UNAVAILABLE_DETAIL = "Memory isn't switched on yet. Your chat still works without it."
+
+
+@router.get(
+    "/api/v2/student/me/memory",
+    dependencies=[Depends(authorize_proxy_request)],
+)
+def get_me_memory(request: Request) -> dict:
+    """The student's saved notes. `available` is false until the table exists,
+    so the app can hide the feature instead of showing an error."""
+    client = _session_client(request)
+    student_id = _resolve_session_student_id(client)
+    try:
+        rows = chat_memory.list_notes(client, str(student_id))
+    except chat_memory.MemoryUnavailable:
+        return {"available": False, "notes": [], "max_notes": chat_memory.MAX_NOTES}
+    except Exception as exc:  # noqa: BLE001 -- RLS denial or transport
+        raise HTTPException(status_code=502, detail="Could not load your saved notes.") from exc
+    return {"available": True, "notes": rows, "max_notes": chat_memory.MAX_NOTES}
+
+
+@router.post(
+    "/api/v2/student/me/memory",
+    dependencies=[Depends(authorize_proxy_request)],
+)
+def post_me_memory(request: Request, body: MemoryNoteRequest) -> dict:
+    """Save one note. Only ever called by the student's own click."""
+    note = chat_memory.clean_note(body.note)
+    if not note or len(note) > chat_memory.MAX_NOTE_LENGTH:
+        raise HTTPException(
+            status_code=422,
+            detail=f"A note needs 1 to {chat_memory.MAX_NOTE_LENGTH} characters.",
+        )
+    client = _session_client(request)
+    student_id = str(_resolve_session_student_id(client))
+    try:
+        existing = chat_memory.list_notes(client, student_id)
+        duplicate = next((row for row in existing if row.get("note", "").casefold() == note.casefold()), None)
+        if duplicate is not None:
+            return {"note": duplicate}
+        if len(existing) >= chat_memory.MAX_NOTES:
+            raise HTTPException(
+                status_code=409,
+                detail=f"You have {chat_memory.MAX_NOTES} saved notes. Delete one in Career Profile to save another.",
+            )
+        saved = chat_memory.add_note(client, student_id, note)
+    except chat_memory.MemoryUnavailable as exc:
+        raise HTTPException(status_code=503, detail=MEMORY_UNAVAILABLE_DETAIL) from exc
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001 -- RLS denial, constraint, transport
+        raise HTTPException(status_code=502, detail="Could not save that note.") from exc
+    return {"note": saved}
+
+
+@router.delete(
+    "/api/v2/student/me/memory/{note_id}",
+    dependencies=[Depends(authorize_proxy_request)],
+)
+def delete_me_memory(request: Request, note_id: UUID) -> dict:
+    client = _session_client(request)
+    student_id = str(_resolve_session_student_id(client))
+    try:
+        chat_memory.delete_note(client, student_id, str(note_id))
+    except chat_memory.MemoryUnavailable as exc:
+        raise HTTPException(status_code=503, detail=MEMORY_UNAVAILABLE_DETAIL) from exc
+    except Exception as exc:  # noqa: BLE001 -- RLS denial or transport
+        raise HTTPException(status_code=502, detail="Could not delete that note.") from exc
+    return {"deleted": str(note_id)}
 
 
 class CanvasCalendarFeedRequest(BaseModel):

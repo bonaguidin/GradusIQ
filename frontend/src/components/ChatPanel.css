@@ -514,3 +514,49 @@ body:has(.rv-commit) .assistant-launcher {
     transform: none;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   "Remember this?" under a reply (ai/chat_memory.py). Quiet and inline: the
+   student decides, and nothing is saved until they press Remember.
+   --------------------------------------------------------------------------- */
+
+.chat-remember {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin-top: var(--sp-1);
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--ink);
+}
+
+.chat-remember--saved {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  border-style: solid;
+  color: var(--muted);
+}
+
+.chat-remember-ask {
+  margin: 0;
+}
+
+.chat-remember q {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.chat-remember-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.chat-remember-error {
+  margin: 0;
+  color: var(--error);
+}

@@ -55,6 +55,11 @@ tell them where to do it.
 - Profile details: when an analysis is missing something (graduation date,
   majors, target roles and similar), GradusIQ asks for it on a short "complete
   your profile" step. These details can be changed later in Career Profile.
+- Assistant memory: the assistant can offer to remember a lasting fact a
+  student mentions (a goal or preference). Nothing is saved unless the student
+  taps Remember. Saved notes are listed under "What GradusIQ remembers" in
+  Career Profile, where any note can be deleted. Conversations themselves are
+  kept only in the open browser tab.
 - Canvas: on the Academic Overview, "Coming up in Canvas" connects the
   student's Canvas calendar. In Canvas, open Calendar, click "Calendar Feed"
   at the bottom right, copy the link and paste it into GradusIQ. This shows due

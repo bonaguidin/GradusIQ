@@ -8,11 +8,16 @@ export interface ChatMessage {
   content: string;
   /** Action button ids on an assistant reply (lib/chatActions.mjs). */
   actions?: string[];
+  /** A fact the assistant offered to remember (api/memory.ts). */
+  remember?: string;
+  /** What the student did with that offer. */
+  rememberState?: 'saved' | 'dismissed';
 }
 
 export interface ChatReply {
   reply: string;
   actions: string[];
+  remember: string | null;
 }
 
 export async function sendChat(
@@ -52,9 +57,10 @@ export async function sendChat(
     throw new Error(detail);
   }
 
-  const data = (await response.json()) as { reply?: string; actions?: unknown };
+  const data = (await response.json()) as { reply?: string; actions?: unknown; remember?: unknown };
   const actions = Array.isArray(data.actions)
     ? data.actions.filter((a): a is string => typeof a === 'string')
     : [];
-  return { reply: data.reply ?? '', actions };
+  const remember = typeof data.remember === 'string' && data.remember.trim() ? data.remember.trim() : null;
+  return { reply: data.reply ?? '', actions, remember };
 }
