@@ -1,21 +1,28 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useAuth } from '../auth/useAuth';
-import { sendChat, type ChatMessage } from '../api/chat';
+import { useChat, useChatPage } from '../chat/ChatContext';
+import { chatSuggestions } from '../lib/chatPage.mjs';
+import { ChatMarkdown } from './ChatMarkdown';
 import './ChatPanel.css';
 
-const SUGGESTIONS = [
-  'What are my biggest skill gaps for my target roles?',
-  'Which courses should I prioritize next term?',
-  'How ready am I for an internship right now?',
-];
+interface ChatPanelProps {
+  autoFocus?: boolean;
+  /**
+   * 'inline' is Overview's card. 'docked' is the side panel every other
+   * signed-in page opens from the launcher (AssistantDock); it fills its
+   * container and has a close button. Both show the same conversation.
+   */
+  variant?: 'inline' | 'docked';
+  onClose?(): void;
+}
 
-export function ChatPanel({ autoFocus = false }: { autoFocus?: boolean } = {}) {
-  const { slug, profile, session, studentAccount } = useAuth();
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+export function ChatPanel({ autoFocus = false, variant = 'inline', onClose }: ChatPanelProps = {}) {
+  const { profile, studentAccount } = useAuth();
+  const { messages, sending, error, canSend, send, reset } = useChat();
+  const page = useChatPage();
+  const suggestions = chatSuggestions(page);
   const [input, setInput] = useState('');
-  const [sending, setSending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   // Shown when Enter is pressed with text while a reply is still pending.
   const [pendingNotice, setPendingNotice] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
@@ -23,13 +30,14 @@ export function ChatPanel({ autoFocus = false }: { autoFocus?: boolean } = {}) {
 
   const realName = studentAccount.profile?.intelligence_profile.identity.name;
   const firstName = (profile?.student?.name ?? realName)?.split(' ')[0] ?? 'there';
-  const canSend = Boolean(slug || session?.access_token);
 
   useEffect(() => {
     if (!autoFocus) return;
     inputRef.current?.focus({ preventScroll: true });
-    inputRef.current?.scrollIntoView({ block: 'center' });
-  }, [autoFocus]);
+    // The docked panel is fixed to the viewport; scrolling it into view would
+    // only move the page behind it.
+    if (variant === 'inline') inputRef.current?.scrollIntoView({ block: 'center' });
+  }, [autoFocus, variant]);
 
   useEffect(() => {
     const el = listRef.current;
@@ -39,24 +47,15 @@ export function ChatPanel({ autoFocus = false }: { autoFocus?: boolean } = {}) {
   async function submit(text: string) {
     const trimmed = text.trim();
     if (!trimmed || sending || !canSend) return;
-    setError(null);
     setPendingNotice(false);
-    const priorHistory = messages;
-    setMessages((m) => [...m, { role: 'user', content: trimmed }]);
     setInput('');
-    setSending(true);
-    try {
-      const reply = await sendChat(
-        { slug, accessToken: session?.access_token ?? null },
-        trimmed,
-        priorHistory,
-      );
-      setMessages((m) => [...m, { role: 'assistant', content: reply }]);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Something went wrong. Try again.');
-    } finally {
-      setSending(false);
-    }
+    await send(trimmed, page);
+  }
+
+  function startNewChat() {
+    reset();
+    setPendingNotice(false);
+    inputRef.current?.focus();
   }
 
   function onSubmit(e: FormEvent) {
@@ -65,7 +64,7 @@ export function ChatPanel({ autoFocus = false }: { autoFocus?: boolean } = {}) {
   }
 
   return (
-    <section className="chat-panel" aria-label="Ask GradusIQ">
+    <section className={`chat-panel chat-panel--${variant}`} aria-label="Ask GradusIQ">
       <div className="chat-header">
         <span className="chat-mark" aria-hidden="true">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -78,6 +77,20 @@ export function ChatPanel({ autoFocus = false }: { autoFocus?: boolean } = {}) {
             Chat about your academics &amp; career — grounded in your profile and analysis.
           </span>
         </div>
+        <div className="chat-header-actions">
+          {messages.length > 0 && (
+            <button type="button" className="btn btn-ghost btn-sm chat-new" onClick={startNewChat}>
+              New chat
+            </button>
+          )}
+          {onClose && (
+            <button type="button" className="chat-close" onClick={onClose} aria-label="Close chat">
+              <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
+                <path d="M4 4l8 8M12 4l-8 8" />
+              </svg>
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="chat-messages" ref={listRef} aria-live="polite">
@@ -87,7 +100,7 @@ export function ChatPanel({ autoFocus = false }: { autoFocus?: boolean } = {}) {
               Hi {firstName} — ask me anything about your record, gaps, or next steps.
             </p>
             <div className="chat-suggestions">
-              {SUGGESTIONS.map((s) => (
+              {suggestions.map((s) => (
                 <button
                   key={s}
                   type="button"
@@ -111,7 +124,9 @@ export function ChatPanel({ autoFocus = false }: { autoFocus?: boolean } = {}) {
         {messages.map((m, i) => (
           <div key={i} className={`chat-msg chat-msg--${m.role}`}>
             <span className="chat-msg-role">{m.role === 'user' ? 'You' : <span translate="no">GradusIQ</span>}</span>
-            <div className="chat-msg-body">{m.content}</div>
+            <div className="chat-msg-body">
+              {m.role === 'assistant' ? <ChatMarkdown text={m.content} /> : m.content}
+            </div>
           </div>
         ))}
 

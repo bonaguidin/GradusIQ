@@ -1,6 +1,7 @@
 // Chat client — posts to the same-origin /api proxy, which injects the backend
 // secret and forwards to FastAPI's POST /api/students/{slug}/chat. Mirrors the
-// fetch style of api/analysis.ts, but sends a JSON body (message + history).
+// fetch style of api/analysis.ts, but sends a JSON body (message + history,
+// plus the page the student has open -- see lib/chatPage.mjs).
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -11,6 +12,7 @@ export async function sendChat(
   identity: { slug: string | null; accessToken: string | null },
   message: string,
   history: ChatMessage[],
+  page: string | null = null,
 ): Promise<string> {
   const path = identity.slug
     ? `/api/students/${encodeURIComponent(identity.slug)}/chat`
@@ -24,7 +26,7 @@ export async function sendChat(
       'Content-Type': 'application/json',
       ...(identity.slug ? {} : { Authorization: `Bearer ${identity.accessToken}` }),
     },
-    body: JSON.stringify({ message, history }),
+    body: JSON.stringify(page ? { message, history, page } : { message, history }),
   });
 
   if (!response.ok) {

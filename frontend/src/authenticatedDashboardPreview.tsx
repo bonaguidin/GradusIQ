@@ -5,6 +5,8 @@ import type { Session } from '@supabase/supabase-js';
 import { AuthContext, type AuthContextValue } from './auth/AuthContext';
 import { StudentAccountProblem } from './auth/AccountStateScreens';
 import { AuthenticatedDashboard } from './pages/AuthenticatedDashboard';
+import { ChatProvider } from './chat/ChatContext';
+import { AssistantDock } from './components/AssistantDock';
 import { ProfileCompletionPage } from './pages/ProfileCompletionPage';
 import { applyInstitutionTheme, fetchInstitutionThemeByName } from './lib/institutionTheme';
 import type { StudentIntelligenceProfile } from './types/studentIntelligenceProfile';
@@ -232,7 +234,9 @@ const app = mode === 'error'
     // from the real address bar -- a Playwright test reading page.url() would
     // never see it change. BrowserRouter keeps this preview's query string
     // real, same as the production app.
-    : <AuthContext.Provider value={context}><BrowserRouter><AuthenticatedDashboard /></BrowserRouter></AuthContext.Provider>;
+    // ChatProvider + AssistantDock as App.tsx mounts them, so the side panel
+    // and the shared conversation can be exercised here too.
+    : <AuthContext.Provider value={context}><BrowserRouter><ChatProvider dashboardPath={window.location.pathname}><AuthenticatedDashboard /><AssistantDock /></ChatProvider></BrowserRouter></AuthContext.Provider>;
 
 // This harness substitutes AuthContext.Provider directly instead of
 // rendering the real AuthProvider, so AuthProvider's own institution-theming
