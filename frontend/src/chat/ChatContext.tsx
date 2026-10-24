@@ -47,10 +47,16 @@ function readStored(key: string | null): ChatMessage[] {
     const raw = window.sessionStorage.getItem(key);
     const parsed: unknown = raw ? JSON.parse(raw) : [];
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (m): m is ChatMessage =>
-        !!m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string',
-    );
+    return parsed
+      .filter(
+        (m): m is ChatMessage =>
+          !!m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string',
+      )
+      .map((m) => ({
+        role: m.role,
+        content: m.content,
+        ...(Array.isArray(m.actions) ? { actions: m.actions.filter((a) => typeof a === 'string') } : {}),
+      }));
   } catch {
     return [];
   }
@@ -132,9 +138,12 @@ function useChatState(persist: boolean): ChatStore {
       setMessages(() => [...history, { role: 'user', content: text }]);
       setSending(true);
       try {
-        const reply = await sendChat({ slug, accessToken }, text, history, page);
+        const { reply, actions } = await sendChat({ slug, accessToken }, text, history, page);
         if (generation.current === asked) {
-          setMessages((m) => [...m, { role: 'assistant', content: reply }]);
+          setMessages((m) => [
+            ...m,
+            { role: 'assistant', content: reply, ...(actions.length ? { actions } : {}) },
+          ]);
         }
       } catch (e) {
         if (generation.current === asked) {
@@ -165,16 +174,32 @@ function useChatState(persist: boolean): ChatStore {
   );
 }
 
-const DashboardPathContext = createContext('/dashboard');
+interface DashboardLocation {
+  path: string;
+  /** Query params every dashboard link keeps (the preview harness's fixture). */
+  keepParams: readonly string[];
+}
+
+const NO_PARAMS: readonly string[] = [];
+const DashboardPathContext = createContext<DashboardLocation>({ path: '/dashboard', keepParams: NO_PARAMS });
 
 /**
- * `dashboardPath` is only for the preview harness, which serves the dashboard
- * from its own .html path rather than /dashboard.
+ * `dashboardPath` and `keepParams` are only for the preview harness, which
+ * serves the dashboard from its own .html path with fixture params.
  */
-export function ChatProvider({ children, dashboardPath = '/dashboard' }: { children: ReactNode; dashboardPath?: string }) {
+export function ChatProvider({
+  children,
+  dashboardPath = '/dashboard',
+  keepParams = NO_PARAMS,
+}: {
+  children: ReactNode;
+  dashboardPath?: string;
+  keepParams?: readonly string[];
+}) {
   const store = useChatState(true);
+  const location = useMemo(() => ({ path: dashboardPath, keepParams }), [dashboardPath, keepParams]);
   return (
-    <DashboardPathContext.Provider value={dashboardPath}>
+    <DashboardPathContext.Provider value={location}>
       <ChatContext.Provider value={store}>{children}</ChatContext.Provider>
     </DashboardPathContext.Provider>
   );
@@ -183,8 +208,13 @@ export function ChatProvider({ children, dashboardPath = '/dashboard' }: { child
 /** The open page's key (lib/chatPage.mjs), or null where the chat isn't offered. */
 export function useChatPage(): string | null {
   const location = useLocation();
-  const dashboardPath = useContext(DashboardPathContext);
-  return chatPageKey(location.pathname, new URLSearchParams(location.search), dashboardPath);
+  const dashboard = useContext(DashboardPathContext);
+  return chatPageKey(location.pathname, new URLSearchParams(location.search), dashboard.path);
+}
+
+/** Where the dashboard lives, for building action-button links. */
+export function useDashboardLocation(): DashboardLocation {
+  return useContext(DashboardPathContext);
 }
 
 /**

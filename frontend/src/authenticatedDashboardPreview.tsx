@@ -196,6 +196,9 @@ if (careerMode === 'bare') {
 // logic runs. `new` has never finished it; `done` finished it on another
 // device (recorded in user_metadata). Without the param there is no user, so
 // every existing mode above renders with no tour, exactly as before.
+// Chat action buttons keep the preview's fixture when they change section.
+const PREVIEW_KEEP_PARAMS = ['mode', 'tour', 'gpaHistory', 'currentTerm'];
+
 const tourMode = new URLSearchParams(location.search).get('tour');
 const session = (tourMode
   ? {
@@ -236,7 +239,7 @@ const app = mode === 'error'
     // real, same as the production app.
     // ChatProvider + AssistantDock as App.tsx mounts them, so the side panel
     // and the shared conversation can be exercised here too.
-    : <AuthContext.Provider value={context}><BrowserRouter><ChatProvider dashboardPath={window.location.pathname}><AuthenticatedDashboard /><AssistantDock /></ChatProvider></BrowserRouter></AuthContext.Provider>;
+    : <AuthContext.Provider value={context}><BrowserRouter><ChatProvider dashboardPath={window.location.pathname} keepParams={PREVIEW_KEEP_PARAMS}><AuthenticatedDashboard /><AssistantDock /></ChatProvider></BrowserRouter></AuthContext.Provider>;
 
 // This harness substitutes AuthContext.Provider directly instead of
 // rendering the real AuthProvider, so AuthProvider's own institution-theming

@@ -6,6 +6,13 @@
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
+  /** Action button ids on an assistant reply (lib/chatActions.mjs). */
+  actions?: string[];
+}
+
+export interface ChatReply {
+  reply: string;
+  actions: string[];
 }
 
 export async function sendChat(
@@ -13,7 +20,7 @@ export async function sendChat(
   message: string,
   history: ChatMessage[],
   page: string | null = null,
-): Promise<string> {
+): Promise<ChatReply> {
   const path = identity.slug
     ? `/api/students/${encodeURIComponent(identity.slug)}/chat`
     : '/api/v2/student/me/chat';
@@ -26,7 +33,12 @@ export async function sendChat(
       'Content-Type': 'application/json',
       ...(identity.slug ? {} : { Authorization: `Bearer ${identity.accessToken}` }),
     },
-    body: JSON.stringify(page ? { message, history, page } : { message, history }),
+    // The backend takes role and content only; buttons stay in the browser.
+    body: JSON.stringify({
+      message,
+      history: history.map(({ role, content }) => ({ role, content })),
+      ...(page ? { page } : {}),
+    }),
   });
 
   if (!response.ok) {
@@ -40,6 +52,9 @@ export async function sendChat(
     throw new Error(detail);
   }
 
-  const data = (await response.json()) as { reply?: string };
-  return data.reply ?? '';
+  const data = (await response.json()) as { reply?: string; actions?: unknown };
+  const actions = Array.isArray(data.actions)
+    ? data.actions.filter((a): a is string => typeof a === 'string')
+    : [];
+  return { reply: data.reply ?? '', actions };
 }
