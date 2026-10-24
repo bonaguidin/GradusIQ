@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useDataChanged } from '../lib/dataChanged';
 import type { FormEvent } from 'react';
 import { connectCanvasCalendar, disconnectCanvasCalendar, fetchCanvasCalendar } from '../api/canvasCalendar';
 import { ConfirmButton, useConfirmStatus } from './ConfirmButton';
@@ -37,6 +38,13 @@ export function CanvasCalendarPanel({ accessToken }: { accessToken: string }) {
       active = false;
     };
   }, [accessToken]);
+
+  // Refreshed from the assistant chat while this card is open.
+  useDataChanged('canvas-calendar', () => {
+    void fetchCanvasCalendar(accessToken).then((result) => {
+      if (result.ok) setState(result);
+    });
+  });
 
   async function handleConnect(event: FormEvent) {
     event.preventDefault();

@@ -2059,3 +2059,103 @@ def test_lookup_grade_needed_uses_saved_scores(monkeypatch):
     assert lookups.used == ["get_course_grades", "solve_grade_needed"]
     missing = json.loads(lookups.run("solve_grade_needed", {"course": "BIO", "component": "x", "target_letter": "A"}))
     assert missing == {"error": "No Grade Calculator course matches 'BIO'."}
+
+
+def _change_lookups(courses=(), terms=(), target_roles=("Data Analyst",)):
+    canonical = SimpleNamespace(
+        career=SimpleNamespace(target_roles=list(target_roles)),
+        academics=SimpleNamespace(courses=list(courses), terms=list(terms)),
+    )
+    return _lookups(canonical)
+
+
+def test_propose_add_planned_course_checks_catalog_record_and_term(monkeypatch):
+    from datetime import date as real_date
+
+    from GradusIQ_career.planning.search import CatalogResult
+
+    class FixedDate(real_date):
+        @classmethod
+        def today(cls):
+            return cls(2026, 10, 24)
+
+    monkeypatch.setattr(api, "date", FixedDate)
+    monkeypatch.setattr(api, "_home_institution_id", lambda client, sid: "inst-1")
+    monkeypatch.setattr(api, "list_planned", lambda client, sid: [SimpleNamespace(course_code="MATH 3304")])
+    monkeypatch.setattr(api, "search_catalog", lambda client, inst, query, limit: [
+        CatalogResult(id="c1", code="CS 3353X", title="Other", department=None, course_level=3000, credit_min=3, credit_max=3),
+        CatalogResult(id="c2", code="CS 3353", title="Data Structures", department=None, course_level=3000, credit_min=3, credit_max=3),
+    ])
+    lookups = _change_lookups(courses=[SimpleNamespace(course_code="CS 1340", status="completed")])
+
+    shown = json.loads(lookups.run("propose_add_planned_course", {"course": "cs 3353", "term": "Spring 2027"}))
+    assert shown["card"] == "Add CS 3353 (Data Structures) to your Spring 2027 plan"
+    assert lookups.proposals == [{
+        "kind": "add_planned_course",
+        "summary": "Add CS 3353 (Data Structures) to your Spring 2027 plan",
+        "payload": {"course_code": "CS 3353", "title": "Data Structures", "credit_hours": 3,
+                    "catalog_course_id": "c2", "year": 2027, "season": "Spring"},
+    }]
+
+    for arguments, error in [
+        ({"course": "CS 3353", "term": "next year"}, "'next year' is not a term like 'Spring 2027'."),
+        ({"course": "CS 3353", "term": "Spring 2026"}, "Spring 2026 is already over."),
+        ({"course": "CS 1340", "term": "Spring 2027"}, "CS 1340 is already on their record (completed)."),
+        ({"course": "MATH 3304", "term": "Spring 2027"}, "MATH 3304 is already in their plan."),
+        ({"course": "CS 9999", "term": "Spring 2027"}, "CS 9999 is not in their school's catalog."),
+    ]:
+        assert json.loads(lookups.run("propose_add_planned_course", arguments)) == {"error": error}
+    assert len(lookups.proposals) == 1
+    # Proposals are not lookups, so they never show as "Checked ...".
+    assert lookups.used == []
+
+
+def test_propose_remove_target_role_and_canvas(monkeypatch):
+    monkeypatch.setattr(api, "list_planned", lambda client, sid: [
+        SimpleNamespace(id="pl-1", course_code="CS 3353", term_id="t1")])
+    monkeypatch.setattr(api, "supported_target_roles", lambda: ["Data Analyst", "UX Designer"])
+    monkeypatch.setattr(api.calendar_feed, "load_feed_row", lambda client, sid: {"events": []})
+    lookups = _change_lookups(terms=[SimpleNamespace(id="t1", label="Spring 2027")])
+
+    lookups.run("propose_remove_planned_course", {"course": "CS 3353"})
+    lookups.run("propose_add_target_role", {"role": "ux designer"})
+    third = json.loads(lookups.run("propose_refresh_canvas", {}))
+
+    assert [p["summary"] for p in lookups.proposals] == [
+        "Remove CS 3353 from your Spring 2027 plan",
+        "Add UX Designer to your target roles",
+    ]
+    assert lookups.proposals[0]["payload"] == {"planned_id": "pl-1"}
+    assert lookups.proposals[1]["payload"] == {"target_roles": ["Data Analyst", "UX Designer"]}
+    assert "error" in third  # two cards per reply at most
+
+    fresh = _change_lookups()
+    assert json.loads(fresh.run("propose_remove_planned_course", {"course": "BIO 1401"}))["error"].startswith(
+        "BIO 1401 is not a planned course")
+    assert json.loads(fresh.run("propose_add_target_role", {"role": "data analyst"})) == {
+        "error": "Data Analyst is already one of their target roles."}
+    assert "supported_roles" in json.loads(fresh.run("propose_add_target_role", {"role": "Astronaut"}))
+    fresh.run("propose_refresh_canvas", {})
+    assert json.loads(fresh.run("propose_refresh_canvas", {}))["status"] == "already shown"
+    assert len(fresh.proposals) == 1
+
+    monkeypatch.setattr(api.calendar_feed, "load_feed_row", lambda client, sid: None)
+    assert "error" in json.loads(_change_lookups().run("propose_refresh_canvas", {}))
+
+
+def test_me_chat_returns_proposals_and_the_change_rules(client, monkeypatch):
+    _patch_session(monkeypatch, profile=_full_profile())
+    monkeypatch.setattr(api.calendar_feed, "load_feed_row", lambda client, sid: {"events": []})
+    fake = ToolCallingAI("propose_refresh_canvas", {}, "You can confirm the refresh below.")
+    monkeypatch.setattr(api, "build_client", lambda: fake)
+
+    response = _call(client, "post", "/api/v2/student/me/chat", {"message": "refresh canvas", "history": []})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["proposals"] == [
+        {"id": "p1", "kind": "refresh_canvas", "summary": "Refresh your Canvas calendar now", "payload": {}}
+    ]
+    assert "lookups" not in body
+    assert "<CHANGES>" in fake.calls[0]["messages"][0]["content"]
+    assert "propose_refresh_canvas" in {tool["function"]["name"] for tool in fake.calls[0]["extra_body"]["tools"]}

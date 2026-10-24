@@ -38,7 +38,7 @@ from GradusIQ_career.ai.errors import AIConfigError, AIRequestError, AIResponseP
 from GradusIQ_career.ai.context import AgentContext, GroundingMetadata
 from GradusIQ_career import analysis_freshness
 from GradusIQ_career.ai import chat_context
-from GradusIQ_career.ai import chat_actions, chat_memory, chat_tools
+from GradusIQ_career.ai import chat_actions, chat_changes, chat_memory, chat_tools
 from GradusIQ_career.ai.contracts import ChatOutput, feature_output_is_valid
 from GradusIQ_career.ai.runtime import AIRuntime
 from GradusIQ_career.ai.model_config import (
@@ -214,6 +214,7 @@ from GradusIQ_career.supabase_client import (
 from GradusIQ_career.transcript.catalog import match_courses
 from GradusIQ_career.transcript.crosscheck import cross_check_terms
 from GradusIQ_career.transcript.extraction import extract_transcript_text
+from GradusIQ_career.transcript.terms import TermParseError, parse_term_label
 from GradusIQ_career.transcript.parser import (
     TranscriptTooLongError,
     parse_transcript_text,
@@ -911,7 +912,7 @@ def build_canonical_chat_messages(
         # student could not save would be worse than none.
         system += f"{chat_memory.memory_instructions()}\n\n"
     if lookups_enabled:
-        system += f"{chat_tools.tool_instructions()}\n\n"
+        system += f"{chat_tools.tool_instructions()}\n\n{chat_changes.change_instructions()}\n\n"
     if context:
         system += (
             f"<STUDENT_CONTEXT_DATA>\n{json.dumps(context, sort_keys=True)}\n"
@@ -1033,9 +1034,12 @@ class _ChatLookups:
         self._grade_cards: list[dict] | None = None
         # Tools that returned data (not an error), for "Looked up: ..." in the reply.
         self.used: list[str] = []
+        # Validated change proposals (ai/chat_changes.py), shown as Confirm cards.
+        self.proposals: list[dict] = []
 
     def run(self, name: str, arguments: dict) -> str:
-        handler = getattr(self, f"_tool_{name}", None) if name in chat_tools.TOOL_NAMES else None
+        known = chat_tools.TOOL_NAMES | chat_changes.TOOL_NAMES
+        handler = getattr(self, f"_tool_{name}", None) if name in known else None
         if handler is None:
             return chat_tools.error_result(f"Unknown lookup '{name}'.")
         try:
@@ -1049,9 +1053,81 @@ class _ChatLookups:
         except Exception:  # noqa: BLE001 -- a failed lookup must not cost the reply
             logger.warning("chat lookup failed: %s", name, exc_info=True)
             return chat_tools.error_result("This lookup is unavailable right now.")
-        if "error" not in payload:
+        if "error" not in payload and name in chat_tools.TOOL_NAMES:
             self.used.append(name)
         return chat_tools.to_result(payload)
+
+    def _propose(self, kind: str, summary: str, payload: dict) -> dict:
+        if len(self.proposals) >= chat_changes.MAX_PROPOSALS:
+            return {"error": "Only two changes can be offered at once. Ask the student to confirm these first."}
+        if any(p["kind"] == kind and p["payload"] == payload for p in self.proposals):
+            return {"status": "already shown", "card": summary}
+        self.proposals.append(chat_changes.proposal(kind, summary, payload))
+        return {
+            "status": "shown to the student as a card with a Confirm button; not done yet",
+            "card": summary,
+        }
+
+    def _tool_propose_add_planned_course(self, course: str, term: str) -> dict:
+        try:
+            resolved = parse_term_label(term)
+        except TermParseError:
+            return {"error": f"'{term}' is not a term like 'Spring 2027'."}
+        if chat_changes.term_is_past(resolved.year, resolved.season, date.today()):
+            return {"error": f"{resolved.season} {resolved.year} is already over."}
+        code = chat_changes.normalize_code(course)
+        taken = {
+            chat_changes.normalize_code(c.course_code): c.status for c in self.canonical.academics.courses
+        }
+        if code in taken:
+            return {"error": f"{code} is already on their record ({taken[code]})."}
+        if any(chat_changes.normalize_code(row.course_code) == code for row in list_planned(self.client, self.student_id)):
+            return {"error": f"{code} is already in their plan."}
+        institution_id = _home_institution_id(self.client, self.student_id)
+        rows = [row.to_dict() for row in search_catalog(self.client, institution_id, code, chat_tools.MAX_CATALOG_RESULTS)]
+        match = chat_changes.find_course(rows, code)
+        if match is None:
+            return {"error": f"{code} is not in their school's catalog."}
+        term_label = f"{resolved.season} {resolved.year}"
+        title = match.get("title")
+        payload = {
+            "course_code": match["code"],
+            "title": title,
+            "credit_hours": match.get("credit_min"),
+            "catalog_course_id": match.get("id"),
+            "year": resolved.year,
+            "season": resolved.season,
+        }
+        named = f"{match['code']} ({title})" if title else match["code"]
+        return self._propose("add_planned_course", f"Add {named} to your {term_label} plan", payload)
+
+    def _tool_propose_remove_planned_course(self, course: str) -> dict:
+        code = chat_changes.normalize_code(course)
+        planned = [row for row in list_planned(self.client, self.student_id)
+                   if chat_changes.normalize_code(row.course_code) == code]
+        if not planned:
+            return {"error": f"{code} is not a planned course. Completed and in-progress courses cannot be removed here."}
+        row = planned[0]
+        labels = {term.id: term.label for term in self.canonical.academics.terms}
+        where = f" from your {labels[row.term_id]} plan" if row.term_id in labels else " from your plan"
+        return self._propose("remove_planned_course", f"Remove {row.course_code}{where}", {"planned_id": row.id})
+
+    def _tool_propose_add_target_role(self, role: str) -> dict:
+        supported = supported_target_roles()
+        match = chat_changes.match_role(role, supported)
+        if match is None:
+            return {"error": f"'{role}' is not a role GradusIQ can analyze yet.", "supported_roles": list(supported)[:40]}
+        current = list(self.canonical.career.target_roles)
+        if any(r.casefold() == match.casefold() for r in current):
+            return {"error": f"{match} is already one of their target roles."}
+        return self._propose(
+            "add_target_role", f"Add {match} to your target roles", {"target_roles": [*current, match]}
+        )
+
+    def _tool_propose_refresh_canvas(self) -> dict:
+        if calendar_feed.load_feed_row(self.client, self.student_id) is None:
+            return {"error": "Canvas calendar is not connected; the canvas-calendar page connects it."}
+        return self._propose("refresh_canvas", "Refresh your Canvas calendar now", {})
 
     def _tool_get_degree_plan(self) -> dict:
         state = _reconstruct_academic_schedule(self.request)
@@ -1168,7 +1244,7 @@ def _complete_authenticated_chat(
         canonical_profile=canonical,
         model_role="chat",
         prompt_name="chat",
-        prompt_version="1.4",
+        prompt_version="1.5",
         grounding=GroundingMetadata(
             source_types=("canonical_student_profile", "student_context", "browser_history"),
             trust_level="untrusted_external",
@@ -1184,7 +1260,7 @@ def _complete_authenticated_chat(
             canonical, body, student_context, memory_enabled=memory_enabled, lookups_enabled=lookups is not None
         ),
         output_model=ChatOutput,
-        tools=chat_tools.TOOLS if lookups is not None else (),
+        tools=(*chat_tools.TOOLS, *chat_changes.TOOLS) if lookups is not None else (),
         run_tool=lookups.run if lookups is not None else None,
         max_tool_rounds=chat_tools.MAX_TOOL_ROUNDS,
     )
@@ -1213,6 +1289,10 @@ def _complete_authenticated_chat(
     looked_up = chat_tools.lookup_labels(lookups.used if lookups is not None else ())
     if looked_up:
         response["lookups"] = looked_up
+    if lookups is not None and lookups.proposals:
+        response["proposals"] = [
+            {"id": f"p{index}", **item} for index, item in enumerate(lookups.proposals, start=1)
+        ]
     return response
 
 

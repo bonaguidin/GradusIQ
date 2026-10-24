@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 import { chatPageKey } from '../lib/chatPage.mjs';
-import { sendChat, type ChatMessage } from '../api/chat';
+import { sendChat, type ChatMessage, type ProposalState } from '../api/chat';
 
 /**
  * One assistant conversation for the whole signed-in app.
@@ -30,6 +30,7 @@ export interface ChatStore {
   reset(): void;
   /** Records what the student did with a "Remember this?" offer. */
   setRememberState(index: number, state: 'saved' | 'dismissed'): void;
+  setProposalState(index: number, id: string, state: ProposalState): void;
   /** Whether the side panel is open. Lives here so it survives navigation. */
   panelOpen: boolean;
   setPanelOpen(open: boolean): void;
@@ -61,6 +62,8 @@ function readStored(key: string | null): ChatMessage[] {
         ...(typeof m.remember === 'string' ? { remember: m.remember } : {}),
         ...(m.rememberState === 'saved' || m.rememberState === 'dismissed' ? { rememberState: m.rememberState } : {}),
         ...(Array.isArray(m.lookups) ? { lookups: m.lookups.filter((l) => typeof l === 'string') } : {}),
+        ...(Array.isArray(m.proposals) ? { proposals: m.proposals } : {}),
+        ...(m.proposalStates && typeof m.proposalStates === 'object' ? { proposalStates: m.proposalStates } : {}),
       }));
   } catch {
     return [];
@@ -143,7 +146,7 @@ function useChatState(persist: boolean): ChatStore {
       setMessages(() => [...history, { role: 'user', content: text }]);
       setSending(true);
       try {
-        const { reply, actions, remember, lookups } = await sendChat({ slug, accessToken }, text, history, page);
+        const { reply, actions, remember, lookups, proposals } = await sendChat({ slug, accessToken }, text, history, page);
         if (generation.current === asked) {
           setMessages((m) => [
             ...m,
@@ -153,6 +156,7 @@ function useChatState(persist: boolean): ChatStore {
               ...(actions.length ? { actions } : {}),
               ...(remember ? { remember } : {}),
               ...(lookups.length ? { lookups } : {}),
+              ...(proposals.length ? { proposals } : {}),
             },
           ]);
         }
@@ -187,9 +191,21 @@ function useChatState(persist: boolean): ChatStore {
     [setMessages],
   );
 
+  const setProposalState = useCallback(
+    (index: number, id: string, state: ProposalState) =>
+      setMessages((current) =>
+        current.map((m, i) =>
+          i === index ? { ...m, proposalStates: { ...m.proposalStates, [id]: state } } : m,
+        ),
+      ),
+    [setMessages],
+  );
+
   return useMemo(
-    () => ({ messages, sending, error, canSend, send, reset, setRememberState, panelOpen, setPanelOpen }),
-    [messages, sending, error, canSend, send, reset, setRememberState, panelOpen],
+    () => ({
+      messages, sending, error, canSend, send, reset, setRememberState, setProposalState, panelOpen, setPanelOpen,
+    }),
+    [messages, sending, error, canSend, send, reset, setRememberState, setProposalState, panelOpen],
   );
 }
 

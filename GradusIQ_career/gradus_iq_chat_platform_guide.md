@@ -60,6 +60,12 @@ tell them where to do it.
   further ahead, look at job postings, and read Grade Calculator grades
   (including the score needed on a remaining assignment). It only reads; it
   cannot change anything. A reply that used a lookup says "Checked ..." under it.
+- Changes from the chat: when a student asks, the assistant can offer to add a
+  course to their plan for a term, remove a planned course, add a target role,
+  or refresh the Canvas calendar. Each shows as a card; nothing changes until
+  the student presses Confirm, and "No thanks" dismisses it. Anything else
+  (confirming transcripts or grades, deleting data, account settings) is done
+  on its own page.
 - Assistant memory: the assistant can offer to remember a lasting fact a
   student mentions (a goal or preference). Nothing is saved unless the student
   taps Remember. Saved notes are listed under "What GradusIQ remembers" in

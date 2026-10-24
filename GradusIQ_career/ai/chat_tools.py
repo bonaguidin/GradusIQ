@@ -42,7 +42,7 @@ TOOL_LABELS: dict[str, str] = {
 }
 
 
-def _function(name: str, description: str, properties: dict, required: Sequence[str] = ()) -> dict:
+def function_tool(name: str, description: str, properties: dict, required: Sequence[str] = ()) -> dict:
     return {
         "type": "function",
         "function": {
@@ -59,7 +59,7 @@ def _function(name: str, description: str, properties: dict, required: Sequence[
 
 
 TOOLS: tuple[dict, ...] = (
-    _function(
+    function_tool(
         "get_degree_plan",
         "The student's term-by-term plan for the rest of their degree, from GradusIQ's "
         "schedule builder: which required courses go in which term, requirements where "
@@ -67,7 +67,7 @@ TOOLS: tuple[dict, ...] = (
         "Use for 'what should I take next term' or 'when will I finish'.",
         {},
     ),
-    _function(
+    function_tool(
         "search_courses",
         "Search the course catalog at the student's school by course code or subject "
         "prefix (e.g. 'CS 3353', 'STAT') or by words in the course title (e.g. "
@@ -75,7 +75,7 @@ TOOLS: tuple[dict, ...] = (
         {"query": {"type": "string", "description": "A course code, subject prefix, or title words."}},
         ["query"],
     ),
-    _function(
+    function_tool(
         "get_deadlines",
         "Canvas due dates and events between two dates (inclusive), up to about five "
         "months ahead. The prompt already lists the next three weeks; use this for "
@@ -86,7 +86,7 @@ TOOLS: tuple[dict, ...] = (
         },
         ["start_date", "end_date"],
     ),
-    _function(
+    function_tool(
         "search_jobs",
         "Recent internship and job postings GradusIQ has collected for the student's "
         "target roles and related role families. Optionally narrow by role family, "
@@ -97,13 +97,13 @@ TOOLS: tuple[dict, ...] = (
             "location": {"type": "string"},
         },
     ),
-    _function(
+    function_tool(
         "get_course_grades",
         "Current grades in the courses where the student added a syllabus to the Grade "
         "Calculator: overall grade, letter, and each graded component's weight and score.",
         {},
     ),
-    _function(
+    function_tool(
         "solve_grade_needed",
         "The score the student needs on one remaining component of a course (e.g. the "
         "final exam) to reach a target letter grade, using the scores saved in the Grade "
