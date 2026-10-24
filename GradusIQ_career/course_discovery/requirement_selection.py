@@ -29,7 +29,7 @@ from .requirement_candidates import (
 )
 from .requirement_candidate_ranking import normalized_career_rank_map
 from .requirement_satisfaction import RequirementGroupResult, RequirementGroupStatus
-from .scheduler import CourseToSchedule, ScheduleResult, UnscheduledRequirement, schedule_courses
+from .scheduler import CourseToSchedule, UnscheduledRequirement, place_courses
 
 
 _UNSAFE_GROUP_NOTES = re.compile(
@@ -148,7 +148,6 @@ class _CandidateEvidence:
 class _ValidCombination:
     score: tuple[Any, ...]
     choices: tuple[_Choice, ...]
-    schedule: ScheduleResult
     candidate_ids: tuple[str, ...]
     completion_terms: tuple[int, ...]
 
@@ -788,50 +787,74 @@ def select_structured_requirements(
             continue
         structurally_valid.append(combination)
 
-    valid_combinations: list[_ValidCombination] = []
-    evaluated = 0
-    for combination in structurally_valid:
-        selected_courses = [
-            CourseToSchedule(
-                course_code=code,
-                credit_hours=float(catalog_credit_by_code[code]),
-                requirement_group_id=choice.owner_group_id,
-                requirement_group_name=choice.owner_group_name,
-                selection_limitations=list(choice.limitations),
-            )
-            for choice in combination
-            for code in choice.courses
-        ]
-        result = schedule_courses(
-            student_id, program_id, base_courses + selected_courses, prerequisites, satisfied, manual,
-            starting_year=starting_year, starting_season=starting_season, max_terms=max_terms,
-            credit_hour_cap=credit_hour_cap,
-        )
-        evaluated += 1
-        blocking_limitations = [
-            note
-            for term in result.terms
-            for course in term.courses
-            for note in course.limitations
-            if note.startswith(("prerequisite ", "corequisite "))
-        ]
-        if result.status != "SCHEDULED" or blocking_limitations:
-            continue
-        last_term = max((i for i, term in enumerate(result.terms) if term.courses), default=-1)
-        placement = {
-            course.course_code: term_index
-            for term_index, term in enumerate(result.terms)
-            for course in term.courses
+    # Built once per choice rather than once per combination: a real SMU
+    # student has 15k+ structurally valid combinations, and each is simulated.
+    courses_by_choice: list[dict[int, list[CourseToSchedule]]] = [
+        {
+            id(choice): [
+                CourseToSchedule(
+                    course_code=code,
+                    credit_hours=float(catalog_credit_by_code[code]),
+                    requirement_group_id=choice.owner_group_id,
+                    requirement_group_name=choice.owner_group_name,
+                    selection_limitations=list(choice.limitations),
+                )
+                for code in choice.courses
+            ]
+            for choice in choices
         }
-        selected_completion_terms = [placement[course.course_code] for course in selected_courses]
-        combination_completion_terms: list[int] = []
-        for deferred, choice in zip((item for item, _ in choices_by_requirement), combination):
-            candidate_id = stable_candidate_id(
+        for _, choices in choices_by_requirement
+    ]
+    candidate_ids_by_choice: list[dict[int, str]] = [
+        {
+            id(choice): stable_candidate_id(
                 deferred.requirement_group_id,
                 choice.option_order,
                 choice.courses,
                 source_path=choice.owner_group_id,
             )
+            for choice in choices
+        }
+        for deferred, choices in choices_by_requirement
+    ]
+
+    valid_combinations: list[_ValidCombination] = []
+    evaluated = 0
+    for combination in structurally_valid:
+        selected_courses = [
+            course
+            for by_choice, choice in zip(courses_by_choice, combination)
+            for course in by_choice[id(choice)]
+        ]
+        # place_courses() is schedule_courses() minus building the result
+        # models; it agrees with it exactly on placement and limitations.
+        term_codes, limitations_by_code = place_courses(
+            base_courses + selected_courses, prerequisites, satisfied,
+            starting_season=starting_season, max_terms=max_terms,
+            credit_hour_cap=credit_hour_cap,
+        )
+        evaluated += 1
+        if term_codes is None or any(
+            note.startswith(("prerequisite ", "corequisite "))
+            for codes in term_codes
+            for code in codes
+            for note in limitations_by_code.get(code, [])
+        ):
+            continue
+        last_term = len(term_codes) - 1
+        placement = {
+            code: term_index
+            for term_index, codes in enumerate(term_codes)
+            for code in codes
+        }
+        combination_candidate_ids = [
+            ids[id(choice)] for ids, choice in zip(candidate_ids_by_choice, combination)
+        ]
+        selected_completion_terms = [placement[course.course_code] for course in selected_courses]
+        combination_completion_terms: list[int] = []
+        for deferred, choice, candidate_id in zip(
+            (item for item, _ in choices_by_requirement), combination, combination_candidate_ids
+        ):
             evidence = evidence_by_requirement[deferred.requirement_group_id][candidate_id]
             candidate_completion = max(
                 (placement[code] for code in choice.courses), default=0
@@ -848,15 +871,6 @@ def select_structured_requirements(
             evidence.exclusion_reasons.clear()
             evidence.exclusion_details.clear()
         additional_credits = sum(course.credit_hours for course in selected_courses)
-        combination_candidate_ids = [
-            stable_candidate_id(
-                deferred.requirement_group_id,
-                choice.option_order,
-                choice.courses,
-                source_path=choice.owner_group_id,
-            )
-            for (deferred, _), choice in zip(choices_by_requirement, combination)
-        ]
         # Career relevance is below every academic objective. The sum is a global
         # preference; the stable per-requirement tuple resolves equal sums. Missing
         # rankings contribute zero, preserving the Phase 3 source/course fallback.
@@ -890,7 +904,6 @@ def select_structured_requirements(
         valid_combinations.append(_ValidCombination(
             score=score,
             choices=combination,
-            schedule=result,
             candidate_ids=tuple(combination_candidate_ids),
             completion_terms=tuple(combination_completion_terms),
         ))

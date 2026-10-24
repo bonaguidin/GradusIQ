@@ -27,6 +27,7 @@ from GradusIQ_career.course_discovery.prerequisites import structured_prerequisi
 from GradusIQ_career.course_discovery.scheduler import (
     CourseToSchedule,
     UnscheduledRequirement,
+    place_courses,
     satisfied_course_codes,
     schedule_courses,
 )
@@ -561,4 +562,85 @@ def test_unsupported_starting_season_raises():
             student_id="stu-1", program_id="prog-1",
             courses=courses, prerequisites=prerequisites, already_satisfied=set(), unscheduled=[],
             starting_year=2026, starting_season="Summer", max_terms=4,
+        )
+
+
+# ---------------------------------------------------------------------------
+# place_courses(): the selector's fast path must agree with schedule_courses()
+# ---------------------------------------------------------------------------
+
+
+def _placement_from_result(result):
+    if result.status != "SCHEDULED":
+        return None
+    return [[course.course_code for course in term.courses] for term in result.terms]
+
+
+def _assert_place_agrees(courses, prerequisites, satisfied, *, max_terms, cap):
+    result = schedule_courses(
+        student_id="stu-1", program_id="prog-1",
+        courses=courses, prerequisites=prerequisites, already_satisfied=satisfied, unscheduled=[],
+        starting_year=2026, starting_season="Fall", max_terms=max_terms, credit_hour_cap=cap,
+    )
+    term_codes, limitations = place_courses(
+        courses, prerequisites, satisfied,
+        starting_season="Fall", max_terms=max_terms, credit_hour_cap=cap,
+    )
+    assert term_codes == _placement_from_result(result)
+    for term in result.terms:
+        for course in term.courses:
+            assert limitations.get(course.course_code, []) == course.limitations
+
+
+def test_place_courses_agrees_with_schedule_courses_on_real_ethan_scope():
+    _, courses, prerequisites, satisfied, _ = _load_ethan_brooks_case()
+    for max_terms in (1, 3, 6):
+        for cap in (6.0, 12.0, 15.0):
+            _assert_place_agrees(courses, prerequisites, satisfied, max_terms=max_terms, cap=cap)
+
+
+def test_place_courses_agrees_with_schedule_courses_on_random_graphs():
+    """Seeded random graphs covering strict edges, OR-clauses, corequisites,
+    satisfied courses, cycles, cap failures and over-constrained horizons."""
+    import random
+
+    rng = random.Random(20261023)
+    codes = [f"C{index}" for index in range(9)]
+    outcomes = set()
+    for _ in range(400):
+        count = rng.randint(0, len(codes))
+        chosen = rng.sample(codes, count)
+        courses = [_course_to_schedule(code, rng.choice((1, 3, 3, 4, 6, 9))) for code in chosen]
+        prerequisites = {}
+        for code in chosen:
+            clauses = [
+                PrerequisiteClause(course_codes=rng.sample(codes, rng.choice((1, 1, 2))))
+                for _ in range(rng.choice((0, 1, 1, 2)))
+            ]
+            coreqs = rng.sample(codes, rng.choice((0, 0, 1)))
+            clauses = [
+                clause for clause in clauses if code not in clause.course_codes
+            ]
+            prerequisites[code] = StructuredPrerequisite(
+                requires_all=clauses, coreq_allowed=[c for c in coreqs if c != code]
+            )
+        satisfied = set(rng.sample(codes, rng.choice((0, 1, 2))))
+        max_terms = rng.choice((1, 2, 4, 6))
+        cap = rng.choice((6.0, 9.0, 15.0))
+        _assert_place_agrees(courses, prerequisites, satisfied, max_terms=max_terms, cap=cap)
+        outcomes.add(
+            place_courses(courses, prerequisites, satisfied, starting_season="Fall",
+                          max_terms=max_terms, credit_hour_cap=cap)[0] is None
+        )
+    # Both scheduled and fail-closed outcomes were exercised.
+    assert outcomes == {True, False}
+
+
+def test_place_courses_rejects_unsupported_starting_season_like_schedule_courses():
+    import pytest
+
+    with pytest.raises(ValueError, match="Unsupported starting season"):
+        place_courses(
+            [_course_to_schedule("A")], {}, set(),
+            starting_season="Summer", max_terms=2,
         )
