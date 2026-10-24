@@ -267,3 +267,213 @@
     opacity: 1;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Header actions: "New chat" and, in the side panel, a close button.
+   --------------------------------------------------------------------------- */
+
+.chat-header-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  flex-shrink: 0;
+}
+
+.chat-close {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-chip);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background var(--t-quick) var(--ease-out), color var(--t-quick) var(--ease-out);
+}
+
+.chat-close:hover {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+/* ---------------------------------------------------------------------------
+   Assistant replies: short paragraphs, lists and bold (ChatMarkdown.tsx).
+   The block elements carry the spacing, so pre-wrap is only for the
+   student's own messages.
+   --------------------------------------------------------------------------- */
+
+.chat-msg--assistant .chat-msg-body {
+  white-space: normal;
+}
+
+/* :where() keeps the reset at zero specificity so the gap rule below wins. */
+.chat-msg-body :where(p, ul, ol) {
+  margin: 0;
+}
+
+.chat-msg-body > * + * {
+  margin-top: var(--sp-2);
+}
+
+.chat-msg-body :where(ul, ol) {
+  padding-left: 1.25em;
+}
+
+.chat-msg-body li + li {
+  margin-top: 2px;
+}
+
+.chat-msg-body strong {
+  font-weight: 600;
+}
+
+.chat-msg-body code {
+  font-family: var(--font-data);
+  font-size: 0.9em;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: rgb(var(--ink-rgb) / 0.06);
+}
+
+.chat-msg-body a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------------------
+   Side panel (AssistantDock.tsx): the same chat, docked to the right edge on
+   every signed-in page except Overview. Not modal; the page stays usable.
+   --------------------------------------------------------------------------- */
+
+.assistant-dock {
+  position: fixed;
+  top: var(--sp-4);
+  right: var(--sp-4);
+  bottom: var(--sp-4);
+  z-index: 60;
+  width: min(400px, calc(100vw - 2 * var(--sp-4)));
+  display: flex;
+  animation: assistant-dock-in var(--t-quick) var(--ease-out);
+}
+
+.chat-panel--docked {
+  flex: 1;
+  min-height: 0;
+  margin-bottom: 0;
+  padding: var(--sp-4) var(--sp-5);
+  box-shadow: 0 18px 48px var(--shadow-ink);
+}
+
+.chat-panel--docked .chat-messages {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+}
+
+/* With no messages, the suggestions sit under the header, not mid-panel. */
+.chat-panel--docked .chat-empty {
+  margin-top: var(--sp-2);
+}
+
+@keyframes assistant-dock-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Phones: a full-screen sheet; the page behind can't be used at that width. */
+@media (max-width: 640px) {
+  .assistant-dock {
+    inset: 0;
+    width: auto;
+  }
+  .chat-panel--docked {
+    border-radius: 0;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Launcher: a pill in the bottom-right corner that opens the panel.
+   --------------------------------------------------------------------------- */
+
+.assistant-launcher {
+  position: fixed;
+  right: var(--sp-5);
+  bottom: var(--sp-5);
+  z-index: 30;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  border: none;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  box-shadow: 0 8px 24px var(--shadow-ink);
+  cursor: pointer;
+  transition: transform var(--t-quick) var(--ease-out), box-shadow var(--t-quick) var(--ease-out);
+}
+
+.assistant-launcher:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 28px var(--shadow-ink);
+}
+
+.assistant-launcher:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* The review screens' Confirm bar is fixed to the bottom too; sit above it. */
+body:has(.rv-commit) .assistant-launcher {
+  bottom: calc(var(--sp-5) + 72px);
+}
+
+/* A reply arrived or is on its way while the panel was closed. */
+.assistant-launcher-pending {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--on-accent);
+  animation: chat-blink var(--t-pulse) infinite ease-in-out;
+}
+
+@media (max-width: 640px) {
+  .assistant-launcher {
+    right: var(--sp-4);
+    bottom: var(--sp-4);
+    padding: var(--sp-3);
+  }
+  .assistant-launcher-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .assistant-dock,
+  .assistant-launcher-pending {
+    animation: none;
+  }
+  .assistant-launcher,
+  .assistant-launcher:hover {
+    transition: none;
+    transform: none;
+  }
+}
