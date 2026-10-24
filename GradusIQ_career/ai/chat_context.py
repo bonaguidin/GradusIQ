@@ -14,7 +14,7 @@ is loaded best effort: a source that fails is simply left out of the prompt.
 
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Collection, Mapping, Sequence
 
 
 PLATFORM_GUIDE_PATH = Path(__file__).resolve().parents[1] / "gradus_iq_chat_platform_guide.md"
@@ -31,11 +31,15 @@ def platform_guide() -> str:
     return PLATFORM_GUIDE_PATH.read_text(encoding="utf-8").strip()
 
 
-def compact_analysis(results: Mapping[str, Mapping[str, Any] | None]) -> dict:
+def compact_analysis(
+    results: Mapping[str, Mapping[str, Any] | None], outdated: Collection[str] = ()
+) -> dict:
     """Saved FeatureResult dicts -> {FEATURE: {summary, data}} for successes only.
 
     A skipped or failed result carries no findings worth citing, and its
     errors/missing_fields are UI bookkeeping, so it is left out entirely.
+    Features in `outdated` were run on an older profile (analysis_freshness)
+    and are flagged so the assistant can say so.
     """
     compact: dict[str, dict] = {}
     for feature in ANALYSIS_FEATURES:
@@ -43,6 +47,8 @@ def compact_analysis(results: Mapping[str, Mapping[str, Any] | None]) -> dict:
         if not isinstance(result, Mapping) or result.get("status") != "success":
             continue
         compact[feature] = {"summary": result.get("summary"), "data": result.get("data") or {}}
+        if feature in outdated:
+            compact[feature]["profile_changed_since_run"] = True
     return compact
 
 

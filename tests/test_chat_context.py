@@ -253,3 +253,19 @@ def test_gather_includes_degree_progress(monkeypatch):
     monkeypatch.setattr(api, "evaluate_requirement_tree", lambda *a: [])
     context = api._gather_chat_context(FakeClient(_tables()), STUDENT_ID, canonical_profile(), NOW)
     assert context["degree_progress"] == {"satisfied": 0, "total": 0, "groups": []}
+
+
+def test_gather_flags_analyses_run_on_an_older_profile():
+    from GradusIQ_career import analysis_freshness
+    from GradusIQ_career.profile_builder import canonical_to_legacy_profile
+
+    legacy = canonical_to_legacy_profile(canonical_profile())
+    fresh = analysis_freshness.stamp({**gap_result(), "feature": "FIT"}, "FIT", legacy)
+    stale = {**gap_result(), analysis_freshness.FINGERPRINT_KEY: "older-profile"}
+    client = FakeClient(_tables(student_analysis_cache=[
+        {"feature": "gap", "result": stale}, {"feature": "fit", "result": fresh},
+    ]))
+    analysis = api._gather_chat_context(client, STUDENT_ID, canonical_profile(), NOW)["saved_analysis"]
+    assert analysis["GAP"]["profile_changed_since_run"] is True
+    assert "profile_changed_since_run" not in analysis["FIT"]
+    assert analysis_freshness.FINGERPRINT_KEY not in json.dumps(analysis)

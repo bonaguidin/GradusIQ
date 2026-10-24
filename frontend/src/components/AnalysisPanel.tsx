@@ -75,6 +75,13 @@ interface AnalysisPanelProps {
    * before.
    */
   blockedReason?: string;
+  /**
+   * The saved result shown was computed from an older profile (the backend's
+   * `profile_changed`). Shown as a quiet note above the result, pointing at
+   * the Re-run button already in the header; nothing re-runs on its own,
+   * since a live run is slow and costs a model call.
+   */
+  profileChanged?: boolean;
   children?: ReactNode;
 }
 
@@ -94,6 +101,7 @@ export function AnalysisPanel({
   refreshing = false,
   refreshError,
   blockedReason,
+  profileChanged = false,
   children,
 }: AnalysisPanelProps) {
   const requestProfileField = useProfileFieldRequest();
@@ -174,6 +182,12 @@ export function AnalysisPanel({
               renders one coherent instruction rather than competing retries. */}
           <p>{failureMessage ?? 'Something went wrong generating this analysis.'}</p>
         </div>
+      )}
+
+      {phase === 'success' && profileChanged && !refreshing && (
+        <p className="analysis-stale-note">
+          Your profile has changed since this analysis ran. Re-run it to include the latest.
+        </p>
       )}
 
       {phase === 'success' && children}

@@ -2117,6 +2117,15 @@ a {
   font-style: italic;
 }
 
+/* A saved FIT/GAP/SHIFT result whose inputs changed since it ran. Quiet on
+   purpose: the result is still worth reading, and the header's Re-run button
+   is the one action. */
+.analysis-stale-note {
+  margin-bottom: var(--sp-3);
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
 /* GAP score */
 .gap-score-row {
   display: flex;
