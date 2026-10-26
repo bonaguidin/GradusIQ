@@ -5,6 +5,8 @@ import type { Session } from '@supabase/supabase-js';
 import { AuthContext, type AuthContextValue } from './auth/AuthContext';
 import { StudentAccountProblem } from './auth/AccountStateScreens';
 import { AuthenticatedDashboard } from './pages/AuthenticatedDashboard';
+import { ChatProvider } from './chat/ChatContext';
+import { AssistantDock } from './components/AssistantDock';
 import { ProfileCompletionPage } from './pages/ProfileCompletionPage';
 import { applyInstitutionTheme, fetchInstitutionThemeByName } from './lib/institutionTheme';
 import type { StudentIntelligenceProfile } from './types/studentIntelligenceProfile';
@@ -194,6 +196,9 @@ if (careerMode === 'bare') {
 // logic runs. `new` has never finished it; `done` finished it on another
 // device (recorded in user_metadata). Without the param there is no user, so
 // every existing mode above renders with no tour, exactly as before.
+// Chat action buttons keep the preview's fixture when they change section.
+const PREVIEW_KEEP_PARAMS = ['mode', 'tour', 'gpaHistory', 'currentTerm'];
+
 const tourMode = new URLSearchParams(location.search).get('tour');
 const session = (tourMode
   ? {
@@ -232,7 +237,9 @@ const app = mode === 'error'
     // from the real address bar -- a Playwright test reading page.url() would
     // never see it change. BrowserRouter keeps this preview's query string
     // real, same as the production app.
-    : <AuthContext.Provider value={context}><BrowserRouter><AuthenticatedDashboard /></BrowserRouter></AuthContext.Provider>;
+    // ChatProvider + AssistantDock as App.tsx mounts them, so the side panel
+    // and the shared conversation can be exercised here too.
+    : <AuthContext.Provider value={context}><BrowserRouter><ChatProvider dashboardPath={window.location.pathname} keepParams={PREVIEW_KEEP_PARAMS}><AuthenticatedDashboard /><AssistantDock /></ChatProvider></BrowserRouter></AuthContext.Provider>;
 
 // This harness substitutes AuthContext.Provider directly instead of
 // rendering the real AuthProvider, so AuthProvider's own institution-theming

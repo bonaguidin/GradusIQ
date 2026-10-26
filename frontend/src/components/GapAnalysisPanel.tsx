@@ -68,6 +68,7 @@ export function GapAnalysisPanel({ run: externalRun }: GapAnalysisPanelProps = {
       refreshing={refreshing}
       refreshError={refreshError}
       blockedReason={blockedReason}
+      profileChanged={state.phase === 'done' && state.result.profile_changed === true}
     >
       {state.phase === 'done' && state.result.status === 'success' && (
         <GapResult data={state.result.data} summary={state.result.summary} />

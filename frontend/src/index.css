@@ -2117,6 +2117,15 @@ a {
   font-style: italic;
 }
 
+/* A saved FIT/GAP/SHIFT result whose inputs changed since it ran. Quiet on
+   purpose: the result is still worth reading, and the header's Re-run button
+   is the one action. */
+.analysis-stale-note {
+  margin-bottom: var(--sp-3);
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
 /* GAP score */
 .gap-score-row {
   display: flex;
@@ -9323,4 +9332,44 @@ label.profile-form-check { display: flex; flex-direction: row; align-items: cent
   .overview-page .overview-stat--ring.is-celebrating {
     animation: none !important;
   }
+}
+
+/* ── Career Profile: "What GradusIQ remembers" (MemoryNotesPanel.tsx) ── */
+.memory-notes-intro,
+.memory-notes-empty {
+  margin: 0 0 var(--sp-3);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+.memory-notes-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.memory-note {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--surface-elevated);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  color: var(--ink);
+}
+.memory-note-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.memory-notes-error {
+  margin: var(--sp-2) 0 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--error);
 }

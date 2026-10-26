@@ -1,5 +1,6 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { REPORT_ISSUE_EVENT, takeReportIssueRequest } from '../lib/reportIssueRequest';
 import { BugIcon, ReportIssueDialog } from './ReportIssueDialog';
 
 /**
@@ -20,6 +21,17 @@ export function ReportIssueButton({
 }) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
+
+  // The assistant's "Report a bug" button asks through reportIssueRequest,
+  // either while this is mounted (the event) or just before (the flag).
+  useEffect(() => {
+    function openIfAsked() {
+      if (takeReportIssueRequest()) setOpen(true);
+    }
+    openIfAsked();
+    window.addEventListener(REPORT_ISSUE_EVENT, openIfAsked);
+    return () => window.removeEventListener(REPORT_ISSUE_EVENT, openIfAsked);
+  }, []);
 
   function close() {
     setOpen(false);

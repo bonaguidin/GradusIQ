@@ -10,9 +10,14 @@ import { ProfileCompletionPage } from './pages/ProfileCompletionPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { RequireAuth } from './auth/RequireAuth';
 import { RequireStudentAccount } from './auth/RequireStudentAccount';
+import { ChatProvider } from './chat/ChatContext';
+import { AssistantDock } from './components/AssistantDock';
 
 export default function App() {
+  // One assistant conversation for every page (ChatProvider), and the
+  // launcher + side panel that opens it away from Overview (AssistantDock).
   return (
+    <ChatProvider>
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignUpPage />} />
@@ -54,5 +59,7 @@ export default function App() {
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
+    <AssistantDock />
+    </ChatProvider>
   );
 }
