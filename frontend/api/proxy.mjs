@@ -145,6 +145,9 @@ const ME_TARGETS = Object.assign(Object.create(null), {
   // holds these three, not the wider analyze vocabulary (chat, action-plan,
   // course-discovery, professor-comments have no cache file).
   'me-analysis-cache': { method: 'GET', needsFeature: false, needsCacheFeature: true },
+  // Background GAP/FIT/SHIFT runs: POST starts (or joins) one, GET reads its
+  // state. Same three features as the cache, so the same flag validates them.
+  'me-analysis-run': { methods: ['GET', 'POST'], needsFeature: false, needsCacheFeature: true },
   'me-career-role-options': { method: 'GET', needsFeature: false },
   // Canvas calendar feed: read, connect (PUT, JSON body with the feed URL),
   // disconnect, and a forced re-sync on its own fixed path.
@@ -266,6 +269,7 @@ function meBackendPath(target, feature, reviewTable, recordId, searchQuery, term
     return `/api/v2/student/me/course-records/${encodeURIComponent(recordId)}/finalize`
   }
   if (target === 'me-analysis-cache') return `/api/v2/student/me/analysis-cache/${encodeURIComponent(feature)}`
+  if (target === 'me-analysis-run') return `/api/v2/student/me/analysis-runs/${encodeURIComponent(feature)}`
   if (target === 'me-career-role-options') return '/api/v2/student/me/career-role-options'
   if (target === 'me-canvas-calendar') return '/api/v2/student/me/canvas-calendar'
   if (target === 'me-canvas-calendar-refresh') return '/api/v2/student/me/canvas-calendar/refresh'

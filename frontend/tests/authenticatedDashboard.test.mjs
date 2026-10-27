@@ -78,19 +78,25 @@ test('authenticated dashboard covers canonical states, routing, themes, errors, 
       }
       return
     }
-    if (request.url?.startsWith('/api/v2/student/me/analyze/')) {
-      requests.push({ url: request.url, authorization: request.headers.authorization })
+    if (request.url?.startsWith('/api/v2/student/me/analysis-runs/')) {
       response.statusCode = 200; response.setHeader('content-type', 'application/json')
+      // The page checks for a run still going on mount (GET); none is.
+      if (request.method !== 'POST') {
+        response.end(JSON.stringify({ state: 'none' }))
+        return
+      }
+      requests.push({ url: request.url, authorization: request.headers.authorization })
+      // A run that settles at once, so the page skips polling.
       // Mirrors base.py's skip result: `errors` carries the human sentence,
       // `missing_fields` carries the label and the dotted path together.
-      response.end(JSON.stringify({
+      response.end(JSON.stringify({ state: 'done', elapsed_seconds: 0.1, result: {
         feature: 'GAP',
         status: 'skipped',
         summary: '',
         data: {},
         errors: ['Missing required field: AI comfort level'],
         missing_fields: [{ path: 'career.ai_anxiety_level', label: 'AI comfort level' }],
-      }))
+      } }))
       return
     }
     if (path === '/api/v2/student/me/profile' && request.method === 'PATCH') {
@@ -610,9 +616,9 @@ test('authenticated dashboard covers canonical states, routing, themes, errors, 
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
 
   assert.deepEqual(requests.map(({ url }) => url), [
-    '/api/v2/student/me/analyze/gap',
-    '/api/v2/student/me/analyze/fit',
-    '/api/v2/student/me/analyze/shift',
+    '/api/v2/student/me/analysis-runs/gap',
+    '/api/v2/student/me/analysis-runs/fit',
+    '/api/v2/student/me/analysis-runs/shift',
   ])
   assert.equal(requests.every(({ authorization }) => authorization === 'Bearer real-access-token'), true)
 

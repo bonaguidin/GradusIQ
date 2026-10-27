@@ -21,7 +21,7 @@ import tempfile
 import threading
 import time
 from collections import deque
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -37,7 +37,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from GradusIQ_career.academics.gpa import CourseRecord, GradeMapRow, Institution, compute_both
 from GradusIQ_career.ai.errors import AIConfigError, AIRequestError, AIResponseParseError
 from GradusIQ_career.ai.context import AgentContext, GroundingMetadata
-from GradusIQ_career import analysis_freshness
+from GradusIQ_career import analysis_freshness, analysis_runs
 from GradusIQ_career.ai import chat_context
 from GradusIQ_career.ai import chat_actions, chat_changes, chat_memory, chat_tools
 from GradusIQ_career.ai.contracts import ChatOutput, feature_output_is_valid
@@ -373,17 +373,29 @@ class AIConcurrencyGate:
     def __init__(self, capacity: int) -> None:
         self._semaphore = threading.BoundedSemaphore(capacity)
 
-    @contextmanager
-    def slot(self) -> Iterator[None]:
+    def acquire(self) -> None:
+        """Take a slot or raise 429. Pair with release(); slot() does both."""
         if not self._semaphore.acquire(blocking=False):
             raise HTTPException(status_code=429, detail="AI service is busy; retry later.")
+
+    def release(self) -> None:
+        self._semaphore.release()
+
+    @contextmanager
+    def slot(self) -> Iterator[None]:
+        self.acquire()
         try:
             yield
         finally:
-            self._semaphore.release()
+            self.release()
 
 
-def authorize_proxy_request(request: Request) -> None:
+def authorize_proxy_secret(request: Request) -> None:
+    """The proxy-secret half of authorize_proxy_request, without the rate limit.
+
+    Only for cheap reads the page repeats on a timer (a background run's
+    status), which would otherwise use up the shared request budget.
+    """
     config: APIConfig = request.app.state.api_config
     if not config.proxy_secret:
         raise HTTPException(status_code=503, detail="Backend proxy authentication is not configured.")
@@ -394,6 +406,9 @@ def authorize_proxy_request(request: Request) -> None:
     ):
         raise HTTPException(status_code=401, detail="Unauthorized.")
 
+
+def authorize_proxy_request(request: Request) -> None:
+    authorize_proxy_secret(request)
     if not request.app.state.rate_limiter.allow():
         raise HTTPException(status_code=429, detail="Request rate limit exceeded.")
 
@@ -1647,15 +1662,31 @@ def _run_authenticated_typed_feature(
     cached = load_cached_feature_result(slug, feature, student_id)
     if cached is not None:
         return cached
-    # Start, finish and failure are logged with timing because a run can
-    # outlast the frontend proxy's 300s limit: the browser then sees a timeout,
-    # uvicorn skips the access line for the closed connection, and these lines
-    # are the only record of whether the run finished and was saved.
+    return _run_and_save_typed_feature(
+        feature, canonical, profile, student_id,
+        hold=request.app.state.ai_concurrency.slot(),
+        cache_client=lambda: _session_client(request),
+    )
+
+
+def _run_and_save_typed_feature(
+    feature: str, canonical, profile: dict, student_id, *, hold, cache_client
+) -> dict:
+    """Run GAP/FIT/SHIFT, save the result to the analysis cache, return it.
+
+    `hold` is the capacity slot held around the model work: a fresh slot()
+    for a request that waits on the run, or nullcontext() for a background
+    run whose slot was taken when it was started. Raises HTTPException on
+    failure. Shared by the waiting route and background runs.
+    """
+    # Start, finish and failure are logged with timing: for a background run
+    # these lines are the server's only record of how it went, and before
+    # background runs a run that outlasted the proxy left no trace at all.
     run_label = f"feature={feature} student={str(student_id)[:8]}"
     started = time.monotonic()
     logger.info("analysis run started: %s", run_label)
     try:
-        with request.app.state.ai_concurrency.slot():
+        with hold:
             runner = RUNNERS[feature](client=build_client())
             result = runner.run_canonical(canonical, profile)
     except HTTPException as exc:
@@ -1669,12 +1700,11 @@ def _run_authenticated_typed_feature(
         raise HTTPException(status_code=502, detail="Analysis service is unavailable.") from exc
     saved = None
     if feature.lower() in _ANALYSIS_CACHE_FEATURES and student_id is not None:
-        client = _session_client(request)
         # Saved with a fingerprint of the inputs it ran on, so a later read can
         # say whether the profile has changed since (analysis_freshness.py).
         # The live response itself is current by definition and goes back as is.
         saved = _write_analysis_cache(
-            client,
+            cache_client(),
             student_id,
             feature,
             _canonical_target_role(profile),
@@ -2010,6 +2040,87 @@ def get_me_analysis_cache(request: Request, feature: str) -> dict:
     # fingerprints existed), so the panel can offer a re-run instead of
     # presenting an analysis of an older profile as current.
     return analysis_freshness.for_client(cached, feature, profile)
+
+
+_BACKGROUND_FEATURES = {"gap": "GAP", "fit": "FIT", "shift": "SHIFT"}
+
+
+def _background_feature(feature: str) -> str:
+    internal = _BACKGROUND_FEATURES.get(feature)
+    if internal is None:
+        raise HTTPException(status_code=404, detail="Unknown feature. Expected one of: fit, gap, shift.")
+    return internal
+
+
+def _background_run_error(exc: BaseException) -> tuple[int, str]:
+    if isinstance(exc, HTTPException):
+        return exc.status_code, str(exc.detail)
+    return 502, "Analysis service is unavailable."
+
+
+@router.post(
+    "/api/v2/student/me/analysis-runs/{feature}",
+    dependencies=[Depends(authorize_proxy_request)],
+)
+def start_me_analysis_run(request: Request, feature: str) -> dict:
+    """Start GAP/FIT/SHIFT in the background and return at once.
+
+    The page then reads GET on the same path every few seconds. A second
+    start while one is running joins it instead of starting another.
+    """
+    internal = _background_feature(feature)
+    registry: analysis_runs.AnalysisRunRegistry = request.app.state.analysis_runs
+    client = _session_client(request)
+    student_id = str(_resolve_session_student_id(client))
+    current = registry.running(student_id, feature)
+    if current is not None:
+        return current.to_client(time.monotonic())
+    canonical = build_student_intelligence_profile(client, student_id)
+    profile = canonical_to_legacy_profile(canonical)
+    gate: AIConcurrencyGate = request.app.state.ai_concurrency
+    # Taken here so a busy service answers this request with 429, as the
+    # waiting route does; the run's thread gives it back when it ends.
+    gate.acquire()
+
+    def work() -> dict:
+        try:
+            return _run_and_save_typed_feature(
+                internal, canonical, profile, student_id,
+                hold=nullcontext(), cache_client=lambda: client,
+            )
+        finally:
+            gate.release()
+
+    try:
+        run, started = registry.start(student_id, feature, work, _background_run_error)
+    except BaseException:
+        gate.release()
+        raise
+    if not started:
+        # Lost a race with another start for the same run; its slot is in use.
+        gate.release()
+    return run.to_client(time.monotonic())
+
+
+@router.get(
+    "/api/v2/student/me/analysis-runs/{feature}",
+    dependencies=[Depends(authorize_proxy_secret)],
+)
+def get_me_analysis_run(request: Request, feature: str) -> dict:
+    """State of this student's latest background run of `feature`.
+
+    {"state": "running" | "done" | "failed" | "none", "elapsed_seconds", ...}
+    with `result` when done and `status_code`/`detail` when failed. "none"
+    means no run is known, e.g. the server restarted during one. Not rate
+    limited (authorize_proxy_secret): the page repeats it on a timer.
+    """
+    _background_feature(feature)
+    client = _session_client(request)
+    student_id = str(_resolve_session_student_id(client))
+    run = request.app.state.analysis_runs.get(student_id, feature)
+    if run is None:
+        return {"state": "none"}
+    return run.to_client(time.monotonic())
 
 
 @router.post(
@@ -5451,6 +5562,7 @@ def create_app(config: APIConfig | None = None) -> FastAPI:
         active_config.rate_limit_requests, active_config.rate_limit_window_seconds
     )
     application.state.ai_concurrency = AIConcurrencyGate(active_config.max_concurrent_ai_requests)
+    application.state.analysis_runs = analysis_runs.AnalysisRunRegistry()
     application.state.career_optimization = CareerOptimizationCoordinator()
     application.state.feedback_account_limiter = feedback_report.KeyedRateLimiter(
         *FEEDBACK_ACCOUNT_LIMIT

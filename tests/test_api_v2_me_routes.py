@@ -34,8 +34,10 @@ ME_ROUTES = [
     ("post", "/api/v2/student/me/action-plan", None),
     ("get", "/api/v2/student/me/career-role-options", None),
     ("get", "/api/v2/student/me/job-search?role=Software+Engineering+Intern", None),
+    ("post", "/api/v2/student/me/analysis-runs/gap", None),
+    ("get", "/api/v2/student/me/analysis-runs/gap", None),
 ]
-ME_IDS = ["analyze", "chat", "profile", "action-plan", "role-options", "job-search"]
+ME_IDS = ["analyze", "chat", "profile", "action-plan", "role-options", "job-search", "run-start", "run-status"]
 
 
 def make_test_config(**overrides):

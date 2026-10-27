@@ -1340,6 +1340,34 @@ test('me-analysis-cache forwards gap/fit/shift and rejects anything else', async
   }
 })
 
+test('me-analysis-run forwards GET and POST for gap/fit/shift and rejects anything else', async () => {
+  for (const feature of ['gap', 'fit', 'shift']) {
+    for (const method of ['GET', 'POST']) {
+      const { handler, seen } = planningHandler()
+      const response = await handler.fetch(
+        new Request(`https://gradusiq.example/api/proxy?target=me-analysis-run&feature=${feature}`, {
+          method,
+          headers: { Authorization: 'Bearer t' },
+        }),
+      )
+      assert.equal(response.status, 200)
+      assert.equal(seen[0].url, `https://backend.example/api/v2/student/me/analysis-runs/${feature}`)
+      assert.equal(seen[0].method, method)
+    }
+  }
+
+  for (const feature of ['chat', 'action-plan', 'unknown']) {
+    const { handler: bad, seen: badSeen } = planningHandler()
+    const response = await bad.fetch(
+      new Request(`https://gradusiq.example/api/proxy?target=me-analysis-run&feature=${feature}`, {
+        method: 'POST',
+      }),
+    )
+    assert.equal(response.status, 400)
+    assert.equal(badSeen.length, 0)
+  }
+})
+
 test('me-job-search with no params forwards a bare request', async () => {
   const { handler, seen } = planningHandler()
   const response = await handler.fetch(
@@ -1502,6 +1530,7 @@ test('Vercel rewrites cover every route added by fix/api-proxy-allowlist-gaps', 
     ['/api/v2/student/me/course-records/:id/finalize', '/api/proxy?target=me-course-record-finalize&id=:id'],
     ['/api/v2/student/me/course-records/:id', '/api/proxy?target=me-course-record&id=:id'],
     ['/api/v2/student/me/analysis-cache/:feature', '/api/proxy?target=me-analysis-cache&feature=:feature'],
+    ['/api/v2/student/me/analysis-runs/:feature', '/api/proxy?target=me-analysis-run&feature=:feature'],
     ['/api/v2/student/me/career-role-options', '/api/proxy?target=me-career-role-options'],
     ['/api/v2/student/me/schedule/choices', '/api/proxy?target=me-schedule-choices'],
     ['/api/v2/student/me/schedule/exclusions', '/api/proxy?target=me-schedule-exclusions'],
