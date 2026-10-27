@@ -63,7 +63,30 @@ def memory_instructions() -> str:
         "`REMEMBER: <the fact in a few words, written about the student>`, e.g. "
         "`REMEMBER: Aiming for remote software roles`. The app asks the student before saving "
         "it. At most one per reply, under 120 characters. Never propose grades, passwords, "
-        "health, or anything about other people, and never for one-off questions.\n"
+        "the student's own health or medical details, or anything about other people, and "
+        "never for one-off questions. A career interest is fine to propose even when its field "
+        "is health care (e.g. `REMEMBER: Considering a switch to a health care major`).\n"
+        "You cannot save anything yourself: never say a note is saved or will appear anywhere. "
+        "If the student asks you to remember something, propose it with the REMEMBER line once "
+        "and say they can tap Remember below to save it; do not ask them to confirm first.\n"
+        "</MEMORY>"
+    )
+
+
+def memory_off_instructions() -> str:
+    """The trusted prompt section for a chat with no memory to save into.
+
+    The app guide still describes memory, so without this the model reads
+    "the assistant can offer to remember" and improvises a save that never
+    happens.
+    """
+    return (
+        "<MEMORY>\n"
+        "Memory is not available in this chat, so nothing the student says is saved after "
+        "this conversation. If they ask you to remember something, say plainly that you can't "
+        "save notes here yet, and suggest adding it to their Career Profile instead if it fits "
+        "there. Never say or imply that a note was saved or will appear under \"What GradusIQ "
+        "remembers\".\n"
         "</MEMORY>"
     )
 

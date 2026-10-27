@@ -32,8 +32,22 @@ def test_memory_instructions_only_when_enabled():
     body = api.ChatRequest(message="hi")
     off = api.build_canonical_chat_messages(canonical_profile(), body)[0]["content"]
     on = api.build_canonical_chat_messages(canonical_profile(), body, memory_enabled=True)[0]["content"]
-    assert "<MEMORY>" not in off and "<MEMORY>" in on
+    assert "REMEMBER:" not in off and "REMEMBER:" in on
     assert on.index("<MEMORY>") < on.index("<STUDENT_PROFILE_DATA>\n")
+
+
+def test_chat_without_memory_is_told_it_cannot_save():
+    # The app guide describes memory either way; with memory off the model
+    # once claimed a note was "saved under What GradusIQ remembers".
+    from test_chat_context import canonical_profile
+
+    body = api.ChatRequest(message="can you remember that?")
+    off = api.build_canonical_chat_messages(canonical_profile(), body)[0]["content"]
+    assert chat_memory.memory_off_instructions() in off
+    assert "Never say or imply that a note was saved" in off
+    on = api.build_canonical_chat_messages(canonical_profile(), body, memory_enabled=True)[0]["content"]
+    assert chat_memory.memory_off_instructions() not in on
+    assert "never say a note is saved" in on
 
 
 def test_demo_chat_drops_remember_lines(monkeypatch):

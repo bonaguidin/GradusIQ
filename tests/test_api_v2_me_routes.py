@@ -1849,7 +1849,8 @@ def test_me_chat_never_offers_to_remember_without_the_table(client, monkeypatch)
 
     assert response.json()["reply"] == "Noted."
     assert "remember" not in response.json()
-    assert "<MEMORY>" not in fake.calls[0]["messages"][0]["content"]
+    system = fake.calls[0]["messages"][0]["content"]
+    assert "REMEMBER:" not in system and "can't save notes here yet" in system
 
 
 class ToolCallingAI:
@@ -2027,6 +2028,38 @@ def test_lookup_jobs_filters_employer_and_location(monkeypatch):
 
     no_roles = _lookups(SimpleNamespace(career=SimpleNamespace(target_roles=[])))
     assert "error" in json.loads(no_roles.run("search_jobs", {}))
+
+
+def test_lookup_jobs_unknown_family_becomes_a_title_search(monkeypatch):
+    # "Data Analyst" is no family (those postings are filed under Business
+    # Analyst Intern); passing it through scoped the search to nothing.
+    seen = {}
+
+    def fake_feed(client, **kwargs):
+        seen.update(kwargs)
+        return {"total": 3, "facets": {"families": []}, "postings": [
+            {"title": "Data Analyst Intern", "employer": "Acme", "locations": ["Dallas, TX"], "url": "https://a.example/1"},
+            {"title": "Data Analyst Intern", "employer": "Beta", "locations": ["Austin, TX"]},
+            {"title": "Finance Intern", "employer": "Gamma", "locations": ["Dallas, TX"]},
+        ]}
+
+    monkeypatch.setattr(api, "build_service_client", lambda: object())
+    monkeypatch.setattr(api, "get_job_search_feed", fake_feed)
+
+    result = json.loads(_lookups().run("search_jobs", {"family": "Data Analyst", "location": "Dallas"}))
+
+    assert [p["employer"] for p in result["postings"]] == ["Acme"]
+    assert result["postings"][0]["url"] == "https://a.example/1"
+    assert seen["families"] == api.family_names()
+
+    # A real family name, in any case, still scopes to that family.
+    json.loads(_lookups().run("search_jobs", {"family": "business analyst intern"}))
+    assert seen["families"] == ["Business Analyst Intern"]
+
+    # A title search works even with no target roles set.
+    no_roles = _lookups(SimpleNamespace(career=SimpleNamespace(target_roles=[])))
+    titled = json.loads(no_roles.run("search_jobs", {"title": "finance"}))
+    assert [p["employer"] for p in titled["postings"]] == ["Gamma"]
 
 
 def test_lookup_grade_needed_uses_saved_scores(monkeypatch):
