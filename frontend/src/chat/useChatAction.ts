@@ -11,7 +11,7 @@ function isPhone(): boolean {
 }
 
 // The destination renders after navigation, so look for it for about a second.
-function scrollWhenThere(selector: string, framesLeft = 60): void {
+export function scrollWhenThere(selector: string, framesLeft = 60): void {
   const el = document.querySelector(selector);
   if (el) {
     const smooth = !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;

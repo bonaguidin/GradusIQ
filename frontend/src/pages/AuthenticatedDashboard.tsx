@@ -41,6 +41,9 @@ import { GapAnalysisPanel } from '../components/GapAnalysisPanel';
 import { ShiftAnalysisPanel } from '../components/ShiftAnalysisPanel';
 import { TermPlanner } from '../components/TermPlanner';
 import { CanvasCalendarPanel } from '../components/CanvasCalendarPanel';
+import { NextDueAlert } from '../components/NextDueAlert';
+import { scrollWhenThere } from '../chat/useChatAction';
+import { CHAT_ACTIONS } from '../lib/chatActions.mjs';
 import { GradeCalculatorPanel } from '../components/GradeCalculatorPanel';
 import { CareerProfile, type CareerFieldFocus } from '../components/career/CareerProfile';
 import { updateProfile } from '../api/profile';
@@ -418,6 +421,14 @@ export function AuthenticatedDashboard() {
     setRailOpen(false);
   }
 
+  // The overview's next-due alert: same destination and scroll target as the
+  // assistant's "Connect Canvas calendar" action, without opening the chat.
+  function openCanvasCard() {
+    navigateToAcademicSubTab('overview');
+    const target = CHAT_ACTIONS['canvas-calendar'].scrollTo;
+    if (target) scrollWhenThere(target);
+  }
+
   function openIntelligencePanel(panel: IntelligencePanel) {
     navigateToCareerSubTab('intelligence');
     setIntelligenceTarget(panel);
@@ -591,6 +602,11 @@ export function AuthenticatedDashboard() {
                     <span>{dashboard.institutionName ?? 'Institution not provided'}</span>
                   </div>
                 </div>
+                <NextDueAlert
+                  result={canvasCalendar.state}
+                  enabled={accessToken !== null && dashboard.courses.length > 0}
+                  onOpen={openCanvasCard}
+                />
                 <ChatPanel autoFocus={askOnArrival} />
                 <div className="overview-stats">
                   <div className="overview-stat"><span className="overview-stat-value"><AnimatedNumber value={dashboard.officialGpa} decimals={2} countIn /></span><span className="overview-stat-label">Official GPA</span><GpaSparkline points={dashboard.gpaByTerm} onOpen={() => navigateToAcademicSubTab('gpa-calculator')} /></div>
