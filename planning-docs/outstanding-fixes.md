@@ -38,57 +38,9 @@ _Last updated 2026-10-10. `AcademicSnapshot.tsx`'s Grades/Professor Comments/AI 
 - [ ] **SHIFT has zero market grounding.** `shift_signals` from local O*NET, `role_trends` from web research. No postings. SHIFT is the weaker candidate: one snapshot cannot establish a trend, and many Workday rows have null `posted_date`.
 - [ ] ~~**FIT missing disclosure for borrowed O*NET data.** Unchanged.~~ **Stale — the prompt has had this since `gap-shift-data-grounding` landed (2026-08-11), before this bullet was last written.** `gradus_iq_prompt_FIT.md:56-67` gives every `market_requirements.by_role` entry's `provenance` an explicit, required behavior: `"onet_neighbor"` → "Say so if you cite them" and name the occupation in `borrowed_from`; `"none"` → "Judge fit from the student's own profile and say the market picture isn't available for that role." Left open as a narrower, correctly-scoped question: whether a live model actually follows that instruction in production output, not whether the instruction exists. See the 2026-09-30 FIT/SHIFT disclosure measurement below for n=10 live evidence either way.
 
-## 🟢 FIT posting grounding — shipped, with measured limits
+## 🟢 FIT posting grounding — shipped
 
-Branch `feat/fit-posting-provider`, seven commits. FIT now cites real employers and posting counts from live Adzuna data.
-
-- `a6c28e1` — role-labeled posting provider. Built on whether a posting carries a `target_role` from the query that fetched it, not on vendor name. Adzuna and JSearch qualify; Workday does not (whole-board scrape, null `target_role`). Every requested role always appears in the result; a role with no postings returns `coverage: "no_market_data"` with a reason, so FIT can tell absent data from an unqueried role.
-- `83f2a92` — employer counting. Reuses `normalize_employer` from `identity.py` so "Texas Instruments" and "Texas Instruments Incorporated" count once. Adds `unknown_employer_postings` so a null company reads as "employer unknown" rather than "0 employers".
-- `d7f89ef` — wiring. `role_postings` as its own context key. On provider failure returns `{"status": "unavailable"}` with no `by_role` key, so "could not look" is structurally distinct from "looked and found nothing".
-- `d5d2f67` — prompt permits grounded posting claims.
-- `69abccd` — prompt restructure (see "What the variance investigation found" below).
-- `5602419`, `8a8aef2` — context trim: 10,623 → 8,021 tokens.
-
-### Measured behavior (4 runs, student 3cb86d81, final state)
-
-| Metric | Baseline | Post-restructure | Post-trim |
-|---|---|---|---|
-| Cites employers/counts for a covered role | 3/4 | 2/4 | 3/4 |
-| States "no posting data found" when absent | 3/4 | 2/4 | 3/4 |
-| Citations correctly scoped to the sample | 2/3 | 1/2 | 6/6 |
-| Hard-ban violations | 1/3 | 0/4 | 0/4 |
-| Correct noun (listings, never openings) | — | 4/4 | 6/6 |
-
-~~All quality metrics are clean. The residual 3/4 is whole-response terseness — run 4 dropped O*NET scores too, not just postings — so it is generic instruction-following variance, not postings avoidance. Do not chase it with an output-contract change; that would optimize against noise at n=4.~~ **Wrong — retested 2026-09-28, live, same code/prompt/model as this table** (`git log` confirms no commits touched `fit.py` or the FIT prompt since this section was written). 20 fresh runs (n=15 plus an earlier same-session n=5, one student, one covered role) put the citation rate at **20% (4/20), not 75%.** The n=4 figure was sampling noise, not a stable baseline. Length-crowding isn't the mechanism either: cited rationale averaged 461.5 chars against 273.6 for non-cited runs — citing runs *longer*, not shorter, when it happens at all, so verbosity isn't squeezing the citation out. "Do not chase it" doesn't survive the bigger sample. Two independent next steps, not mutually exclusive: (a) give `role_matches[]` a dedicated structured field for hiring-signal data instead of folding it into free-text `rationale` — this also fixes the frontend gap where `RoleMatchCard` has nowhere to render posting data even on the runs that do cite it; or (b) a harder prompt-level imperative than the current "you MAY name hiring employers" phrasing.
-
-**Resolved 2026-09-29, branch `feat/fit-hiring-signal-field`.** Took path (a): `role_matches[].hiring_signal` (`coverage`/`employers`/`posting_count`) is now a schema-enforced field (`FitHiringSignal` in `contracts.py`), not optional prose. It is not model-trusted output, though — `fit.py`'s `_hiring_signal_by_role` derives the correct value server-side from `role_postings` *before* the model call, and `_apply_hiring_signal_ground_truth` unconditionally overwrites whatever the model returns for this field with that precomputed value, after `FitOutput.model_validate` succeeds and before the result returns to the caller. The model's own attempt is only ever compared for a `fit_hiring_signal_mismatch` log line, never trusted. This makes the frontend-facing number model-independent, and the live re-measurement confirms it: n=20, student `85a3c88a-52fb-43df-97db-d8257d1098db`, "Computer Engineering Intern" (same student/role as the 20% baseline above, for comparability) — **100% of runs (20/20) delivered accurate `hiring_signal` to the frontend**, identical across every run (`coverage: "available"`, `employers: ["Micron Technology, Inc.", "Micron"]`, `posting_count: 5`), versus the 20% free-text citation baseline this replaces. `fit_hiring_signal_mismatch` fired 0/20 (the model's own attempt never diverged from server truth at this n) and the new rationale-instruction change (below) held at 0/20 rationale re-mentions of a cited employer. `RoleMatchCard` now renders the field (`hiring_signal`).
-
-- **Employer-normalization gap surfaced in the UI for the first time.** `hiring_signal.employers` for this role shows `"Micron Technology, Inc."` and `"Micron"` as two separate entries — real output of the existing `normalize_employer` function (`identity.py`), which strips legal suffixes (`Inc.`) but not the word "Technology", so the two strings normalize to different keys and don't collapse. This is the same underlying gap as the open "Employer normalization doesn't strip 'Company' or 'Services'" item below — not a new bug, just the first place a student would actually see it rendered. Left unfixed here; fixing `normalize_employer` is that existing item's job, not this task's.
-- **One whole-run `"failed"` status observed, not reproduced.** Of 21 total live FIT attempts across this measurement (1 exploratory + this n=20), exactly one (the first) came back `status: "failed"` — JSON parse/validation repair exhausted within `AIRuntime`'s existing one-retry budget. Not reproduced in any of the following 20 runs. The existing fail-path already handles this safely (no malformed data reaches the frontend; the caller gets an explicit `"failed"` result). Flagging as an observed rare rate for future reference, not a new open item requiring action.
-- **Mismatch/mention logging is `logger.info` only, not a durable/queryable store.** `fit_hiring_signal_mismatch` and `fit_rationale_employer_mention` are structured log lines (Python `logging`, same convention as `role_research_agent.py`), not a DB write or counter — nothing currently aggregates them over time. Deferred: this measurement's numbers (0% both, n=20) don't justify building that infrastructure yet. Revisit if a live incident or a larger-n remeasurement suggests either log line fires often enough to need trend tracking rather than ad hoc `grep`.
-
-### What the variance investigation found
-
-FIT ignored `role_postings` entirely in 1 of 4 early runs and once said "8 DFW employers" despite an explicit ban. GAP and SHIFT went 8/8 clean on structurally identical prose-only rules, so the cause was FIT-specific:
-
-- The frontmatter manifest listing what the script hands the model omitted `role_postings`, and the MARKET CONTEXT header said "Two blocks" when there were three. The model read an inaccurate inventory of its own inputs. Three separate stale self-inventory bugs were found in this one prompt — the third had `in_demand_software` attributed to `role_context` when it lives on `market_requirements`. Worth checking the other prompts for the same class of error.
-- Rules sat in a 646-word mid-body block; GAP and SHIFT state theirs in one sentence at line 6. Compressed to 237 words with an early rule added.
-- The prohibition text contained the banned phrase as a worked example.
-- Context was 10,623 tokens against GAP's 4,969, with 41.7% being `role_postings` — mostly `description_snippet` text the prompt forbids using. Trimmed along with duplicated `hot_software` and unused `related`.
-
-### Limits this ships with — state them before demoing
-
-- Adzuna only. Workday carries no role label. A classifier would reach 13 of 1,319 rows: those boards are retail, clinical and support roles, not what students target. The lever is employer selection, not labeling.
-- Coverage is thin and uneven. 28 postings for Software Engineering Intern, 25 for Research Assistant, 1 for People Operations Intern, zero for several others.
-- Counts are `distinct_clusters`, not openings. Adzuna's fuzzy matching cannot separate syndication duplicates from separate requisitions.
-- The same job may be counted twice across sources. Vendor rows carry no employer ATS ID.
-- `freshness` is always unknown. Adzuna is query-scoped, so absence from a page is not evidence of closure.
-- No visual check yet. The "Who's hiring" bullet has never been inspected in the rendered dashboard.
-
-### Settled — do not re-investigate
-
-- LLM-generated query terms: tested, rejected. 12 calls across 4 roles returned 5 usable postings, all from one employer. Two other roles are structurally absent from Adzuna — an unpaid volunteer position and a campus job. The bottleneck is corpus supply, not phrasing.
-- `related` dropped from FIT — unused in 0/4 runs, no instruction referenced it. SHIFT keeps it. Surfacing adjacent roles in FIT is worth doing properly, with its own output bullet and a way for students to act on it, not smuggled in as background context.
+Archived: [planning-docs/archive/fit-posting-grounding-2026-09.md](archive/fit-posting-grounding-2026-09.md) (what shipped, measured behavior and limits, the variance investigation, the "Settled — do not re-investigate" notes).
 
 ### Follow-ups from this work
 
@@ -98,51 +50,7 @@ FIT ignored `role_postings` entirely in 1 of 4 early runs and once said "8 DFW e
 
 ## 🟢 FIT/SHIFT O*NET disclosure — measured live, n=10 each
 
-Branch `chore/onet-coverage-fixes`. Question: when a role has thin/no O*NET grounding, does the model actually disclose that (per `gradus_iq_prompt_FIT.md:56-67` and `gradus_iq_prompt_SHIFT.md:64-65`), or silently omit / fabricate instead? Measured against the state immediately before the Operations Intern neighbor-borrow fix below landed, since that's the real "provenance: none" case to observe — a role with real self-report and posting data but zero O*NET ratings and (at measurement time) no related occupation either.
-
-**Setup:** Jordan Reyes's real demo profile (`data/students/student_jordanReyes.json`), `target_roles` narrowed to `["Operations Intern"]` only (bounds SHIFT's trend-research loop to one role). `demo_cache/analysis_jordanReyes.json` (last regenerated 2026-08-11, before the Sep 2026 FIT posting-grounding and hiring_signal-field prompt changes) was checked and found too stale to reuse — see `git log` on `gradus_iq_prompt_FIT.md`, three more rounds of prompt changes since. Live OpenRouter/Tavily calls instead, `uv run`, n=10 per feature.
-
-### FIT (n=10, all `status: "success"`)
-
-| Run | O*NET disclosure in `rationale` | `hiring_signal` (separate, Adzuna-backed, independent of O*NET) |
-|---|---|---|
-| 1 | ✅ "No national survey data exists for this role" | available, 33 postings |
-| 2 | ❌ no mention either way | available, 33 postings |
-| 3 | ❌ no mention either way | available, 33 postings |
-| 4 | ✅ "no specific market demand data exists for this occupation" | available, 33 postings |
-| 5 | ❌ no mention either way | available, 33 postings |
-| 6 | ❌ no mention either way | available, 33 postings |
-| 7 | ✅ "No market requirement data is available for this role." | available, 33 postings |
-| 8 | ✅ "national occupational survey data isn't available for this role" | available, 33 postings |
-| 9 | ✅ "no specific market requirement data exists for this role from national [sources]" | available, 33 postings |
-| 10 | ✅ "no market data exists to detail core tasks or requirements for this occupation" | available, 33 postings |
-
-**6/10 explicit disclosure, 4/10 silent omission, 0/10 fabrication.** No run invented an O*NET importance score, a false "national survey shows X%" claim, or any O*NET-attributed statistic for Operations Intern — the failure mode this measurement was built to catch did not appear. The 4 silent-omission runs aren't neutral, though: the prompt's instruction is "say the market picture isn't available," not "say nothing about it," so those runs under-comply rather than mis-comply. `hiring_signal` (the server-computed, model-independent Adzuna field from `feat/fit-hiring-signal-field`) was accurate and identical in all 10 — a separate, already-solid grounding channel that explains why several of the "no O*NET data" rationales still read as confident: the role has real posting evidence even without O*NET ratings.
-
-### SHIFT (n=10: 9 `success`, 1 `failed`)
-
-| Run | `role_evolution_summary` | `task_shifts` | `durable_skills` | `adjacent_paths` |
-|---|---|---|---|---|
-| 1 | generic, no fabricated specifics | 0 | 0 | 0 |
-| 2 | — | — | — | — (schema validation failure, see below) |
-| 3 | cites NACE 2026 (named study, permitted) | 0 | 0 | 0 |
-| 4 | generic | 0 | 0 | 0 |
-| 5 | generic | 0 | 0 | 0 |
-| 6 | cites NACE-style stat (named study) | 0 | 0 | 0 |
-| 7 | ✅ explicit: "specific data for Operations Intern roles is limited" | 0 | 0 | 0 |
-| 8 | generic | 2 generic | 3 generic | 0 |
-| 9 | generic | 0 | 0 | 0 |
-| 10 | generic | 1 generic | 3 generic | 0 |
-
-**0/9 successful runs fabricated a named employer, posting count, or percentage for Operations Intern specifically** — `role_evolution_summary` either stayed generic ("business operations roles," "entry-level positions") or cited a real named study (NACE's 2026 outlook), which the prompt's no-postings rule explicitly permits. 1/9 explicitly disclosed data scarcity in plain language; the rest neither disclosed nor fabricated, landing in the same "silent omission" bucket as FIT.
-
-**The one clear finding: `adjacent_paths` was empty in all 9 successful runs, despite `shift_signals.by_role["Operations Intern"].related` now carrying a real (disclosed, `manual_override: true`) entry** (Logisticians, from the fix below — at measurement time this was still the pre-fix empty `related: []`, so emptiness there was expected; worth re-measuring post-fix, since the model had nothing to surface before and now has exactly one candidate). Not evidence of fabrication risk, but evidence that a single related occupation may not be enough signal for the model to act on even when disclosed and available — track if it stays empty after the neighbor-borrow fix lands.
-
-**1/10 SHIFT runs came back `status: "failed"`** — a `ShiftGuidance`/`ShiftGuidanceSection` union schema-validation failure on `ai_fluency_guidance`, unrelated to O*NET grounding (it's a structural output-shape issue, same class as the "one whole-run failed status observed, not reproduced" note in the FIT section above). Not investigated further here — out of this measurement's scope — but worth a dedicated n-run if it recurs.
-
-### Bottom line
-
-Neither feature fabricated O*NET-sourced facts for the ungrounded role across 19 successful live runs. Both under-comply with the "disclose explicitly" instruction some of the time (FIT 4/10, SHIFT 8/9) by saying nothing rather than something false — a real gap between "the prompt says to disclose" and "the model reliably does," but a materially safer failure mode than silent fabrication. The Operations Intern neighbor-borrow fix below removes the `provenance: "none"` case from the live catalog entirely for this specific role, so this exact gap no longer has a real demo-role example to recur on — re-measure if a genuinely ungrounded role resurfaces (a student-typed role string outside the 14 curated ones, say).
+Archived: [planning-docs/archive/onet-disclosure-measurement-2026-09-30.md](archive/onet-disclosure-measurement-2026-09-30.md) (FIT and SHIFT measurements; 0 fabrication, inconsistent disclosure). The open follow-up from it stays below.
 
 - [ ] **Disclosure consistency itself is a known gap, currently unexercised by the demo catalog.** This same session's n=10/n=9 measurement: zero fabrication (0/19) but inconsistent disclosure — FIT explicitly said "market data unavailable" 6/10 times, SHIFT 1/9 times; the remaining runs were silent (neither disclosed nor fabricated) rather than wrong. Now that Operations Intern also resolves (14/14), no demo role still produces a live `provenance: "none"` / `grounded: false` case, so normal testing won't catch this if it regresses or resurfaces. Not an active bug and not blocking anything today — flag for a closer look (tighter prompt imperative, or a structured field the way `hiring_signal` replaced free-text posting claims) if/when a real `provenance: "none"` or low-confidence neighbor-borrow case appears again, live or in a future role.
 
@@ -206,14 +114,7 @@ Corpus repair (2026-09-14, transaction-scoped, direct Postgres): split the 30 re
 
 ## 🟡 TAMU degree planner — verified working end-to-end, several pieces still soft
 
-TAMU Computer Engineering - BS now has a full pipeline: catalog scrape (`data/catalog/fetch_tamu_requirements.py`, commit `b5560f2`, 2026-08-23 12:55) → requirement-skeleton import (`data/catalog/import_tamu_requirements.py`, commit `01c8f81`, 16:04) → satisfaction engine (`requirement_satisfaction.py`, extended for `course_code` alongside SMU's `coursedog_group_id`) → scheduler (`scheduler_scope.py`'s `_leaf_course_requirements()`, redesigned to return `list[frozenset[str]]` so "/"-joined cross-listings like `ENGR 216/PHYS 216` resolve as "either code satisfies," commit `bc5953b`, 16:27) → SCHEDULE/satisfaction API routes (`cd3988d`, 16:27; `e2403a8`, 16:28).
-
-**✅ Verified working end-to-end against a real account as of 2026-08-24, re-confirmed via a fresh live trace** (not the prior session's self-report — an independent read-only script run against the live Supabase project, replicating `_reconstruct_academic_schedule()`'s exact call sequence for `muralideepak2006@gmail.com`, service-role client, zero writes):
-  - `student_institutions.catalog_year` = `'2026-2027'`, resolving to `institution_id 75d68331-91d2-47e8-9671-2a3b065955d0` (Texas A&M University).
-  - `_resolve_program_id_for_student` resolves exactly one program: `id=8c240ed7-c7da-4f81-896f-6e04885a9cea, code=ECEN-CPEN-BS, name=Computer Engineering` — matches the previously-cited program ID.
-  - `fetch_requirement_tree` → `evaluate_requirement_tree` → `scope_schedule_input` → `structured_candidate_codes` → `select_structured_requirements` → `schedule_courses` ran the full chain live: **31 requirement groups, 33 options, 37 option_courses fetched; scheduler output `SCHEDULED`, 2 terms — 2027-Spring (`CSCE 313, CSCE 350, CSCE 481, ECEN 314, MATH 311`, 15 cr) and 2027-Fall (`MATH 152`, 4 cr) — 6 no-choice courses total, 17 unscheduled** (a mix of 8 `SELECTION_DEFERRED` and 9 `FREEFORM_MANUAL_REVIEW`, not previously broken out). This matches the doc's prior "6 no-choice courses across 2 terms, 17 deferred" claim exactly.
-  - **On the contradiction the audit flagged:** `b5560f2` (12:55, "not integrated... no demo student") and `01c8f81` (16:04, "hypothetical transcript, not a real student") both predate the scheduler-extension commits `cd3988d`/`bc5953b`/`e2403a8` (16:27–16:28) by 20+ minutes same-day. Those messages describe an honest earlier point in the same session's timeline, before the code-path wiring was added — not a standing contradiction of the later "works against a real account" claim. Confirmed by commit timestamp ordering, not assumed.
-  - **Caveat:** this is a point-in-time verification (run 2026-08-24), not a standing guarantee — schema or data drift could change the result on a future re-run. A read-only live trace against a real account legitimately leaves no commit trail, which is why this needed a fresh out-of-band check rather than a repo grep.
+Archived: [planning-docs/archive/tamu-end-to-end-trace-2026-08-24.md](archive/tamu-end-to-end-trace-2026-08-24.md) (pipeline history and the 2026-08-24 live trace against a real account; point-in-time, not a standing guarantee).
 
 Open items surfaced by this session's work, none of which block the above:
 
@@ -328,15 +229,9 @@ Session memory exists. Longitudinal memory does not — target role changes, gap
 
 - **"Known blockers" recheck (2026-08-24):** re-audited a recalled list of four items — a "demo-login routing gap," an "overly-broad `confirmed_at` trigger," "mock interview Whisper verification," and an "AI model tier decision." **None of these correspond to anything in this repo.** `git log --all` has zero hits for "whisper," "demo-login," or "model tier/pricing tier" anywhere in history. The one real `confirmed_at`-related commit (`82e9b85`) explicitly states "No auto-update trigger added; none exists anywhere in the schema today" — directly contradicting the recalled "overly-broad trigger." No "mock interview" feature exists in the codebase at all. These appear to be from a different project or a stale/confabulated memory — not tracked here since there's nothing to act on. Flag if a source for these turns up.
 
-## Corrected claims — this file was wrong about these
+## Corrected claims
 
-- **"O*NET covers the wrong roles, only 2/14 resolve."** False, and more completely resolved than this file's own prior correction on this line said. Verified live 2026-09-30 against `data/reference/onet_soc_requirements.json` (O\*NET 30.3, 1,016 occupations, generated by `data/onet/build_onet.py` — not the 10-SOC hand-built file a stale copy of this backlog item described): **14/14 target roles now resolve to real O\*NET ratings** — 12 directly (`provenance: "onet"`), plus Finance Intern and Operations Intern via disclosed `onet_neighbor` borrowing from a related occupation O\*NET did rate (`market_data._nearest_rated_neighbour`; documented in `docs/plans/gap-shift-data-grounding.md`, which itself predates and doesn't mention this neighbor-borrowing mechanism at all — it's a later addition on top of that plan). Operations Intern's borrow (Logisticians, 13-1081.00) required one further fix beyond what Finance Intern needed: O\*NET's own Related Occupations table has zero rows for 13-1199.00 in either direction, so a `MANUAL_RELATED_OVERRIDES` exception was added to `build_onet.py` (chore/onet-coverage-fixes, 2026-09-30) — a hand-curated pick, same spirit as `data/role_requirements.json`'s own curation, marked `"manual_override": true` in the generated JSON so it's never confused with real O\*NET relatedness data. Both FIT (`gradus_iq_prompt_FIT.md:56-67`) and SHIFT (`gradus_iq_prompt_SHIFT.md:64-65`) have provenance/`grounded`-aware prompt instructions that require explicit disclosure rather than silent fallback when a role's market data is thin or absent — see "🟢 FIT/SHIFT O*NET disclosure" above for whether a live model actually honors that.
-- **"`dfw_postings: None` is a hardcoded literal."** False. The key doesn't exist in executable code.
-- **"No TTL primitive exists anywhere."** False. `job_postings.fetched_at` exists, `retention.py` applies 90 days, and `degree_plan_career_optimization.py` has a 15-minute in-memory TTL.
-- **"Vendor never decided / no credential, no config, no code."** False. Adzuna is the default vendor with a validated field map and nightly runs.
-- **"Job posting data doesn't exist at all."** False.
-- **"121 of 130 multi-posting clusters are bad."** Was true; repaired 2026-09-14. Now zero.
-- **"FIT has zero market grounding."** Was true through 2026-09-14; FIT now cites real employers and counts from live Adzuna postings.
+Archived: [planning-docs/archive/corrected-claims.md](archive/corrected-claims.md). Read it before trusting older notes in this file or in git history.
 
 ---
 
