@@ -4,6 +4,7 @@ import { useAuth } from '../auth/useAuth';
 import { analyzeCourseDiscovery, analyzeFit, analyzeGap, analyzeShift } from '../api/analysis';
 import { useAnalysisRun } from '../hooks/useAnalysisRun';
 import { useCachedAnalysisRun } from '../hooks/useCachedAnalysisRun';
+import { useCanvasCalendar } from '../hooks/useCanvasCalendar';
 import { useSequencedAnalysisRuns } from '../hooks/useSequencedAnalysisRuns';
 import { ChatPanel } from '../components/ChatPanel';
 import { ErrorBoundary } from '../components/ErrorBoundary';
@@ -273,6 +274,10 @@ export function AuthenticatedDashboard() {
     () => (canonical ? buildDashboardViewModel(canonical) : null),
     [canonical],
   );
+  // One Canvas calendar request per session, shared by the Academic card and
+  // the Overview's next-due alert. Skipped for demo identities (no token) and
+  // for students with no confirmed courses, who are not shown the card.
+  const canvasCalendar = useCanvasCalendar(accessToken, (dashboard?.courses.length ?? 0) > 0);
   // Lifted out of CourseDiscoveryPanel (which still owns its own internal
   // useAnalysisRun by default) so Academic Overview's compact summary can
   // read the exact same run/result the full Course Discovery view shows --
@@ -749,7 +754,7 @@ export function AuthenticatedDashboard() {
                     </section>
                     {/* Due dates and exams from the student's Canvas calendar
                         feed. Session-only: a demo identity has no feed. */}
-                    {accessToken && <CanvasCalendarPanel accessToken={accessToken} />}
+                    {accessToken && <CanvasCalendarPanel accessToken={accessToken} calendar={canvasCalendar} />}
                     {/* Compact reflection of the same run Course Discovery
                         itself shows (courseDiscoveryRun, lifted above) -- not
                         a second analysis or a second result store. */}

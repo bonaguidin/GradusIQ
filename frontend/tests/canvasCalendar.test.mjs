@@ -94,7 +94,8 @@ test('day headings and sync labels', () => {
 
 test('the dashboard mounts the panel only for a real session', async () => {
   const dashboard = await readFile(new URL('../src/pages/AuthenticatedDashboard.tsx', import.meta.url), 'utf8')
-  assert.match(dashboard, /\{accessToken && <CanvasCalendarPanel accessToken=\{accessToken\} \/>\}/)
+  assert.match(dashboard, /\{accessToken && <CanvasCalendarPanel accessToken=\{accessToken\} calendar=\{canvasCalendar\} \/>\}/)
+  assert.match(dashboard, /useCanvasCalendar\(accessToken, /)
 })
 
 // ── next-due selection and the shared formatter ─────────────────────────────
