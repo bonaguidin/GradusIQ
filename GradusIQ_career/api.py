@@ -16,6 +16,7 @@ import json
 import logging
 import os
 import re
+import sys
 import tempfile
 import threading
 import time
@@ -453,6 +454,26 @@ def authorize_student_access(request: Request, student_slug: str) -> None:
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+def _configure_app_logging() -> None:
+    """Send the package's INFO lines to stdout, where Render shows them.
+
+    Uvicorn configures only its own loggers, so without this every
+    logger.info in GradusIQ_career (analysis run timing, chat token counts,
+    transcript catalog misses) was dropped, and Render's logs showed nothing
+    but access lines.
+    """
+    package_logger = logging.getLogger("GradusIQ_career")
+    if package_logger.handlers:
+        return
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(logging.Formatter("%(levelname)s:     %(name)s: %(message)s"))
+    package_logger.addHandler(handler)
+    package_logger.setLevel(logging.INFO)
+
+
+_configure_app_logging()
 
 
 def _session_client(request: Request):
@@ -1541,7 +1562,7 @@ _ANALYSIS_CACHE_FEATURES = {"gap", "fit", "shift"}
 
 def _write_analysis_cache(
     client, student_id: str, feature: str, target_role: str | None, result: dict
-) -> None:
+) -> bool:
     """Best-effort upsert of a fresh GAP/FIT/SHIFT result for a real student.
 
     Called after a live run succeeds so the next page load (or a fresh login)
@@ -1562,8 +1583,10 @@ def _write_analysis_cache(
             },
             on_conflict="student_id,feature,target_role",
         ).execute()
-    except Exception:  # noqa: BLE001 -- caching is best-effort, never fatal
-        pass
+    except Exception:  # caching is best-effort, never fatal
+        logger.warning("analysis cache write failed: feature=%s", feature.lower(), exc_info=True)
+        return False
+    return True
 
 
 # The career-profile fields GAP and FIT read as the student's skills
@@ -1624,26 +1647,44 @@ def _run_authenticated_typed_feature(
     cached = load_cached_feature_result(slug, feature, student_id)
     if cached is not None:
         return cached
+    # Start, finish and failure are logged with timing because a run can
+    # outlast the frontend proxy's 300s limit: the browser then sees a timeout,
+    # uvicorn skips the access line for the closed connection, and these lines
+    # are the only record of whether the run finished and was saved.
+    run_label = f"feature={feature} student={str(student_id)[:8]}"
+    started = time.monotonic()
+    logger.info("analysis run started: %s", run_label)
     try:
         with request.app.state.ai_concurrency.slot():
             runner = RUNNERS[feature](client=build_client())
             result = runner.run_canonical(canonical, profile)
-    except HTTPException:
+    except HTTPException as exc:
+        logger.warning(
+            "analysis run failed: %s status_code=%s after=%.1fs",
+            run_label, exc.status_code, time.monotonic() - started,
+        )
         raise
     except Exception as exc:
+        logger.exception("analysis run failed: %s after=%.1fs", run_label, time.monotonic() - started)
         raise HTTPException(status_code=502, detail="Analysis service is unavailable.") from exc
+    saved = None
     if feature.lower() in _ANALYSIS_CACHE_FEATURES and student_id is not None:
         client = _session_client(request)
         # Saved with a fingerprint of the inputs it ran on, so a later read can
         # say whether the profile has changed since (analysis_freshness.py).
         # The live response itself is current by definition and goes back as is.
-        _write_analysis_cache(
+        saved = _write_analysis_cache(
             client,
             student_id,
             feature,
             _canonical_target_role(profile),
             analysis_freshness.stamp(result, feature, profile),
         )
+    status = result.get("status") if isinstance(result, dict) else getattr(result, "status", None)
+    logger.info(
+        "analysis run finished: %s status=%s saved=%s after=%.1fs",
+        run_label, status, saved, time.monotonic() - started,
+    )
     return result
 
 
