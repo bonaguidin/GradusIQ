@@ -8238,7 +8238,7 @@ label.profile-form-check { display: flex; flex-direction: row; align-items: cent
 }
 
 .next-due-text {
-  flex: 1 1 18rem;
+  flex: 1 1 12rem;
   min-width: 0;
   overflow-wrap: anywhere;
 }
