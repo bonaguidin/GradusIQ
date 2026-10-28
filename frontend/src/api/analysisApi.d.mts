@@ -18,6 +18,29 @@ export declare function getCachedAnalysis<T>(
   accessToken: string,
 ): Promise<FeatureResult<T> | null>;
 
+export interface AnalysisRunOptions {
+  pollMs?: number;
+  maxWaitMs?: number;
+  sleep?: (ms: number) => Promise<void>;
+  now?: () => number;
+}
+
+export declare function runAnalysisInBackground<T>(
+  feature: 'gap' | 'fit' | 'shift',
+  accessToken: string,
+  options?: AnalysisRunOptions,
+): Promise<FeatureResult<T>>;
+export declare function waitForAnalysisRun<T>(
+  feature: 'gap' | 'fit' | 'shift',
+  accessToken: string,
+  options?: AnalysisRunOptions,
+): Promise<FeatureResult<T>>;
+export declare function resumeAnalysisRun<T>(
+  feature: 'gap' | 'fit' | 'shift',
+  accessToken: string,
+  options?: AnalysisRunOptions,
+): Promise<{ result: Promise<FeatureResult<T>> } | null>;
+
 export declare function analyzeGap(identity: AnalysisIdentity): Promise<FeatureResult<GapAnalysisData>>;
 export declare function analyzeFit(identity: AnalysisIdentity): Promise<FeatureResult<FitAnalysisData>>;
 export declare function analyzeShift(identity: AnalysisIdentity): Promise<FeatureResult<ShiftAnalysisData>>;
