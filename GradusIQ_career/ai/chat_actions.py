@@ -29,8 +29,8 @@ CHAT_ACTIONS: dict[str, str] = {
     "career-profile": "Career Profile: edit target roles, skills, experience and interests",
     "transcript": "Transcript upload: add or fix courses and grades from a transcript",
     "resume": "Resume upload: add experience, projects and skills from a resume",
-    "canvas-calendar": "Canvas calendar: connect or reconnect Canvas so due dates show up",
-    "report-issue": "Report a bug or suggest a feature to the GradusIQ team",
+    "canvas-calendar": "Canvas calendar: connect, reconnect or refresh Canvas; use whenever due dates are missing, wrong or stopped showing",
+    "report-issue": "Report a bug or suggest a feature to the GradusIQ team; use whenever the student says something is broken or asks how to report it",
 }
 
 # Demo personas have no account rows, so these pages would only error for them.
@@ -53,8 +53,10 @@ def action_instructions(allowed: tuple[str, ...]) -> str:
         "When a page in GradusIQ would help the student act on your answer, end the reply "
         "with one final line naming up to three of these destinations, most useful first, "
         "e.g. `ACTIONS: gpa-calculator, transcript`. The app shows them as buttons, so do not "
-        "also write links or describe how to click. Use only ids from this list; leave the "
-        "line out when no page helps (small talk, general advice).\n"
+        "also write links or describe how to click. If your reply sends the student to one of "
+        "these pages, its id must be on the line: a button, never directions to find it. Use "
+        "only ids from this list; leave the line out when no page helps (small talk, general "
+        "advice).\n"
         f"{lines}\n"
         "</ACTION_BUTTONS>"
     )

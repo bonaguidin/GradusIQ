@@ -1,6 +1,7 @@
 """Saved GAP/FIT/SHIFT results report when the profile changed since they ran."""
 
 import copy
+import logging
 
 import pytest
 
@@ -98,6 +99,51 @@ def test_live_run_saves_a_stamped_result_and_returns_it_unstamped(client, monkey
     assert analysis_freshness.FINGERPRINT_KEY not in response.json()
     assert written[0][analysis_freshness.FINGERPRINT_KEY] == \
         analysis_freshness.input_fingerprint("GAP", _full_profile())
+
+
+def test_live_run_logs_start_and_finish_with_timing(client, monkeypatch, caplog):  # noqa: F811
+    _patch_session(monkeypatch, profile=_full_profile())
+    monkeypatch.setattr(api, "build_client", lambda: FakeAI())
+    monkeypatch.setattr(api, "_write_analysis_cache", lambda *args: True)
+    caplog.set_level(logging.INFO, logger="GradusIQ_career.api")
+
+    response = _call(client, "post", "/api/v2/student/me/analyze/gap", None)
+
+    assert response.status_code == 200
+    lines = [r.getMessage() for r in caplog.records if r.name == "GradusIQ_career.api"]
+    assert any(line.startswith("analysis run started: feature=GAP") for line in lines)
+    finished = [line for line in lines if line.startswith("analysis run finished: feature=GAP")]
+    assert len(finished) == 1 and "saved=True" in finished[0] and "after=" in finished[0]
+
+
+def test_failed_run_is_logged(client, monkeypatch, caplog):  # noqa: F811
+    _patch_session(monkeypatch, profile=_full_profile())
+
+    def broken_client():
+        raise RuntimeError("model down")
+
+    monkeypatch.setattr(api, "build_client", broken_client)
+    caplog.set_level(logging.INFO, logger="GradusIQ_career.api")
+
+    response = _call(client, "post", "/api/v2/student/me/analyze/gap", None)
+
+    assert response.status_code == 502
+    failed = [r for r in caplog.records if r.getMessage().startswith("analysis run failed: feature=GAP")]
+    assert len(failed) == 1 and failed[0].exc_info is not None
+
+
+def test_cache_write_failure_is_logged_not_raised(caplog):
+    class BrokenTable:
+        def upsert(self, *args, **kwargs):
+            raise RuntimeError("rls")
+
+    class BrokenClient:
+        def table(self, name):
+            return BrokenTable()
+
+    caplog.set_level(logging.WARNING, logger="GradusIQ_career.api")
+    assert api._write_analysis_cache(BrokenClient(), "s1", "GAP", None, {"status": "success"}) is False
+    assert any(r.getMessage() == "analysis cache write failed: feature=gap" for r in caplog.records)
 
 
 @pytest.mark.parametrize("edit_profile", [False, True])

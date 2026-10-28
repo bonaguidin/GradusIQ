@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../auth/useAuth';
-import { getCachedAnalysis } from '../api/analysis';
+import { getCachedAnalysis, resumeAnalysisRun } from '../api/analysis';
 import type { AnalysisRunState } from './useAnalysisRun';
 import type { FeatureResult } from '../types/analysis';
 
@@ -74,15 +74,16 @@ export function useCachedAnalysisRun<TData>(
     stateRef.current = state;
   }, [state]);
 
-  const trigger = useCallback(() => {
-    const hasResult = stateRef.current.phase === 'done';
+  // Shows a run in flight (over the current result when there is one) and
+  // applies its outcome. Used by `trigger` and by a run resumed on mount.
+  const follow = useCallback((pending: Promise<TResult>, hasResult: boolean) => {
     if (hasResult) {
       setRefreshing(true);
       setRefreshError(undefined);
     } else {
       setState({ phase: 'loading' });
     }
-    run()
+    pending
       .then((result) => {
         setRefreshing(false);
         setRefreshError(undefined);
@@ -97,7 +98,11 @@ export function useCachedAnalysisRun<TData>(
           setState({ phase: 'transport-error', message });
         }
       });
-  }, [run]);
+  }, []);
+
+  const trigger = useCallback(() => {
+    follow(run(), stateRef.current.phase === 'done');
+  }, [run, follow]);
 
   // Mount-only: fires once per hook instance (per panel), not on every
   // identity/accessToken change -- matches every other one-shot mount effect
@@ -120,13 +125,27 @@ export function useCachedAnalysisRun<TData>(
     // after a real cached result comes back.
     getCachedAnalysis<TData>(feature, accessToken)
       .then((result) => {
-        if (result === null) return;
+        if (result === null) return false;
         setState({ phase: 'done', result });
+        return true;
       })
       .catch(() => {
         // A transport failure reading the cache is not a run failure -- leave
         // state at 'idle' so the student still sees the normal invitation and
         // can trigger a live run themselves.
+        return false;
+      })
+      .then(async (hasResult) => {
+        // A run started before a reload (or in another tab) is still going on
+        // the server: show it as running and pick up its result. hasResult is
+        // passed along because stateRef has not caught up with the setState
+        // above yet.
+        const resumed = await resumeAnalysisRun<TData>(feature, accessToken);
+        if (resumed) follow(resumed.result, hasResult);
+      })
+      .catch(() => {
+        // Could not read the run status; the cached result (or the
+        // invitation) stays as it is.
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally mount-only
   }, []);

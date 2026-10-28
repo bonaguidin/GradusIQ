@@ -307,6 +307,11 @@ def build_facets(cards: Sequence[Card]) -> dict[str, list[dict[str, Any]]]:
     }
 
 
+def family_names() -> list[str]:
+    """Every family a posting can be filed under, sorted."""
+    return sorted({f["family"] for f in load_all_families()})
+
+
 def resolve_family_set(
     requested_families: list[str] | None,
     target_role_families: list[str],

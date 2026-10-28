@@ -193,6 +193,10 @@
       "destination": "/api/proxy?target=me-analysis-cache&feature=:feature"
     },
     {
+      "source": "/api/v2/student/me/analysis-runs/:feature",
+      "destination": "/api/proxy?target=me-analysis-run&feature=:feature"
+    },
+    {
       "source": "/api/v2/student/me/career-role-options",
       "destination": "/api/proxy?target=me-career-role-options"
     },
