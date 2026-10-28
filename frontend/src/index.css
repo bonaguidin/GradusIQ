@@ -8192,6 +8192,105 @@ label.profile-form-check { display: flex; flex-direction: row; align-items: cent
 }
 
 .overview-page > .overview-header { animation-delay: 0ms; }
+
+/* ── next-due alert ──
+   One line under the name. It arrives after the calendar request, so it grows
+   in (height and opacity) instead of snapping the page down; with reduced
+   motion it simply appears. */
+.overview-page > .next-due {
+  display: grid;
+  grid-template-rows: 1fr;
+  margin: 0 0 var(--sp-6);
+  animation: next-due-in calc(var(--t-move) * 2) var(--ease-out) backwards;
+  animation-delay: 0ms;
+}
+
+.next-due-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.next-due-link {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent-ghost-border);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--text-base);
+  text-decoration: none;
+}
+
+.next-due-link:hover {
+  background: var(--accent-tint);
+}
+
+.next-due-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.next-due-icon {
+  flex: none;
+}
+
+.next-due-text {
+  flex: 1 1 12rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.next-due-label,
+.next-due-relative,
+.next-due-course {
+  color: var(--muted);
+}
+
+.next-due-badge,
+.next-due-more,
+.next-due-sync {
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+.next-due-badge {
+  font-weight: 600;
+  border: 1px solid var(--accent-ghost-border);
+  background: var(--accent-tint);
+  padding: 2px 6px;
+}
+
+.next-due-more,
+.next-due-sync {
+  color: var(--muted);
+}
+
+/* Within 24 hours: heavier frame, solid fill on the badge, a clock instead of
+   a calendar, and the words "Due soon". Not color alone. */
+.next-due[data-due-soon="true"] .next-due-link {
+  border: 2px solid var(--accent);
+  padding: calc(var(--sp-3) - 1px) calc(var(--sp-4) - 1px);
+  background: var(--accent-tint);
+}
+
+.next-due-badge--soon {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--surface-elevated);
+}
+
+@keyframes next-due-in {
+  from { grid-template-rows: 0fr; opacity: 0; }
+  to { grid-template-rows: 1fr; opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overview-page > .next-due { animation: none; }
+}
+
 .overview-page > .chat-panel { animation-delay: 60ms; }
 .overview-page .overview-stat:nth-child(1) { animation-delay: 120ms; }
 .overview-page .overview-stat:nth-child(2) { animation-delay: 170ms; }

@@ -4,6 +4,7 @@ import { useAuth } from '../auth/useAuth';
 import { analyzeCourseDiscovery, analyzeFit, analyzeGap, analyzeShift } from '../api/analysis';
 import { useAnalysisRun } from '../hooks/useAnalysisRun';
 import { useCachedAnalysisRun } from '../hooks/useCachedAnalysisRun';
+import { useCanvasCalendar } from '../hooks/useCanvasCalendar';
 import { useSequencedAnalysisRuns } from '../hooks/useSequencedAnalysisRuns';
 import { ChatPanel } from '../components/ChatPanel';
 import { ErrorBoundary } from '../components/ErrorBoundary';
@@ -40,6 +41,9 @@ import { GapAnalysisPanel } from '../components/GapAnalysisPanel';
 import { ShiftAnalysisPanel } from '../components/ShiftAnalysisPanel';
 import { TermPlanner } from '../components/TermPlanner';
 import { CanvasCalendarPanel } from '../components/CanvasCalendarPanel';
+import { NextDueAlert } from '../components/NextDueAlert';
+import { scrollWhenThere } from '../chat/useChatAction';
+import { CHAT_ACTIONS } from '../lib/chatActions.mjs';
 import { GradeCalculatorPanel } from '../components/GradeCalculatorPanel';
 import { CareerProfile, type CareerFieldFocus } from '../components/career/CareerProfile';
 import { updateProfile } from '../api/profile';
@@ -273,6 +277,10 @@ export function AuthenticatedDashboard() {
     () => (canonical ? buildDashboardViewModel(canonical) : null),
     [canonical],
   );
+  // One Canvas calendar request per session, shared by the Academic card and
+  // the Overview's next-due alert. Skipped for demo identities (no token) and
+  // for students with no confirmed courses, who are not shown the card.
+  const canvasCalendar = useCanvasCalendar(accessToken, (dashboard?.courses.length ?? 0) > 0);
   // Lifted out of CourseDiscoveryPanel (which still owns its own internal
   // useAnalysisRun by default) so Academic Overview's compact summary can
   // read the exact same run/result the full Course Discovery view shows --
@@ -411,6 +419,14 @@ export function AuthenticatedDashboard() {
   function navigateToCareerSubTab(tab: CareerSubTab) {
     setParams({ section: 'career', career: tab === 'overview' ? null : tab });
     setRailOpen(false);
+  }
+
+  // The overview's next-due alert: same destination and scroll target as the
+  // assistant's "Connect Canvas calendar" action, without opening the chat.
+  function openCanvasCard() {
+    navigateToAcademicSubTab('overview');
+    const target = CHAT_ACTIONS['canvas-calendar'].scrollTo;
+    if (target) scrollWhenThere(target);
   }
 
   function openIntelligencePanel(panel: IntelligencePanel) {
@@ -586,6 +602,11 @@ export function AuthenticatedDashboard() {
                     <span>{dashboard.institutionName ?? 'Institution not provided'}</span>
                   </div>
                 </div>
+                <NextDueAlert
+                  result={canvasCalendar.state}
+                  enabled={accessToken !== null && dashboard.courses.length > 0}
+                  onOpen={openCanvasCard}
+                />
                 <ChatPanel autoFocus={askOnArrival} />
                 <div className="overview-stats">
                   <div className="overview-stat"><span className="overview-stat-value"><AnimatedNumber value={dashboard.officialGpa} decimals={2} countIn /></span><span className="overview-stat-label">Official GPA</span><GpaSparkline points={dashboard.gpaByTerm} onOpen={() => navigateToAcademicSubTab('gpa-calculator')} /></div>
@@ -749,7 +770,7 @@ export function AuthenticatedDashboard() {
                     </section>
                     {/* Due dates and exams from the student's Canvas calendar
                         feed. Session-only: a demo identity has no feed. */}
-                    {accessToken && <CanvasCalendarPanel accessToken={accessToken} />}
+                    {accessToken && <CanvasCalendarPanel accessToken={accessToken} calendar={canvasCalendar} />}
                     {/* Compact reflection of the same run Course Discovery
                         itself shows (courseDiscoveryRun, lifted above) -- not
                         a second analysis or a second result store. */}
