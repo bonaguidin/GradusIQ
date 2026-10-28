@@ -1,16 +1,17 @@
-import { useEffect, useState } from 'react';
-import { useDataChanged } from '../lib/dataChanged';
+import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { connectCanvasCalendar, disconnectCanvasCalendar, fetchCanvasCalendar } from '../api/canvasCalendar';
+import type { CanvasCalendarStore } from '../hooks/useCanvasCalendar';
 import { ConfirmButton, useConfirmStatus } from './ConfirmButton';
 import {
   canvasCalendarPageUrl,
+  cleanCourse,
+  cleanTitle,
   dayHeading,
   eventTimeLabel,
   groupEventsByDay,
   syncedLabel,
 } from '../lib/canvasCalendar.mjs';
-import type { CanvasCalendarResult } from '../lib/canvasCalendar.mjs';
 import { SkeletonRows } from './Skeleton';
 import { EmptyState } from './EmptyState';
 
@@ -22,29 +23,12 @@ import { EmptyState } from './EmptyState';
  * flow. Connected: the next three weeks grouped by day, with exams flagged.
  * "Likely exam" is a title match on the backend, so it is worded as a guess.
  */
-export function CanvasCalendarPanel({ accessToken }: { accessToken: string }) {
-  const [state, setState] = useState<CanvasCalendarResult | null>(null);
+export function CanvasCalendarPanel({ accessToken, calendar }: { accessToken: string; calendar: CanvasCalendarStore }) {
+  const { state, setState } = calendar;
   const [feedUrl, setFeedUrl] = useState('');
   const [busy, setBusy] = useState<'connect' | 'refresh' | 'disconnect' | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const confirm = useConfirmStatus();
-
-  useEffect(() => {
-    let active = true;
-    void fetchCanvasCalendar(accessToken).then((result) => {
-      if (active) setState(result);
-    });
-    return () => {
-      active = false;
-    };
-  }, [accessToken]);
-
-  // Refreshed from the assistant chat while this card is open.
-  useDataChanged('canvas-calendar', () => {
-    void fetchCanvasCalendar(accessToken).then((result) => {
-      if (result.ok) setState(result);
-    });
-  });
 
   async function handleConnect(event: FormEvent) {
     event.preventDefault();
@@ -161,8 +145,10 @@ export function CanvasCalendarPanel({ accessToken }: { accessToken: string }) {
                   <li key={item.uid} className={item.likelyExam ? 'canvas-calendar-item is-exam' : 'canvas-calendar-item'}>
                     <span className="canvas-calendar-time">{eventTimeLabel(item)}</span>
                     <span className="canvas-calendar-title">
-                      {item.url ? <a href={item.url} target="_blank" rel="noreferrer">{item.title}</a> : item.title}
-                      {item.courseLabel && <small>{item.courseLabel}</small>}
+                      {item.url
+                        ? <a href={item.url} target="_blank" rel="noreferrer" title={item.title}>{cleanTitle(item.title)}</a>
+                        : <span title={item.title}>{cleanTitle(item.title)}</span>}
+                      {item.courseLabel && <small title={item.courseLabel}>{cleanCourse(item.courseLabel)}</small>}
                     </span>
                     {item.likelyExam && <span className="canvas-calendar-badge">Likely exam</span>}
                   </li>

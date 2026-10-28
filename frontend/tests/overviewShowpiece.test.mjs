@@ -21,6 +21,20 @@ test('Overview opens with the name, then the chat, then the stat tiles', async (
   }
 })
 
+// The next-due alert is a real-account feature (a demo identity has no
+// Canvas feed), so only the authenticated dashboard carries it.
+test('on the real dashboard the next-due alert sits between the name and the chat', async () => {
+  const page = await read('pages/AuthenticatedDashboard.tsx')
+  const start = page.indexOf('stage-section overview-page')
+  const header = page.indexOf('className="overview-header"', start)
+  const alert = page.indexOf('<NextDueAlert', start)
+  const chat = page.indexOf('<ChatPanel', start)
+  const stats = page.indexOf('className="overview-stats"', start)
+  assert.ok(header > 0 && header < alert && alert < chat && chat < stats)
+  const demo = await read('pages/DashboardPage.tsx')
+  assert.doesNotMatch(demo, /NextDueAlert/)
+})
+
 test('headline figures count in, and words sit in a status pill instead of a number slot', async () => {
   for (const path of OVERVIEW_PAGES) {
     const page = await read(path)
