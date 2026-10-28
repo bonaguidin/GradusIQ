@@ -50,6 +50,14 @@ def test_chat_without_memory_is_told_it_cannot_save():
     assert "never say a note is saved" in on
 
 
+def test_memory_prompt_counts_job_preferences():
+    # Noah's test: a stated $65k-$70k target was not offered as a note
+    # until he asked, while "remote roles" was.
+    text = chat_memory.memory_instructions()
+    assert "salary range" in text and "remote preference" in text
+    assert "you may end the reply" not in text
+
+
 def test_demo_chat_drops_remember_lines(monkeypatch):
     class Fake:
         def complete(self, messages, role):
